@@ -107,6 +107,14 @@ pre.wa{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1p
 .preview img{width:100%;border-radius:8px;border:1px solid var(--line);margin-top:10px}
 .muted{color:var(--muted);font-size:13.5px;line-height:1.45}
 .zoom button:disabled{opacity:.4;cursor:default}
+.gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:grid;place-items:center;padding:16px}
+.gbox{width:100%;max-width:340px;display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px}
+.gbox h1{font-family:var(--f-display);font-weight:700;margin:0;font-size:28px}
+.gbox img{border-radius:14px}
+.gbox label{font-size:13px;color:var(--muted);font-weight:500;margin-top:4px}
+.gbox input{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:10px 12px;font-size:16px;min-width:0}
+.gbox .ibtn{justify-content:center;height:42px;margin-top:4px}
+.gerr{color:var(--accent);margin:0;font-size:14px}
 .fotos{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .fotos button{border:0;padding:0;background:none;min-width:0}
 .fotos img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--line);display:block;background:var(--surface2)}
@@ -140,6 +148,9 @@ pre.wa{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1p
   </div>
   <div class="legend" id="legend"></div>
 </div>
+<div class="gate" id="gate"><form class="gbox" id="gForm"><img src="icon-192.png" alt="" width="64" height="64"><h1>Medição Enaex</h1><p class="muted" style="margin:0">Digite a senha da equipe para entrar.</p>
+  <label for="gPw">Senha</label><input id="gPw" type="password" autocomplete="current-password" required>
+  <p class="gerr" id="gErr" hidden>Senha incorreta. Confira com o responsável e tente de novo.</p><button class="ibtn pri" type="submit">Entrar</button></form></div>
 <div id="layer"></div>
 <input type="file" id="fPdf" accept="application/pdf,.pdf" hidden>
 <input type="file" id="fJson" accept="application/json,.json" hidden>
@@ -602,6 +613,11 @@ async function importPdf(buf,fileName,readMarks){
     [60,61,62,74,75,76,88,89,90].forEach(k=>set(k,{cam:'1045',dia:todayIso()}));[64,65,78,79,92,93].forEach(k=>set(k,{cam:'1038',dia:todayIso()}));
     await dbPut(s);all=[s]}
   const last=lsGet('cr-last');await usePoly(all.find(p=>p.id===last)||all.sort((a,b)=>(b.upd||0)-(a.upd||0))[0]);initRemote()})();
+/* team password screen: only a salted hash lives here; the device remembers a correct entry */
+(()=>{const GATE='87090f08367f60d39d3e39b1d00ba43c0e2f1aeadfdcf4070fbdd0d7d7d57a69',g=$('#gate');if(!g)return;if(lsGet('cr-gate')===GATE){g.remove();return}
+  setTimeout(()=>$('#gPw').focus(),100);
+  $('#gForm').onsubmit=async e=>{e.preventDefault();try{const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('medicao-enaex-v1:'+$('#gPw').value));
+    const hx=[...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join('');if(hx===GATE){lsSet('cr-gate',GATE);g.remove();fit()}else{$('#gErr').hidden=false;$('#gPw').select()}}catch(err){$('#gErr').textContent='Este navegador não conseguiu conferir a senha. Abra o app pelo link https.';$('#gErr').hidden=false}}})();
 if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 
