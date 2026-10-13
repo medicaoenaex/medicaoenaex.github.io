@@ -268,7 +268,10 @@ const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 /* ---------- helpers ---------- */
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
-function ranges(a){a=[...a].sort((x,y)=>x-y);const o=[];for(let i=0;i<a.length;){let j=i;while(j+1<a.length&&a[j+1]===a[j]+1)j++;o.push(j-i>=2?a[i]+'–'+a[j]:j>i?a[i]+', '+a[j]:''+a[i]);i=j+1}return o.join(', ')}
+/* field-added holes are stored as 100000+k and shown as Ak */
+const hn=h=>h.n>=1e5?'A'+(h.n-1e5):h.n;
+function ranges(a){const N=a.filter(x=>x<1e5),A=a.filter(x=>x>=1e5).map(x=>x-1e5);return[rng0(N),A.length?rng0(A).replace(/(\d+)/g,'A$1'):''].filter(Boolean).join(', ')}
+function rng0(a){a=[...a].sort((x,y)=>x-y);const o=[];for(let i=0;i<a.length;){let j=i;while(j+1<a.length&&a[j+1]===a[j]+1)j++;o.push(j-i>=2?a[i]+'–'+a[j]:j>i?a[i]+', '+a[j]:''+a[i]);i=j+1}return o.join(', ')}
 function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,1600)}
 const num=v=>{const n=parseFloat(String(v).replace(',','.'));return isFinite(n)?n:null};
 const fmt=n=>n==null?'':String(Math.round(n*100)/100).replace('.',',');
@@ -292,10 +295,10 @@ function drawOverlay(c,o={}){
     const [cx,cy]=hc(h);const fills=h.st.filter(k=>SK[k]&&!SK[k].ring&&!SK[k].drop);
     if(fills.length){const S=15,x0=cx-S/2,y0=cy-S/2;c.save();rr(c,x0,y0,S,S,2.5);c.clip();c.globalAlpha=.86;
       fills.forEach((k,j)=>{c.fillStyle=SK[k].c;c.fillRect(x0+S*j/fills.length,y0,S/fills.length+.2,S)});c.restore()}
-    if(h.add&&!fills.length){c.font='bold 6.85px "IBM Plex Mono",Consolas,monospace';const w=c.measureText(String(h.n)).width;c.fillStyle='rgba(255,255,255,.95)';rr(c,h.x-1.2,h.y+.6,w+2.4,7.4,1.5);c.fill()}
+    if(h.add&&!fills.length){c.font='bold 6.85px "IBM Plex Mono",Consolas,monospace';const w=c.measureText(String(hn(h))).width;c.fillStyle='rgba(255,255,255,.95)';rr(c,h.x-1.2,h.y+.6,w+2.4,7.4,1.5);c.fill()}
     if(h.add){c.fillStyle='#f08080';c.beginPath();c.arc(h.x,h.y,2.3,0,7);c.fill()}
-    if(o.nobg){c.beginPath();c.arc(h.x-3.4,h.y+3.6,1.9,0,7);c.fillStyle='#e8807a';c.fill();if(!fills.length&&!h.add){c.font='bold 6.85px "IBM Plex Mono",Consolas,monospace';c.fillStyle='#111';c.fillText(h.n,h.x,h.y+6.3)}}
-    if(fills.length||h.add){c.font='bold 6.85px "IBM Plex Mono",Consolas,monospace';c.fillStyle=fills.some(k=>SK[k].deck)?'#fff':'#111';c.fillText(h.n,h.x,h.y+6.3)}
+    if(o.nobg){c.beginPath();c.arc(h.x-3.4,h.y+3.6,1.9,0,7);c.fillStyle='#e8807a';c.fill();if(!fills.length&&!h.add){c.font='bold 6.85px "IBM Plex Mono",Consolas,monospace';c.fillStyle='#111';c.fillText(hn(h),h.x,h.y+6.3)}}
+    if(fills.length||h.add){c.font='bold 6.85px "IBM Plex Mono",Consolas,monospace';c.fillStyle=fills.some(k=>SK[k].deck)?'#fff':'#111';c.fillText(hn(h),h.x,h.y+6.3)}
     {const dk=fills.map(k=>SK[k].deck).find(Boolean);if(dk>1){c.fillStyle='#fff';c.strokeStyle='#2b1a0c';c.lineWidth=.8;c.beginPath();c.arc(cx+7.2,cy-7.2,3.6,0,7);c.fill();c.stroke();c.fillStyle='#2b1a0c';c.font='bold 5px Barlow,Arial,sans-serif';c.textAlign='center';c.fillText(dk,cx+7.2,cy-5.4);c.textAlign='left'}}
     if(h.st.includes('agua')){const dx=cx-7.4,dy=cy-8.4;c.fillStyle='#1e6fd9';c.strokeStyle='#fff';c.lineWidth=.8;c.beginPath();c.moveTo(dx,dy-3.8);c.bezierCurveTo(dx+1,dy-2,dx+3,dy-.4,dx+3,dy+1.4);c.arc(dx,dy+1.4,3,0,Math.PI);c.bezierCurveTo(dx-3,dy-.4,dx-1,dy-2,dx,dy-3.8);c.closePath();c.fill();c.stroke()}
     if(h.pm||h.pr){const mx=cx-7.6,my=cy+5.4;c.beginPath();c.moveTo(mx-3.1,my-2.6);c.lineTo(mx+3.1,my-2.6);c.lineTo(mx,my+2.9);c.closePath();c.fillStyle=h.pr?'#1f7a45':'#0b4f8a';c.fill();c.strokeStyle='#fff';c.lineWidth=.7;c.stroke()}
@@ -353,15 +356,15 @@ function hit(wx,wy){let b=-1,bd=Math.max(9,22/view.s);P.holes.forEach((h,i)=>{if
 function hitZone(wx,wy){const lim=Math.max(14,30/view.s);let b=-1,bd=lim;P.zones.forEach((z,i)=>{if(!z.lb)return;const[x,y]=zc(z);const d=Math.hypot(x-wx,y-wy);if(d<bd){bd=d;b=i}});return b}
 function tap(sx,sy){if(!P)return;const wx=(sx-view.ox)/view.s,wy=(sy-view.oy)/view.s;
   if(mode==='cam'){const i=hit(wx,wy);if(i<0)return;const h=P.holes[i];
-    if(h.cam===camSel&&h.dia===camDia){delete h.cam;delete h.dia;toast('Furo '+h.n+' sem caminhão')}else{h.cam=camSel;h.dia=camDia;toast('Furo '+h.n+' → caminhão '+camSel)}save();renderLegend();draw();return}
-  if(mode==='move'){const h=P.holes[moveIdx];if(h){h.x=wx-LABEL_DX;h.y=wy-LABEL_DY;save()}const k=moveIdx;moveIdx=-1;setMode('sel');if(h){sel=k;draw();toast('Furo '+h.n+' movido')}return}
+    if(h.cam===camSel&&h.dia===camDia){delete h.cam;delete h.dia;toast('Furo '+hn(h)+' sem caminhão')}else{h.cam=camSel;h.dia=camDia;toast('Furo '+hn(h)+' → caminhão '+camSel)}save();renderLegend();draw();return}
+  if(mode==='move'){const h=P.holes[moveIdx];if(h){h.x=wx-LABEL_DX;h.y=wy-LABEL_DY;save()}const k=moveIdx;moveIdx=-1;setMode('sel');if(h){sel=k;draw();toast('Furo '+hn(h)+' movido')}return}
   if(mode==='add'){if(wx<0||wy<0||wx>P.w||wy>P.h)return;const X=wx-LABEL_DX,Y=wy-LABEL_DY;
     if(addType==='fora_malha'){
       if(addSrc<0){const i=hit(wx,wy);if(i>=0&&!P.holes[i].add){addSrc=i;draw();addHint();return}}
       if(addSrc>=0){const o=P.holes[addSrc];const keep=o.st.filter(k=>!(SK[k]&&SK[k].cr));P.holes.push({n:o.n,x:X,y:Y,st:['fora_malha',...keep],pm:o.pm||'',pr:o.pr||'',obs:o.obs||'',add:true,of:o.n});o.ghost=true;o.st=[];addSrc=-1;save();renderLegend();draw();addHint();toast('Furo '+o.n+' deslocado (fora da malha)');return}}
-    const n=Math.max(0,...P.holes.map(h=>h.n))+1;P.holes.push({n,x:X,y:Y,st:[addType],pm:'',pr:'',obs:'',add:true});save();renderLegend();draw();toast('Furo '+n+' criado: '+SK[addType].l);return}
+    const n=1e5+Math.max(0,...P.holes.filter(h=>h.n>=1e5).map(h=>h.n-1e5))+1;P.holes.push({n,x:X,y:Y,st:[addType],pm:'',pr:'',obs:'',add:true});save();renderLegend();draw();toast('Furo '+hn({n})+' criado: '+SK[addType].l);return}
   const i=hit(wx,wy);
-  if(brush){if(i<0)return;const h=P.holes[i];const k=brush;toggle(h,k);save();renderLegend();sel=-1;draw();toast('Furo '+h.n+(h.st.includes(k)?' → ':' sem ')+SK[k].l);return}
+  if(brush){if(i<0)return;const h=P.holes[i];const k=brush;toggle(h,k);save();renderLegend();sel=-1;draw();toast('Furo '+hn(h)+(h.st.includes(k)?' → ':' sem ')+SK[k].l);return}
   if(i>=0){sel=i;draw();holeSheet(i);return}
   const z=hitZone(wx,wy);if(z>=0){zoneSheet(z);return}
   if(sel>=0){sel=-1;draw();closeSheet()}}
@@ -404,13 +407,13 @@ function addHint(){const h=$('#hint');h.hidden=false;const tb=k=>`<button data-t
 function areaHint(){const h=$('#hint');h.hidden=false;h.innerHTML=`<span>${draft.length<3?'Toque em volta dos furos para desenhar a área de carregamento ('+draft.length+' pontos).':draft.length+' pontos. Toque em Concluir para nomear a área.'}</span><span style="display:flex;gap:6px">${draft.length?'<button id="hUndo">Desfazer</button>':''}<button id="hDone">${draft.length>=3?'Concluir':'Cancelar'}</button></span>`;
   if($('#hUndo'))$('#hUndo').onclick=()=>{draft.pop();draw();areaHint()};
   $('#hDone').onclick=()=>{if(draft.length<3){setMode('sel');return}P.zones.push({pts:draft,lb:''});const zi=P.zones.length-1;draft=[];save();mode='sel';document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode==='sel'));$('#hint').hidden=true;draw();renderLegend();zoneSheet(zi,true)}}
-$('#fSearch').onsubmit=e=>{e.preventDefault();const n=parseInt($('#q').value,10);const i=P.holes.findIndex(h=>h.n===n&&!h.ghost);if(i<0){toast('Furo '+($('#q').value||'?')+' não encontrado');return}$('#q').blur();sel=i;centerOn(P.holes[i],3);holeSheet(i)};
+$('#fSearch').onsubmit=e=>{e.preventDefault();const qv=$('#q').value.trim(),qa=qv.match(/^a\s*(\d+)$/i),n=qa?1e5+(+qa[1]):parseInt(qv,10);const i=P.holes.findIndex(h=>h.n===n&&!h.ghost);if(i<0){toast('Furo '+($('#q').value||'?')+' não encontrado');return}$('#q').blur();sel=i;centerOn(P.holes[i],3);holeSheet(i)};
 
 /* ---------- sheets ---------- */
 function openSheet(html,scrim=true){$('#layer').innerHTML=(scrim?'<div class="scrim" id="scrim"></div>':'')+'<div class="sheet" role="dialog">'+html+'</div>';if(scrim)$('#scrim').onclick=closeSheet;const x=document.querySelector('.sheet .x');if(x)x.onclick=closeSheet}
 function closeSheet(){$('#layer').innerHTML='';if(sel>=0){sel=-1;draw()}}
 function holeSheet(i){const h=P.holes[i];const projOf=()=>{const v=num(h.pp);return v!=null?v:num(P.proj)},tol=num(P.tol)||0;let proj=projOf();
-  openSheet(`<div class="shead"><h2>Furo ${h.n}${h.add?' <span class="muted" style="font-family:var(--f-body);font-size:14px;font-weight:500">'+(h.of?'deslocado do projeto':'criado em campo')+'</span>':''}</h2><button class="x" aria-label="Fechar">✕</button></div>
+  openSheet(`<div class="shead"><h2>Furo ${hn(h)}${h.add?' <span class="muted" style="font-family:var(--f-body);font-size:14px;font-weight:500">'+(h.of?'deslocado do projeto':'criado em campo')+'</span>':''}</h2><button class="x" aria-label="Fechar">✕</button></div>
   <h3>Status</h3><div class="stgrid">${ST.filter(s=>!s.cr||h.add||h.st.includes(s.k)).map(s=>`<button class="chip" data-k="${s.k}" aria-pressed="${h.st.includes(s.k)}"><span class="sw${s.ring?' ring':''}" style="${s.ring?'border-color':'background'}:${s.c}">${s.deck>1?s.deck:''}</span>${esc(s.l)}</button>`).join('')}</div>
   <h3>Medição</h3><div class="fields">
    <div class="fld"><label for="pp">Prof. de projeto (m)</label><input id="pp" inputmode="decimal" value="${esc(h.pp)}" placeholder="${num(P.proj)!=null?fmt(num(P.proj))+' (polígono)':'ex.: 15'}"></div>
@@ -434,12 +437,12 @@ function holeSheet(i){const h=P.holes[i];const projOf=()=>{const v=num(h.pp);ret
   $('#bAg').onclick=()=>{toggle(h,'agua');if(!h.st.includes('agua')){h.ag='';$('#ag').value=''}agSync();save();renderLegend();draw()};
   sh.querySelector('.stgrid').addEventListener('click',()=>setTimeout(agSync));
   ['pp','pm','pr','obs','ag'].forEach(id=>$('#'+id).oninput=e=>{h[id]=e.target.value.trim();if(id==='ag'&&h.ag&&!h.st.includes('agua')){h.st.push('agua');agSync();renderLegend()}save();draw();if(id!=='obs'&&id!=='ag')chk()});chk();
-  const F=h.fotos||[],fe=$('#fotos');fe.innerHTML=F.length?F.map((f,j)=>`<button type="button" data-j="${j}" aria-label="Ver foto ${j+1}"><img alt="Foto ${j+1} do furo ${h.n}" src="${esc(fotoSrc(f))}"></button>`).join(''):'<span class="muted">Nenhuma foto.</span>';fe.style.display=F.length?'grid':'block';
+  const F=h.fotos||[],fe=$('#fotos');fe.innerHTML=F.length?F.map((f,j)=>`<button type="button" data-j="${j}" aria-label="Ver foto ${j+1}"><img alt="Foto ${j+1} do furo ${hn(h)}" src="${esc(fotoSrc(f))}"></button>`).join(''):'<span class="muted">Nenhuma foto.</span>';fe.style.display=F.length?'grid':'block';
   fe.onclick=e=>{const b=e.target.closest('[data-j]');if(b)fotoView(h,+b.dataset.j)};
   $('#bFoto').onclick=()=>{fotoTarget=h;$('#fImg').click()};showLog(h);
   $('#hcam').onchange=e=>{const v=e.target.value;if(v){h.cam=v;if(!h.dia){h.dia=todayIso();$('#hdia').value=h.dia}}else{delete h.cam;delete h.dia;$('#hdia').value=''}save();renderLegend();draw()};
   $('#hdia').onchange=e=>{if(e.target.value)h.dia=e.target.value;else delete h.dia;save();draw()};
-  if(h.add){$('#bMove').onclick=()=>{const k=P.holes.indexOf(h);closeSheet();moveIdx=k;setMode('move');draw()};const b=$('#bDel');b.onclick=()=>{if(b.dataset.c){P.holes.splice(P.holes.indexOf(h),1);if(h.of){const o=P.holes.find(q=>q.ghost&&q.n===h.of);if(o){o.ghost=false;o.st=h.st.filter(k=>k!=='fora_malha')}}sel=-1;save();renderLegend();closeSheet();draw();toast('Furo '+h.n+' excluído')}else{b.dataset.c=1;b.textContent='Toque de novo para excluir'}}}
+  if(h.add){$('#bMove').onclick=()=>{const k=P.holes.indexOf(h);closeSheet();moveIdx=k;setMode('move');draw()};const b=$('#bDel');b.onclick=()=>{if(b.dataset.c){P.holes.splice(P.holes.indexOf(h),1);if(h.of){const o=P.holes.find(q=>q.ghost&&q.n===h.of);if(o){o.ghost=false;o.st=h.st.filter(k=>k!=='fora_malha')}}sel=-1;save();renderLegend();closeSheet();draw();toast('Furo '+hn(h)+' excluído')}else{b.dataset.c=1;b.textContent='Toque de novo para excluir'}}}
   sh.querySelector('.x').onclick=closeSheet}
 const when=t=>new Date(t).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
 async function whoMap(ids){ids=[...new Set(ids.filter(Boolean))];let ps={};if(ids.length&&ruser){try{ps=await ruser.profiles(ids)}catch(e){}}
@@ -449,7 +452,7 @@ async function showLog(h){const el=$('#hlog');if(!el)return;const L=(h.log||[]).
   el.innerHTML='<b style="font-weight:600;color:var(--ink)">Histórico</b>'+L.map(e=>`<div>${when(e.t)} · ${esc(who(e))} · ${esc(st(e.s))}${e.pr?' · '+esc(fmt(num(e.pr)))+' m após repasse':e.pm?' · '+esc(fmt(num(e.pm)))+' m':''}</div>`).join('')}
 let fotoTarget=null;
 function fotoView(h,j){const f=(h.fotos||[])[j];if(!f)return;
-  openSheet(`<div class="shead"><h2>Furo ${h.n} · foto ${j+1}</h2><button class="x" aria-label="Fechar">✕</button></div><div class="ph"><img alt="Foto ${j+1} do furo ${h.n}" src="${esc(fotoSrc(f))}"></div>
+  openSheet(`<div class="shead"><h2>Furo ${hn(h)} · foto ${j+1}</h2><button class="x" aria-label="Fechar">✕</button></div><div class="ph"><img alt="Foto ${j+1} do furo ${hn(h)}" src="${esc(fotoSrc(f))}"></div>
   <div class="row"><button class="ibtn" id="fBack">Voltar ao furo</button><button class="ibtn danger" id="fDel">Remover foto</button></div>`);
   const back=()=>{const k=P.holes.indexOf(h);if(k>=0){sel=k;draw();holeSheet(k)}else closeSheet()};$('#fBack').onclick=back;
   const d=$('#fDel');d.onclick=()=>{if(!d.dataset.c){d.dataset.c=1;d.textContent='Toque de novo para remover';return}h.fotos.splice(j,1);if(!h.fotos.length)delete h.fotos;if(isA(f)&&ras)ras.delete(f.slice(2)).catch(()=>{});save();toast('Foto removida');back()}}
@@ -473,8 +476,8 @@ function summaryData(){const by={};ST.forEach(s=>by[s.k]=[]);live().forEach(h=>h
   return{by,zones,ok:live().filter(h=>!h.st.length).length}}
 function waText(){const{by,zones}=summaryData();let t=`*${P.nome} – croqui real*\n${live().length} furos · ${new Date().toLocaleDateString('pt-BR')}\n`;
   ST.forEach(s=>{if(by[s.k].length)t+=`\n${s.e} ${s.l} (${by[s.k].length}): ${ranges(by[s.k])}`});
-  const rep=live().filter(h=>h.st.includes('repasse')&&(h.pm||h.pr));if(rep.length)t+='\n\n*Repasse – profundidades*\n'+rep.map(h=>`${h.n}: ${h.pm?fmt(num(h.pm))+' m':'?'}${h.pr?' → '+fmt(num(h.pr))+' m':''}`).join('\n');
-  const ag=live().filter(h=>h.st.includes('agua')&&h.ag);if(ag.length)t+='\n\n*Furos com água – lâmina*\n'+ag.map(h=>`${h.n}: ${fmt(num(h.ag))} m`).join('\n');
+  const rep=live().filter(h=>h.st.includes('repasse')&&(h.pm||h.pr));if(rep.length)t+='\n\n*Repasse – profundidades*\n'+rep.map(h=>`${hn(h)}: ${h.pm?fmt(num(h.pm))+' m':'?'}${h.pr?' → '+fmt(num(h.pr))+' m':''}`).join('\n');
+  const ag=live().filter(h=>h.st.includes('agua')&&h.ag);if(ag.length)t+='\n\n*Furos com água – lâmina*\n'+ag.map(h=>`${hn(h)}: ${fmt(num(h.ag))} m`).join('\n');
   const m=metros();if(m.nR)t+=`\n\n*Metragem*\nProjeto: ${fmt(m.pj)} m · Medido: ${fmt(m.rl)} m (${m.nR} furos medidos)`;
   if(zones.length)t+='\n\n*Carregamentos*\n'+zones.map(z=>`${z.lb.replace(/\n/g,' · ')}: ${z.n} furos${z.r?' ('+z.r+')':''}`).join('\n');return t}
 function metros(){let pj=0,rl=0,nP=0,nR=0;live().forEach(h=>{if(h.st.includes('nao_furado'))return;const p=num(h.pp)??num(P.proj),r=num(h.pr)??num(h.pm);if(p!=null){pj+=p;nP++}if(r!=null){rl+=r;nR++}});return{pj,rl,nP,nR}}
@@ -507,7 +510,7 @@ function sumSheet(){const{by,zones,ok}=summaryData();
   $('#bPdf').onclick=async()=>{const c=await exportCanvas(opt());const{jsPDF}=window.jspdf||{};if(!jsPDF){toast('Gerador de PDF não carregou');return}const W=c.width,H=c.height;const doc=new jsPDF({orientation:W>H?'l':'p',unit:'px',format:[W,H],hotfixes:['px_scaling']});doc.addImage(c.toDataURL('image/jpeg',.9),'JPEG',0,0,W,H);offer(fname('pdf'),doc.output('blob'),c)};
   $('#bCsv').onclick=async()=>{const rows=[['furo','status','prof_projeto_m','prof_medida_m','prof_apos_repasse_m','lamina_agua_m','observacao','fotos','criado_em_campo','caminhao','dia_carregamento','area_carregamento','alterado_em','alterado_por']];
     const who=await whoMap(live().map(h=>h.by));
-    live().sort((a,b)=>a.n-b.n).forEach(h=>{const z=P.zones.find(z=>inPoly(...hc(h),z.pts));rows.push([h.n,h.st.map(k=>SK[k]?SK[k].l:k).join(' + '),fmt(num(h.pp)),fmt(num(h.pm)),fmt(num(h.pr)),fmt(num(h.ag)),h.obs,(h.fotos||[]).length||'',h.add?(h.of?'deslocado do projeto':'novo'):'',h.cam||'',h.dia?h.dia.split('-').reverse().join('/'):'',z?z.lb.replace(/\n/g,' '):'',h.t?when(h.t):'',h.t?who(h):''])});
+    live().sort((a,b)=>a.n-b.n).forEach(h=>{const z=P.zones.find(z=>inPoly(...hc(h),z.pts));rows.push([hn(h),h.st.map(k=>SK[k]?SK[k].l:k).join(' + '),fmt(num(h.pp)),fmt(num(h.pm)),fmt(num(h.pr)),fmt(num(h.ag)),h.obs,(h.fotos||[]).length||'',h.add?(h.of?'deslocado do projeto':'novo'):'',h.cam||'',h.dia?h.dia.split('-').reverse().join('/'):'',z?z.lb.replace(/\n/g,' '):'',h.t?when(h.t):'',h.t?who(h):''])});
     offer(fname('csv'),'﻿'+rows.map(r=>r.map(v=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';')).join('\r\n'))};
   $('#bBak').onclick=()=>offer(fname('json').replace('croqui-real','backup'),JSON.stringify({app:'croqui-real',v:1,poly:P}));
   $('#bRes').onclick=()=>$('#fJson').click()}
