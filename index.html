@@ -287,10 +287,11 @@ function drawOverlay(c,o={}){
     if(fills.length||h.add){c.font='bold 6.85px "IBM Plex Mono",Consolas,monospace';c.fillStyle=fills.some(k=>SK[k].deck)?'#fff':'#111';c.fillText(h.n,h.x,h.y+6.3)}
     {const dk=fills.map(k=>SK[k].deck).find(Boolean);if(dk>1){c.fillStyle='#fff';c.strokeStyle='#2b1a0c';c.lineWidth=.8;c.beginPath();c.arc(cx+7.2,cy-7.2,3.6,0,7);c.fill();c.stroke();c.fillStyle='#2b1a0c';c.font='bold 5px Barlow,Arial,sans-serif';c.textAlign='center';c.fillText(dk,cx+7.2,cy-5.4);c.textAlign='left'}}
     if(h.st.includes('agua')){const dx=cx-7.4,dy=cy-8.4;c.fillStyle='#1e6fd9';c.strokeStyle='#fff';c.lineWidth=.8;c.beginPath();c.moveTo(dx,dy-3.8);c.bezierCurveTo(dx+1,dy-2,dx+3,dy-.4,dx+3,dy+1.4);c.arc(dx,dy+1.4,3,0,Math.PI);c.bezierCurveTo(dx-3,dy-.4,dx-1,dy-2,dx,dy-3.8);c.closePath();c.fill();c.stroke()}
+    if(h.pm||h.pr){const mx=cx-7.6,my=cy+5.4;c.beginPath();c.moveTo(mx-3.1,my-2.6);c.lineTo(mx+3.1,my-2.6);c.lineTo(mx,my+2.9);c.closePath();c.fillStyle=h.pr?'#1f7a45':'#0b4f8a';c.fill();c.strokeStyle='#fff';c.lineWidth=.7;c.stroke()}
     if(h.cam){c.fillStyle=camColor(h.cam);c.strokeStyle='#fff';c.lineWidth=.8;c.beginPath();c.arc(cx+7,cy+7,2.6,0,7);c.fill();c.stroke()}
     if(h.st.includes('alta_metragem')){c.strokeStyle='#111';c.lineWidth=1.1;c.beginPath();c.arc(cx,cy,9,0,7);c.stroke()}
     if(h.st.includes('adicional')){c.strokeStyle='#18a33a';c.lineWidth=1.6;c.beginPath();c.arc(h.x,h.y,3.4,0,7);c.stroke()}
-    if(o.depth&&(h.pm||h.pr)){const t=(h.pr?fmt(num(h.pr)):fmt(num(h.pm)))+'m';c.font='600 5.2px "IBM Plex Mono",Consolas,monospace';c.lineWidth=1.6;c.strokeStyle='#fff';c.strokeText(t,h.x-1,h.y+12.6);c.fillStyle='#0b4f8a';c.fillText(t,h.x-1,h.y+12.6)}
+    if(o.depth&&(h.pm||h.pr)){const t=(h.pr?fmt(num(h.pr)):fmt(num(h.pm)))+'m';c.font='600 5.2px "IBM Plex Mono",Consolas,monospace';c.lineWidth=1.6;c.strokeStyle='#fff';c.strokeText(t,h.x+1.5,h.y+12.6);c.fillStyle='#0b4f8a';c.fillText(t,h.x+1.5,h.y+12.6)}
     if(o.src===i){c.save();c.setLineDash([3,2]);c.strokeStyle='#0a7fa0';c.lineWidth=2*z;c.beginPath();c.arc(cx,cy,11,0,7);c.stroke();c.restore()}
     if(o.sel===i){c.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#c8102e';c.lineWidth=2.4*z;c.beginPath();c.arc(cx,cy,11,0,7);c.stroke()}
   });
@@ -472,6 +473,7 @@ function syncMsg(){if(P.sample)return'O exemplo não é compartilhado. Abra um P
 function sumSheet(){const{by,zones,ok}=summaryData();
   openSheet(`<div class="shead"><h2>${esc(P.nome)}</h2><button class="x" aria-label="Fechar">✕</button></div>
   <h3>Status dos furos</h3><table class="tbl"><tbody>${ST.map(s=>`<tr><td><span class="lb"><span class="sw${s.ring?' ring':''}" style="${s.ring?'border-color':'background'}:${s.c}">${s.deck>1?s.deck:''}</span>${esc(s.l)}</span>${by[s.k].length?`<span class="nums">${ranges(by[s.k])}</span>`:''}</td><td class="q">${by[s.k].length}</td></tr>`).join('')}
+  <tr><td><span class="lb"><span aria-hidden="true" style="color:#0b4f8a;width:16px;text-align:center">▼</span>Furos medidos</span><span class="nums">${ranges(live().filter(h=>h.pm||h.pr).map(h=>h.n))}</span><span class="nums"><span style="color:#0b4f8a">▼</span> medido · <span style="color:#1f7a45">▼</span> medido após repasse</span></td><td class="q">${live().filter(h=>h.pm||h.pr).length}</td></tr>
   <tr><td><span class="lb">Sem marcação</span></td><td class="q">${ok}</td></tr><tr><td><span class="lb">Total</span></td><td class="q">${live().length}</td></tr></tbody></table>
   ${zones.length?`<h3>Carregamentos</h3><table class="tbl"><tbody>${zones.map(z=>`<tr><td>${esc(z.lb).replace(/\n/g,'<br>')}</td><td class="q">${z.n}</td></tr>`).join('')}</tbody></table>`:''}
   <h3>Projeto do polígono</h3><div class="fields"><div class="fld"><label for="sp">Profundidade de projeto (m)</label><input id="sp" inputmode="decimal" value="${esc(P.proj)}" placeholder="ex.: 15"></div><div class="fld"><label for="stl">Tolerância (m)</label><input id="stl" inputmode="decimal" value="${esc(P.tol)}" placeholder="0,3"></div>
