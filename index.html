@@ -3,9 +3,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="lib/pdf.min.js"></script>
+<script src="lib/pdf.worker.min.js"></script>
+<script src="lib/jspdf.umd.min.js"></script>
 <style>
 /* Layout: one-screen field tool. Header, toolbar, croqui stage filling the screen, status bar (pincel) at the bottom, sheets sliding up. */
 :root{
@@ -514,7 +514,7 @@ function sumSheet(){const{by,zones,ok}=summaryData();
     offer(fname('csv'),'﻿'+rows.map(r=>r.map(v=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';')).join('\r\n'))};
   $('#bBak').onclick=()=>offer(fname('json').replace('croqui-real','backup'),JSON.stringify({app:'croqui-real',v:1,poly:P}));
   $('#bRes').onclick=()=>$('#fJson').click()}
-let xlsxP=null;function loadXlsx(){return xlsxP||(xlsxP=new Promise((res,rej)=>{if(window.XLSX)return res(window.XLSX);const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=()=>res(window.XLSX);s.onerror=()=>{xlsxP=null;rej(new Error('xlsx'))};document.head.appendChild(s)}))}
+let xlsxP=null;function loadXlsx(){return xlsxP||(xlsxP=new Promise((res,rej)=>{if(window.XLSX)return res(window.XLSX);const s=document.createElement('script');s.src='lib/xlsx.full.min.js';s.onload=()=>res(window.XLSX);s.onerror=()=>{xlsxP=null;rej(new Error('xlsx'))};document.head.appendChild(s)}))}
 function parseCsv(t){const L=t.replace(/^﻿/,'').split(/\r?\n/).filter(l=>l.trim());const d=[';','\t',','].find(c=>L.slice(0,5).every(l=>l.includes(c)))||';';return L.map(l=>l.split(d).map(v=>v.trim().replace(/^"|"$/g,'')))}
 $('#fDep').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f||!P)return;busy('Lendo planilha…');
   try{let rows;if(/\.xlsx?$/i.test(f.name)){const X=await loadXlsx();const wb=X.read(await f.arrayBuffer(),{type:'array'});rows=X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false}).map(r=>r.map(v=>String(v??'').trim()))}else rows=parseCsv(await f.text());
