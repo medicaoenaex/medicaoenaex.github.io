@@ -1,6 +1,6 @@
 // Medição Enaex: guarda o app e TODAS as bibliotecas no cache para abrir sem sinal no campo.
 // Aumente a versão sempre que publicar um index.html novo.
-const CACHE = 'croqui-real-v7';
+const CACHE = 'croqui-real-v8';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png',
