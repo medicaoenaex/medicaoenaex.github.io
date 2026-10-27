@@ -1,10 +1,10 @@
 // Medição Enaex: guarda o app e TODAS as bibliotecas no cache para abrir sem sinal no campo.
 // Aumente a versão sempre que publicar um index.html novo.
-const CACHE = 'croqui-real-v10';
+const CACHE = 'croqui-real-v11';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png',
-  './lib/pdf.min.js', './lib/pdf.worker.min.js', './lib/jspdf.umd.min.js', './lib/xlsx.full.min.js', './campo.html', './campo2.html'
+  './lib/pdf.min.js', './lib/pdf.worker.min.js', './lib/jspdf.umd.min.js', './lib/xlsx.full.min.js', './campo.html', './campo2.html', './campo3.html'
 ];
 
 self.addEventListener('install', e => {
