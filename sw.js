@@ -1,14 +1,14 @@
 // Medição Enaex: guarda o app e TODAS as bibliotecas no cache para abrir sem sinal no campo.
 // Aumente a versão sempre que publicar um index.html novo.
-const CACHE = 'croqui-real-v9';
+const CACHE = 'croqui-real-v10';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png',
-  './lib/pdf.min.js', './lib/pdf.worker.min.js', './lib/jspdf.umd.min.js', './lib/xlsx.full.min.js', './campo.html'
+  './lib/pdf.min.js', './lib/pdf.worker.min.js', './lib/jspdf.umd.min.js', './lib/xlsx.full.min.js', './campo.html', './campo2.html'
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -25,7 +25,7 @@ self.addEventListener('fetch', e => {
     let hit = await cache.match(req, { ignoreSearch: true });
     // Abrir o app sem internet por qualquer endereço do site cai no index.html
     if (!hit && req.mode === 'navigate') hit = await cache.match('./index.html');
-    const net = fetch(req).then(res => {
+    const net = fetch(req, req.url.startsWith(self.location.origin) ? { cache: 'no-cache' } : {}).then(res => {
       if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
       return res;
     }).catch(() => hit || Response.error());

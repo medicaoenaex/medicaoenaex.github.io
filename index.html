@@ -566,7 +566,7 @@ async function usePoly(p){if(saveT)commit();P=p;mem[p.id]=p;lsSet('cr-last',p.id
 
 /* ---------- PDF import ---------- */
 function openPdfSheet(){openSheet(`<div class="shead"><h2>Abrir croqui em PDF</h2><button class="x" aria-label="Fechar">✕</button></div>
-  <p class="muted">O app lê os números dos furos direto do PDF do Paradigm Terra e monta a malha para você marcar.</p>
+  <p class="muted">O app lê os furos direto do PDF (Paradigm Terra ou croqui da Vale) e monta a malha para você marcar. <b>Versão 10</b></p>
   <label class="chk"><input type="checkbox" id="oMarks" ${lsGet('cr-marks')==='0'?'':'checked'}>Ler as marcações coloridas que já estiverem no PDF (repasse, não furado, etc.)</label>
   <div class="row"><button class="ibtn pri" id="oPick">Escolher PDF</button></div>`);$('#oPick').onclick=()=>{lsSet('cr-marks',$('#oMarks').checked?'1':'0');$('#fPdf').click()}}
 $('#bOpen').onclick=openPdfSheet;$('#bPolys').onclick=polySheet;$('#bSum').onclick=()=>P&&sumSheet();
@@ -677,7 +677,7 @@ async function importPdf(buf,fileName,readMarks){
   const sc={};dig.forEach(d=>{const k=d.sz.toFixed(1);sc[k]=(sc[k]||0)+1});const mode=+Object.entries(sc).sort((a,b)=>b[1]-a[1])[0]?.[0];
   const seen=new Set();const holes=[];dig.filter(d=>Math.abs(d.sz-mode)<.15).forEach(d=>{if(seen.has(d.n))return;seen.add(d.n);holes.push({n:d.n,x:d.vx,y:d.vy-.92*d.sz,st:[],pm:'',pr:'',obs:'',add:false})});
   holes.sort((a,b)=>a.n-b.n);
-  if(holes.length<20){busy('Procurando os furos no desenho…');const rh=await rasterHoles(page,20);if(rh.length>=20){holes.length=0;rh.sort((a,b)=>a.n-b.n).forEach(f=>holes.push({n:f.n,pf:f.pf,x:f.cx-LABEL_DX,y:f.cy-LABEL_DY,st:[],pm:'',pr:'',obs:'',add:false}))}busy('Lendo PDF…')}
+  if(holes.length<20){busy('Procurando os furos no desenho…');let rh=[];try{rh=await rasterHoles(page,20)}catch(e){console.error(e);toast('Pouca memória para ler o desenho. Feche outros apps e tente de novo.')}if(rh.length>=20){holes.length=0;rh.sort((a,b)=>a.n-b.n).forEach(f=>holes.push({n:f.n,pf:f.pf,x:f.cx-LABEL_DX,y:f.cy-LABEL_DY,st:[],pm:'',pr:'',obs:'',add:false}))}busy('Lendo PDF…')}
   const Z=Math.min(3,2400/vp.width);const v2=page.getViewport({scale:Z});const AM=lib.AnnotationMode||{};
   const render=async(am)=>{const c=document.createElement('canvas');c.width=Math.round(v2.width);c.height=Math.round(v2.height);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);await page.render({canvasContext:x,viewport:v2,annotationMode:am}).promise;return c};
   const clean=await render(AM.DISABLE??0);
