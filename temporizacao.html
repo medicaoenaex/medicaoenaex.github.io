@@ -762,6 +762,7 @@ function drawOverlay(c,o={}){
     if(h.pm||h.pr){const mx=cx-7.6,my=cy+5.4;c.beginPath();c.moveTo(mx-3.1,my-2.6);c.lineTo(mx+3.1,my-2.6);c.lineTo(mx,my+2.9);c.closePath();c.fillStyle=h.pr?'#1f7a45':'#0b4f8a';c.fill();c.strokeStyle='#fff';c.lineWidth=.7;c.stroke()}
     if(h.cam){c.fillStyle=camColor(h.cam);c.strokeStyle='#fff';c.lineWidth=.8;c.beginPath();c.arc(cx+7,cy+7,2.6,0,7);c.fill();c.stroke()}
     {const rg=h.st.filter(k=>SK[k]&&SK[k].ring&&!SK[k].cr);rg.forEach((k,j)=>{const G=P.tzg||{rx:8.4,ry:5.4},rx=G.rx+j*1.7*G.rx/8.4,ry=G.ry+j*1.5*G.ry/5.4;c.strokeStyle=SK[k].c;c.lineWidth=k==='deck3'?1.9:1.5;if(k==='deck3'){c.save();c.strokeStyle='rgba(60,45,0,.55)';c.lineWidth=2.7;c.beginPath();c.ellipse(cx,cy,rx,ry,0,0,7);c.stroke();c.restore();c.strokeStyle=SK[k].c}c.beginPath();c.ellipse(cx,cy,rx,ry,0,0,7);c.stroke()});
+      {const nd=h.st.includes('deck3')?3:h.st.includes('deck2')?2:0,dt=(h.dt||[]).slice(0,nd).filter(Boolean);if(nd&&dt.length){const G=P.tzg||{rx:8.4,ry:5.4},fs=Math.max(3.2,G.ry*.72),t=dt.join(' / ');c.font='bold '+fs+'px Barlow,Arial,sans-serif';c.textAlign='center';c.lineJoin='round';c.lineWidth=fs*.45;c.strokeStyle='rgba(255,255,255,.95)';const ty=cy+G.ry*1.08+fs*.95+(rg.length-1)*1.5;c.strokeText(t,cx,ty);c.fillStyle=h.st.includes('deck3')?'#7a5c00':'#0f4fa8';c.fillText(t,cx,ty);c.textAlign='left'}}
       if(h.st.includes('anomalia')&&h.an&&ANL[h.an]){const G=P.tzg||{rx:8.4,ry:5.4},nr=h.st.filter(k=>SK[k]&&SK[k].ring&&!SK[k].cr).length-1,ax=cx+(G.rx-.8+nr*1.7)*.92,ay=cy-(G.ry-.4+nr*1.5)*.92;c.fillStyle='#18a33a';c.beginPath();c.arc(ax,ay,3.3,0,7);c.fill();c.fillStyle='#fff';c.font='bold 4.6px Barlow,Arial,sans-serif';c.textAlign='center';c.fillText(ANL[h.an][2],ax,ay+1.6);c.textAlign='left'}}
     if(!P.tz&&h.st.includes('adicional')){c.strokeStyle='#18a33a';c.lineWidth=1.6;c.beginPath();c.arc(h.x,h.y,3.4,0,7);c.stroke()}
     if(o.depth&&(h.pm||h.pr)){const t=(h.pr?fmt(num(h.pr)):fmt(num(h.pm)))+'m';c.font='600 5.2px "IBM Plex Mono",Consolas,monospace';c.lineWidth=1.6;c.strokeStyle='#fff';c.strokeText(t,h.x+1.5,h.y+12.6);c.fillStyle='#0b4f8a';c.fillText(t,h.x+1.5,h.y+12.6)}
@@ -1220,7 +1221,7 @@ async function importPdf(buf,fileName,readMarks){
   if(readMarks&&holes.length){busy('Lendo marcações…');const mk=await render(AM.ENABLE??1);const im=mk.getContext('2d').getImageData(0,0,mk.width,mk.height).data;const W=mk.width,H=mk.height;const ci=clean.getContext('2d').getImageData(0,0,W,H).data;
     holes.forEach(h=>{const v={};let n=0;for(let dx=2;dx<14;dx+=2)for(let dy=0;dy<10;dy+=2){const px=Math.round((h.x+dx)*Z),py=Math.round((h.y+dy)*Z);if(px<0||py<0||px>=W||py>=H)continue;const o=(py*W+px)*4;const k=classify(im[o],im[o+1],im[o+2]);n++;if(k)v[k]=(v[k]||0)+1}
       let st=null;if((v.perdido||0)>=.4*n)st='perdido';else{delete v.perdido;const b=Object.entries(v).sort((a,b)=>b[1]-a[1])[0];if(b&&b[1]>=.15*n)st=b[0]}if(st)h.st=[st];ringMarks(h,im,ci,W,H,Z)})}
-  return{id:uid(),tz:1,tzPage:TZ?TZ.p:1,tzg:TZ?TZ.geo:null,nome:(nm||fileName.replace(/\.pdf$/i,'')).trim(),arquivo:fileName,w:vp.width,h:vp.height,holeCount:hcnt,bg:clean.toDataURL('image/jpeg',.82),holes,zones:[],proj:'',tol:'0,3',created:Date.now(),upd:Date.now()}}
+  return{id:uid(),tz:1,tzPage:TZ?TZ.p:1,tzg:TZ?TZ.geo:null,tzv:2,nome:(nm||fileName.replace(/\.pdf$/i,'')).trim(),arquivo:fileName,w:vp.width,h:vp.height,holeCount:hcnt,bg:clean.toDataURL('image/jpeg',.82),holes,zones:[],proj:'',tol:'0,3',created:Date.now(),upd:Date.now()}}
 
 /* ---------- boot ---------- */
 (async()=>{dbh=await idb();let all=await dbAll();
@@ -1264,14 +1265,20 @@ function holeSheet(i){const h=P.holes[i];sel=i;draw();
    ${h.add?`<h3 style="margin-top:0">Tempo do furo adicional (ms)</h3><input class="tzt" id="tzT" inputmode="numeric" pattern="[0-9]*" placeholder="ex.: 2808" value="${esc(h.tl||'')}"><p class="muted" id="tzTw" style="margin:4px 0 8px"></p>`:''}
    <p class="muted" style="margin:0 0 4px">${h.add?'Marcação (opcional):':'Toque na marcação. Toque de novo para tirar.'}</p>
    <div class="tzpick" id="tzSt">${ST.map(btn).join('')}<button type="button" class="full" data-clear="1">Limpar marcação</button></div>
+   <div id="tzDk"></div>
    <div id="tzAn">${anH()}</div>
    <div class="fields"><div class="fld full"><label for="obs">Observação</label><textarea id="obs" placeholder="Opcional">${esc(h.obs||'')}</textarea></div></div>
    <div class="row"><button class="ibtn pri" id="tzOk" type="button">Pronto</button>${h.add?'<button class="ibtn" id="tzMv" type="button">Mudar posição</button><button class="ibtn danger" id="tzDel" type="button">Excluir adicional</button>':''}</div>`,false);
   const sh=document.querySelector('.sheet');
-  const sync=()=>{sh.querySelectorAll('#tzSt [data-k]').forEach(b=>b.setAttribute('aria-pressed',h.st.includes(b.dataset.k)));$('#tzAn').innerHTML=anH();
+  /* 2 or 3 decks: one time per deck */
+  const ndk=()=>h.st.includes('deck3')?3:h.st.includes('deck2')?2:0;let lastN=-1;
+  const dkDraw=()=>{const n=ndk();if(n===lastN)return;lastN=n;const el=$('#tzDk');if(!n){el.innerHTML='';return}h.dt=h.dt||[];if(!h.dt[0]&&h.tl&&!/^\?/.test(h.tl))h.dt[0]=String(h.tl);
+    el.innerHTML='<h3>Tempo de cada deck (ms)</h3><div class="fields">'+Array.from({length:n},(_,j)=>`<div class="fld"><label for="dt${j}">Deck ${j+1}${j===0?' (fundo)':j===n-1?' (topo)':''}</label><input class="tzt" style="height:46px;font-size:20px" id="dt${j}" inputmode="numeric" pattern="[0-9]*" value="${esc(h.dt[j]||'')}" placeholder="ms"></div>`).join('')+'</div>';
+    for(let j=0;j<n;j++)$('#dt'+j).oninput=e=>{const v=e.target.value.replace(/\D/g,'');if(v!==e.target.value)e.target.value=v;h.dt[j]=v;save();draw()}};
+  const sync=()=>{dkDraw();sh.querySelectorAll('#tzSt [data-k]').forEach(b=>b.setAttribute('aria-pressed',h.st.includes(b.dataset.k)));$('#tzAn').innerHTML=anH();
     $('#tzAn').querySelectorAll('[data-an]').forEach(b=>b.onclick=()=>{h.an=b.dataset.an;anSel=h.an;save();draw();sync()});save();renderLegend();draw()};
   $('#tzSt').onclick=e=>{const b=e.target.closest('button');if(!b)return;
-    if(b.dataset.clear){h.st=h.st.filter(k=>SK[k]&&SK[k].cr);delete h.an;sync();toast('Furo '+hn(h)+' sem marcação');return}
+    if(b.dataset.clear){h.st=h.st.filter(k=>SK[k]&&SK[k].cr);delete h.an;delete h.dt;sync();toast('Furo '+hn(h)+' sem marcação');return}
     const k=b.dataset.k;toggle(h,k);if(k==='anomalia'){if(h.st.includes(k)){if(!h.an)h.an=anSel}else delete h.an}sync();
     toast('Furo '+hn(h)+(h.st.includes(k)?' → ':' sem ')+SK[k].l)};
   sync();$('#obs').oninput=e=>{h.obs=e.target.value.trim();save()};
@@ -1298,16 +1305,18 @@ function sumSheet(){const{by}=summaryData();const an=live().filter(h=>h.st.inclu
   const opt=()=>({depth:false,leg:$('#xLeg').checked});
   $('#bPng').onclick=async()=>{const c=await exportCanvas(opt());c.toBlob(b=>offer(fname('png'),b,c),'image/png')};
   $('#bPdf').onclick=async()=>{const c=await exportCanvas(opt());const{jsPDF}=window.jspdf||{};if(!jsPDF){toast('Gerador de PDF não carregou');return}const W=c.width,H=c.height;const doc=new jsPDF({orientation:W>H?'l':'p',unit:'px',format:[W,H],hotfixes:['px_scaling']});doc.addImage(c.toDataURL('image/jpeg',.9),'JPEG',0,0,W,H);offer(fname('pdf'),doc.output('blob'),c)};
-  $('#bCsv').onclick=()=>{const rows=[['tempo_ms','adicional','marcacao','tipo_anomalia','observacao']];
-    live().slice().sort((a,b)=>String(hn(a)).localeCompare(String(hn(b)),'pt',{numeric:true})).forEach(h=>rows.push([hn(h),h.add?'sim':'',h.st.filter(k=>SK[k]&&!SK[k].cr).map(k=>SK[k].l).join(' + '),h.st.includes('anomalia')&&h.an?ANL[h.an][1]:'',h.obs||'']));
+  $('#bCsv').onclick=()=>{const rows=[['tempo_ms','adicional','marcacao','tempo_deck1','tempo_deck2','tempo_deck3','tipo_anomalia','observacao']];
+    live().slice().sort((a,b)=>String(hn(a)).localeCompare(String(hn(b)),'pt',{numeric:true})).forEach(h=>rows.push([hn(h),h.add?'sim':'',h.st.filter(k=>SK[k]&&!SK[k].cr).map(k=>SK[k].l).join(' + '),...[0,1,2].map(j=>{const n=h.st.includes('deck3')?3:h.st.includes('deck2')?2:0;return j<n&&h.dt?h.dt[j]||'':''}),h.st.includes('anomalia')&&h.an?ANL[h.an][1]:'',h.obs||'']));
     offer(fname('csv'),'﻿'+rows.map(r=>r.map(v=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';')).join('\r\n'))};
   $('#bBak').onclick=()=>offer(fname('json').replace('temporizacao','backup'),JSON.stringify({app:'temporizacao',v:1,poly:P}));
   $('#bRes').onclick=()=>$('#fJson').click()}
 function waText(){const{by}=summaryData();let t=`*${P.nome} – temporização*\n${live().length} furos · ${new Date().toLocaleDateString('pt-BR')}\n`;
   ST.forEach(s=>{if(by[s.k].length)t+=`\n${s.e} ${s.l} (${by[s.k].length}): ${ranges(by[s.k])}`});
   const an=live().filter(h=>h.st.includes('anomalia'));if(an.length)t+='\n\n*Anomalias*\n'+AN.map(a=>{const L=an.filter(h=>(h.an||'outra')===a[0]);return L.length?`${a[1]} (${L.length}): ${L.map(hn).join(', ')}`:''}).filter(Boolean).join('\n');
+  const dk=live().filter(h=>(h.st.includes('deck2')||h.st.includes('deck3'))&&(h.dt||[]).some(Boolean));if(dk.length)t+='\n\n*Tempos dos decks*\n'+dk.map(h=>`${hn(h)}: ${h.dt.slice(0,h.st.includes('deck3')?3:2).map(v=>v||'?').join(' / ')}`).join('\n');
   const ad=live().filter(h=>h.add);if(ad.length)t+=`\n\n🟣 *Adicionais* (${ad.length}): ${ad.map(hn).join(', ')}`;
   const ob=live().filter(h=>h.obs);if(ob.length)t+='\n\n*Observações*\n'+ob.map(h=>`${hn(h)}: ${h.obs}`).join('\n');return t}
+(function(){const up=usePoly;usePoly=async function(p){const r=await up(p);try{const b=$('#banner');if(p&&p.tz&&!(p.tzv>=2)){b.innerHTML='<span>Este polígono foi lido por uma versão antiga do app e pode estar sem alguns furos (ex.: 2808 do POL 76). <b>Abra o PDF de novo</b> para ler todos.</span><button aria-label="Fechar aviso">✕</button>';b.hidden=false;b.querySelector('button').onclick=()=>b.hidden=true}else if(b&&/versão antiga/.test(b.textContent))b.hidden=true}catch(e){}return r}})();
 </script>
 </body></html>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
