@@ -726,7 +726,7 @@ const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
 /* field-added holes are stored as 100000+k and shown as Ak */
-const hn=h=>h.n>=1e5?'A'+(h.n-1e5):h.tl!=null?h.tl:h.n;
+const hn=h=>h.tl!=null&&h.tl!==''?h.tl:h.n>=1e5?'A'+(h.n-1e5):h.n;
 function ranges(a){if(P&&P.tz){const L=a.map(n=>{const h=P.holes.find(q=>q.n===n);return h?hn(h):n});return L.join(', ')}const N=a.filter(x=>x<1e5),A=a.filter(x=>x>=1e5).map(x=>x-1e5);return[rng0(N),A.length?rng0(A).replace(/(\d+)/g,'A$1'):''].filter(Boolean).join(', ')}
 function rng0(a){a=[...a].sort((x,y)=>x-y);const o=[];for(let i=0;i<a.length;){let j=i;while(j+1<a.length&&a[j+1]===a[j]+1)j++;o.push(j-i>=2?a[i]+'–'+a[j]:j>i?a[i]+', '+a[j]:''+a[i]);i=j+1}return o.join(', ')}
 function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,1600)}
@@ -752,17 +752,18 @@ function drawOverlay(c,o={}){
     const [cx,cy]=hc(h);const fills=h.st.filter(k=>SK[k]&&!SK[k].ring&&!SK[k].drop);
     if(fills.length){const S=15,x0=cx-S/2,y0=cy-S/2;c.save();rr(c,x0,y0,S,S,2.5);c.clip();c.globalAlpha=.86;
       fills.forEach((k,j)=>{c.fillStyle=SK[k].c;c.fillRect(x0+S*j/fills.length,y0,S/fills.length+.2,S)});c.restore()}
-    if(h.add&&!fills.length){c.font='bold 6.85px "IBM Plex Mono",Consolas,monospace';const w=c.measureText(String(hn(h))).width;c.fillStyle='rgba(255,255,255,.95)';rr(c,h.x-1.2,h.y+.6,w+2.4,7.4,1.5);c.fill()}
-    if(h.add){c.fillStyle='#f08080';c.beginPath();c.arc(h.x,h.y,2.3,0,7);c.fill()}
+    if(h.add&&!P.tz&&!fills.length){c.font='bold 6.85px "IBM Plex Mono",Consolas,monospace';const w=c.measureText(String(hn(h))).width;c.fillStyle='rgba(255,255,255,.95)';rr(c,h.x-1.2,h.y+.6,w+2.4,7.4,1.5);c.fill()}
+    if(h.add&&!P.tz){c.fillStyle='#f08080';c.beginPath();c.arc(h.x,h.y,2.3,0,7);c.fill()}
     if(o.nobg){c.beginPath();c.arc(h.x-3.4,h.y+3.6,1.9,0,7);c.fillStyle='#e8807a';c.fill();if(!fills.length&&!h.add){c.font='bold 6.85px "IBM Plex Mono",Consolas,monospace';c.fillStyle='#111';c.fillText(hn(h),h.x,h.y+6.3)}}
-    if(fills.length||h.add){c.font='bold 6.85px "IBM Plex Mono",Consolas,monospace';c.fillStyle=fills.some(k=>SK[k].deck)?'#fff':'#111';c.fillText(hn(h),h.x,h.y+6.3)}
+    if(P.tz&&h.add){const G=P.tzg||{rx:8.4,ry:5.4},r=G.ry*1.08;c.fillStyle='#fff';c.strokeStyle='#7b3fe4';c.lineWidth=1.5;c.beginPath();c.arc(cx,cy,r,0,7);c.fill();c.stroke();const t=h.tl!=null&&h.tl!==''?String(h.tl):'?';let fs=r*.8;c.font='bold '+fs+'px Barlow,Arial,sans-serif';const w=c.measureText(t).width;if(w>r*1.7){fs*=r*1.7/w;c.font='bold '+fs+'px Barlow,Arial,sans-serif'}c.fillStyle='#4b1fa8';c.textAlign='center';c.textBaseline='middle';c.fillText(t,cx,cy+.3);c.textAlign='left';c.textBaseline='alphabetic'}
+    if(fills.length||(h.add&&!P.tz)){c.font='bold 6.85px "IBM Plex Mono",Consolas,monospace';c.fillStyle=fills.some(k=>SK[k].deck)?'#fff':'#111';c.fillText(hn(h),h.x,h.y+6.3)}
     {const dk=fills.map(k=>SK[k].deck).find(Boolean);if(dk>1){c.fillStyle='#fff';c.strokeStyle='#2b1a0c';c.lineWidth=.8;c.beginPath();c.arc(cx+7.2,cy-7.2,3.6,0,7);c.fill();c.stroke();c.fillStyle='#2b1a0c';c.font='bold 5px Barlow,Arial,sans-serif';c.textAlign='center';c.fillText(dk,cx+7.2,cy-5.4);c.textAlign='left'}}
     if(h.st.includes('agua')){const dx=cx-7.4,dy=cy-8.4;c.fillStyle='#1e6fd9';c.strokeStyle='#fff';c.lineWidth=.8;c.beginPath();c.moveTo(dx,dy-3.8);c.bezierCurveTo(dx+1,dy-2,dx+3,dy-.4,dx+3,dy+1.4);c.arc(dx,dy+1.4,3,0,Math.PI);c.bezierCurveTo(dx-3,dy-.4,dx-1,dy-2,dx,dy-3.8);c.closePath();c.fill();c.stroke()}
     if(h.pm||h.pr){const mx=cx-7.6,my=cy+5.4;c.beginPath();c.moveTo(mx-3.1,my-2.6);c.lineTo(mx+3.1,my-2.6);c.lineTo(mx,my+2.9);c.closePath();c.fillStyle=h.pr?'#1f7a45':'#0b4f8a';c.fill();c.strokeStyle='#fff';c.lineWidth=.7;c.stroke()}
     if(h.cam){c.fillStyle=camColor(h.cam);c.strokeStyle='#fff';c.lineWidth=.8;c.beginPath();c.arc(cx+7,cy+7,2.6,0,7);c.fill();c.stroke()}
     {const rg=h.st.filter(k=>SK[k]&&SK[k].ring&&!SK[k].cr);rg.forEach((k,j)=>{const G=P.tzg||{rx:8.4,ry:5.4},rx=G.rx+j*1.7*G.rx/8.4,ry=G.ry+j*1.5*G.ry/5.4;c.strokeStyle=SK[k].c;c.lineWidth=k==='deck3'?1.9:1.5;if(k==='deck3'){c.save();c.strokeStyle='rgba(60,45,0,.55)';c.lineWidth=2.7;c.beginPath();c.ellipse(cx,cy,rx,ry,0,0,7);c.stroke();c.restore();c.strokeStyle=SK[k].c}c.beginPath();c.ellipse(cx,cy,rx,ry,0,0,7);c.stroke()});
       if(h.st.includes('anomalia')&&h.an&&ANL[h.an]){const G=P.tzg||{rx:8.4,ry:5.4},nr=h.st.filter(k=>SK[k]&&SK[k].ring&&!SK[k].cr).length-1,ax=cx+(G.rx-.8+nr*1.7)*.92,ay=cy-(G.ry-.4+nr*1.5)*.92;c.fillStyle='#18a33a';c.beginPath();c.arc(ax,ay,3.3,0,7);c.fill();c.fillStyle='#fff';c.font='bold 4.6px Barlow,Arial,sans-serif';c.textAlign='center';c.fillText(ANL[h.an][2],ax,ay+1.6);c.textAlign='left'}}
-    if(h.st.includes('adicional')){c.strokeStyle='#18a33a';c.lineWidth=1.6;c.beginPath();c.arc(h.x,h.y,3.4,0,7);c.stroke()}
+    if(!P.tz&&h.st.includes('adicional')){c.strokeStyle='#18a33a';c.lineWidth=1.6;c.beginPath();c.arc(h.x,h.y,3.4,0,7);c.stroke()}
     if(o.depth&&(h.pm||h.pr)){const t=(h.pr?fmt(num(h.pr)):fmt(num(h.pm)))+'m';c.font='600 5.2px "IBM Plex Mono",Consolas,monospace';c.lineWidth=1.6;c.strokeStyle='#fff';c.strokeText(t,h.x+1.5,h.y+12.6);c.fillStyle='#0b4f8a';c.fillText(t,h.x+1.5,h.y+12.6)}
     if(o.src===i){c.save();c.setLineDash([3,2]);c.strokeStyle='#0a7fa0';c.lineWidth=2*z;c.beginPath();c.arc(cx,cy,11,0,7);c.stroke();c.restore()}
     if(o.sel===i){c.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#c8102e';c.lineWidth=2.4*z;c.beginPath();c.arc(cx,cy,11,0,7);c.stroke()}
@@ -820,7 +821,7 @@ function tap(sx,sy){if(!P)return;const wx=(sx-view.ox)/view.s,wy=(sy-view.oy)/vi
     if(addType==='fora_malha'){
       if(addSrc<0){const i=hit(wx,wy);if(i>=0&&!P.holes[i].add){addSrc=i;draw();addHint();return}}
       if(addSrc>=0){const o=P.holes[addSrc];const keep=o.st.filter(k=>!(SK[k]&&SK[k].cr));P.holes.push({n:o.n,x:X,y:Y,st:['fora_malha',...keep],pm:o.pm||'',pr:o.pr||'',obs:o.obs||'',add:true,of:o.n});o.ghost=true;o.st=[];addSrc=-1;save();renderLegend();draw();addHint();toast('Furo '+o.n+' deslocado (fora da malha)');return}}
-    const n=1e5+Math.max(0,...P.holes.filter(h=>h.n>=1e5).map(h=>h.n-1e5))+1;P.holes.push({n,x:X,y:Y,st:[addType],pm:'',pr:'',obs:'',add:true});save();renderLegend();draw();toast('Furo '+hn({n})+' criado: '+SK[addType].l);return}
+    const n=1e5+Math.max(0,...P.holes.filter(h=>h.n>=1e5).map(h=>h.n-1e5))+1;P.holes.push({n,x:X,y:Y,st:[addType],pm:'',pr:'',obs:'',add:true});save();renderLegend();draw();if(P.tz){holeSheet(P.holes.length-1);return}toast('Furo '+hn({n})+' criado: '+SK[addType].l);return}
   const i=hit(wx,wy);
   if(brush){if(i<0)return;const h=P.holes[i];const k=brush;if(k==='anomalia'&&h.st.includes('anomalia')&&h.an!==anSel){h.an=anSel;save();draw();toast('Furo '+hn(h)+' → anomalia: '+ANL[anSel][1]);return}toggle(h,k);if(k==='anomalia'){if(h.st.includes(k))h.an=anSel;else delete h.an}save();renderLegend();sel=-1;draw();toast('Furo '+hn(h)+(h.st.includes(k)?' → ':' sem ')+SK[k].l+(k==='anomalia'&&h.st.includes(k)?': '+ANL[h.an][1]:''));return}
   if(i>=0){sel=i;draw();holeSheet(i);return}
@@ -988,7 +989,7 @@ function fname(ext){return (P.nome||'poligono').replace(/[^\w\- ]+/g,'').trim().
 
 /* ---------- export ---------- */
 async function exportCanvas(o){const Z=bgImg?bgImg.naturalWidth/P.w:2.5;const W=Math.round(P.w*Z),Hc=Math.round(P.h*Z);const{by,zones}=summaryData();
-  const items=ST.filter(s=>by[s.k].length);const cols=W>1600?4:2,rows=Math.ceil(items.length/cols);const band=o.leg?Math.round(130+rows*52+(zones.length?40+zones.length*38:0)):0;
+  if(P.tz)by._ad=live().filter(h=>h.add).map(h=>h.n);const items=ST.filter(s=>by[s.k].length).concat(P.tz&&by._ad.length?[{k:'_ad',l:'Adicional',c:'#7b3fe4',ring:1}]:[]);const cols=W>1600?4:2,rows=Math.ceil(items.length/cols);const band=o.leg?Math.round(130+rows*52+(zones.length?40+zones.length*38:0)):0;
   const c=document.createElement('canvas');c.width=W;c.height=Hc+band;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,W,c.height);
   if(bgImg)x.drawImage(bgImg,0,0,W,Hc);x.save();x.scale(Z,Z);drawOverlay(x,{depth:o.depth,nobg:!bgImg});x.restore();
   if(o.leg){let y=Hc+20;x.fillStyle='#1c2224';x.fillRect(40,y,W-80,3);y+=52;x.font='700 40px "Barlow Condensed",Arial,sans-serif';x.fillText('Temporização · '+P.nome,40,y);
@@ -1246,19 +1247,26 @@ async function importPdf(buf,fileName,readMarks){
 .tzpick button[aria-pressed="true"]{background:#1c2224;color:#fff;border-color:#1c2224}
 .tzpick .ring{width:24px;height:24px;border-radius:50%;border:4px solid;flex:none;box-sizing:border-box}
 .tzpick .full{grid-column:1/-1}
+#tzAdd{flex:none;white-space:nowrap}#tzAdd[aria-pressed="true"]{background:#7b3fe4;color:#fff;border-color:#7b3fe4}
+.tzt{width:100%;height:52px;font:700 24px Barlow,Arial,sans-serif;text-align:center;border-radius:10px;border:2px solid #7b3fe4;box-sizing:border-box}
 </style>
 <script>
 /* Temporização: tocar no furo abre só as cinco marcações */
-(function(){const q=document.getElementById('q');if(q){q.placeholder='Tempo do furo (ex.: 1500)';q.setAttribute('aria-label','Buscar furo pelo tempo')}})();
+(function(){const q=document.getElementById('q');if(q){q.placeholder='Tempo do furo (ex.: 1500)';q.setAttribute('aria-label','Buscar furo pelo tempo')}
+  const f=document.getElementById('fSearch');if(f){const b=document.createElement('button');b.type='button';b.className='ibtn';b.id='tzAdd';b.setAttribute('aria-pressed','false');b.textContent='+ Adicional';f.after(b);
+    b.onclick=()=>{if(!P||P.sample){toast('Abra o PDF de temporização primeiro');return}if(mode==='add')setMode('sel');else{addType='adicional';setMode('add')}}}})();
+function addHint(){const h=$('#hint');h.hidden=false;h.innerHTML='<span><b>Furo adicional:</b> toque no desenho onde o furo foi feito. Depois digite o tempo.</span><button id="hStop">Concluir</button>';$('#hStop').onclick=()=>setMode('sel')}
+(function(){const sm=setMode;setMode=function(m,k){sm(m,k);const b=document.getElementById('tzAdd');if(b)b.setAttribute('aria-pressed',m==='add')}})();
 function holeSheet(i){const h=P.holes[i];sel=i;draw();
   const btn=s=>`<button type="button" data-k="${s.k}" aria-pressed="${h.st.includes(s.k)}"><span class="ring" style="border-color:${s.c}"></span>${esc(s.l)}</button>`;
   const anH=()=>h.st.includes('anomalia')?'<h3>Tipo de anomalia</h3><div class="tzpick">'+AN.map(a=>`<button type="button" data-an="${a[0]}" aria-pressed="${h.an===a[0]}">${a[1]}</button>`).join('')+'</div>':'';
   openSheet(`<div class="shead"><h2>Furo ${esc(String(hn(h)))}</h2><button class="x" aria-label="Fechar">✕</button></div>
-   <p class="muted" style="margin:0 0 4px">Toque na marcação. Toque de novo para tirar.</p>
+   ${h.add?`<h3 style="margin-top:0">Tempo do furo adicional (ms)</h3><input class="tzt" id="tzT" inputmode="numeric" pattern="[0-9]*" placeholder="ex.: 2808" value="${esc(h.tl||'')}"><p class="muted" id="tzTw" style="margin:4px 0 8px"></p>`:''}
+   <p class="muted" style="margin:0 0 4px">${h.add?'Marcação (opcional):':'Toque na marcação. Toque de novo para tirar.'}</p>
    <div class="tzpick" id="tzSt">${ST.map(btn).join('')}<button type="button" class="full" data-clear="1">Limpar marcação</button></div>
    <div id="tzAn">${anH()}</div>
    <div class="fields"><div class="fld full"><label for="obs">Observação</label><textarea id="obs" placeholder="Opcional">${esc(h.obs||'')}</textarea></div></div>
-   <div class="row"><button class="ibtn pri" id="tzOk" type="button">Pronto</button></div>`,false);
+   <div class="row"><button class="ibtn pri" id="tzOk" type="button">Pronto</button>${h.add?'<button class="ibtn" id="tzMv" type="button">Mudar posição</button><button class="ibtn danger" id="tzDel" type="button">Excluir adicional</button>':''}</div>`,false);
   const sh=document.querySelector('.sheet');
   const sync=()=>{sh.querySelectorAll('#tzSt [data-k]').forEach(b=>b.setAttribute('aria-pressed',h.st.includes(b.dataset.k)));$('#tzAn').innerHTML=anH();
     $('#tzAn').querySelectorAll('[data-an]').forEach(b=>b.onclick=()=>{h.an=b.dataset.an;anSel=h.an;save();draw();sync()});save();renderLegend();draw()};
@@ -1267,12 +1275,17 @@ function holeSheet(i){const h=P.holes[i];sel=i;draw();
     const k=b.dataset.k;toggle(h,k);if(k==='anomalia'){if(h.st.includes(k)){if(!h.an)h.an=anSel}else delete h.an}sync();
     toast('Furo '+hn(h)+(h.st.includes(k)?' → ':' sem ')+SK[k].l)};
   sync();$('#obs').oninput=e=>{h.obs=e.target.value.trim();save()};
-  $('#tzOk').onclick=()=>{sel=-1;closeSheet();draw()};sh.querySelector('.x').onclick=()=>{sel=-1;closeSheet();draw()}}
+  if(h.add){const ti=$('#tzT'),tw=$('#tzTw');const chk=()=>{const v=h.tl;const o=v&&P.holes.find(q=>q!==h&&!q.ghost&&String(q.tl)===v);tw.textContent=o?'Atenção: já existe um furo com o tempo '+v+'.':''};
+    ti.oninput=e=>{const v=e.target.value.replace(/\D/g,'');if(v!==e.target.value)e.target.value=v;if(v)h.tl=v;else delete h.tl;chk();save();draw()};chk();if(!h.tl)setTimeout(()=>ti.focus(),150);
+    $('#tzMv').onclick=()=>{const k=P.holes.indexOf(h);sel=-1;closeSheet();moveIdx=k;setMode('move');draw()};
+    const del=$('#tzDel');del.onclick=()=>{if(!del.dataset.c){del.dataset.c=1;del.textContent='Toque de novo para excluir';return}P.holes.splice(P.holes.indexOf(h),1);sel=-1;save();renderLegend();closeSheet();draw();toast('Furo adicional excluído')}}
+  $('#tzOk').onclick=()=>{sel=-1;closeSheet();draw();if(h.add&&mode==='add')addHint()};sh.querySelector('.x').onclick=()=>{sel=-1;closeSheet();draw()}}
 function sumSheet(){const{by}=summaryData();const an=live().filter(h=>h.st.includes('anomalia'));
   openSheet(`<div class="shead"><h2>${esc(P.nome)}</h2><button class="x" aria-label="Fechar">✕</button></div>
   <h3>Furos marcados</h3><table class="tbl"><tbody>${ST.map(s=>`<tr><td><span class="lb"><span class="sw ring" style="border-color:${s.c}"></span>${esc(s.l)}</span>${by[s.k].length?`<span class="nums">${ranges(by[s.k])}</span>`:''}</td><td class="q">${by[s.k].length}</td></tr>`).join('')}
   ${AN.map(a=>{const L=an.filter(h=>(h.an||'outra')===a[0]);return L.length?`<tr><td><span class="lb" style="padding-left:26px">↳ ${a[1]}</span><span class="nums">${L.map(hn).join(', ')}</span></td><td class="q">${L.length}</td></tr>`:''}).join('')}
-  <tr><td><span class="lb">Sem marcação</span></td><td class="q">${live().filter(h=>!h.st.some(k=>SK[k]&&!SK[k].cr)).length}</td></tr><tr><td><span class="lb">Total de furos</span></td><td class="q">${live().length}</td></tr></tbody></table>
+  ${(()=>{const A=live().filter(h=>h.add);return A.length?`<tr><td><span class="lb"><span class="sw ring" style="border-color:#7b3fe4"></span>Adicionais</span><span class="nums">${A.map(hn).join(', ')}</span></td><td class="q">${A.length}</td></tr>`:''})()}
+  <tr><td><span class="lb">Sem marcação</span></td><td class="q">${live().filter(h=>!h.add&&!h.st.some(k=>SK[k]&&!SK[k].cr)).length}</td></tr><tr><td><span class="lb">Total de furos</span></td><td class="q">${live().length}</td></tr></tbody></table>
   <div class="fields"><div class="fld full"><label for="snm">Nome do polígono</label><input id="snm" value="${esc(P.nome)}"></div></div>
   <h3>Texto para o grupo</h3><pre class="wa" id="wa">${esc(waText())}</pre><div class="row"><button class="ibtn" id="bCopy">Copiar texto</button></div>
   <h3>Salvar temporização marcada</h3><label class="chk"><input type="checkbox" id="xLeg" checked>Incluir legenda abaixo do desenho</label>
@@ -1285,14 +1298,15 @@ function sumSheet(){const{by}=summaryData();const an=live().filter(h=>h.st.inclu
   const opt=()=>({depth:false,leg:$('#xLeg').checked});
   $('#bPng').onclick=async()=>{const c=await exportCanvas(opt());c.toBlob(b=>offer(fname('png'),b,c),'image/png')};
   $('#bPdf').onclick=async()=>{const c=await exportCanvas(opt());const{jsPDF}=window.jspdf||{};if(!jsPDF){toast('Gerador de PDF não carregou');return}const W=c.width,H=c.height;const doc=new jsPDF({orientation:W>H?'l':'p',unit:'px',format:[W,H],hotfixes:['px_scaling']});doc.addImage(c.toDataURL('image/jpeg',.9),'JPEG',0,0,W,H);offer(fname('pdf'),doc.output('blob'),c)};
-  $('#bCsv').onclick=()=>{const rows=[['tempo_ms','marcacao','tipo_anomalia','observacao']];
-    live().slice().sort((a,b)=>String(hn(a)).localeCompare(String(hn(b)),'pt',{numeric:true})).forEach(h=>rows.push([hn(h),h.st.filter(k=>SK[k]&&!SK[k].cr).map(k=>SK[k].l).join(' + '),h.st.includes('anomalia')&&h.an?ANL[h.an][1]:'',h.obs||'']));
+  $('#bCsv').onclick=()=>{const rows=[['tempo_ms','adicional','marcacao','tipo_anomalia','observacao']];
+    live().slice().sort((a,b)=>String(hn(a)).localeCompare(String(hn(b)),'pt',{numeric:true})).forEach(h=>rows.push([hn(h),h.add?'sim':'',h.st.filter(k=>SK[k]&&!SK[k].cr).map(k=>SK[k].l).join(' + '),h.st.includes('anomalia')&&h.an?ANL[h.an][1]:'',h.obs||'']));
     offer(fname('csv'),'﻿'+rows.map(r=>r.map(v=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';')).join('\r\n'))};
   $('#bBak').onclick=()=>offer(fname('json').replace('temporizacao','backup'),JSON.stringify({app:'temporizacao',v:1,poly:P}));
   $('#bRes').onclick=()=>$('#fJson').click()}
 function waText(){const{by}=summaryData();let t=`*${P.nome} – temporização*\n${live().length} furos · ${new Date().toLocaleDateString('pt-BR')}\n`;
   ST.forEach(s=>{if(by[s.k].length)t+=`\n${s.e} ${s.l} (${by[s.k].length}): ${ranges(by[s.k])}`});
   const an=live().filter(h=>h.st.includes('anomalia'));if(an.length)t+='\n\n*Anomalias*\n'+AN.map(a=>{const L=an.filter(h=>(h.an||'outra')===a[0]);return L.length?`${a[1]} (${L.length}): ${L.map(hn).join(', ')}`:''}).filter(Boolean).join('\n');
+  const ad=live().filter(h=>h.add);if(ad.length)t+=`\n\n🟣 *Adicionais* (${ad.length}): ${ad.map(hn).join(', ')}`;
   const ob=live().filter(h=>h.obs);if(ob.length)t+='\n\n*Observações*\n'+ob.map(h=>`${hn(h)}: ${h.obs}`).join('\n');return t}
 </script>
 </body></html>
