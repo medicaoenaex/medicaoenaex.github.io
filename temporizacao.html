@@ -1217,5 +1217,61 @@ async function importPdf(buf,fileName,readMarks){
 
 </script>
 
+<style>
+.seg{display:none!important}
+.tzpick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0 4px}
+.tzpick button{display:flex;align-items:center;gap:10px;min-height:52px;padding:0 12px;border-radius:10px;border:1px solid var(--line,#d0d4d2);background:var(--surface,#fff);color:inherit;font:600 16px Barlow,Arial,sans-serif;text-align:left}
+.tzpick button[aria-pressed="true"]{background:#1c2224;color:#fff;border-color:#1c2224}
+.tzpick .ring{width:24px;height:24px;border-radius:50%;border:4px solid;flex:none;box-sizing:border-box}
+.tzpick .full{grid-column:1/-1}
+</style>
+<script>
+/* Temporização: tocar no furo abre só as cinco marcações */
+(function(){const q=document.getElementById('q');if(q){q.placeholder='Tempo do furo (ex.: 1500)';q.setAttribute('aria-label','Buscar furo pelo tempo')}})();
+function holeSheet(i){const h=P.holes[i];sel=i;draw();
+  const btn=s=>`<button type="button" data-k="${s.k}" aria-pressed="${h.st.includes(s.k)}"><span class="ring" style="border-color:${s.c}"></span>${esc(s.l)}</button>`;
+  const anH=()=>h.st.includes('anomalia')?'<h3>Tipo de anomalia</h3><div class="tzpick">'+AN.map(a=>`<button type="button" data-an="${a[0]}" aria-pressed="${h.an===a[0]}">${a[1]}</button>`).join('')+'</div>':'';
+  openSheet(`<div class="shead"><h2>Furo ${esc(String(hn(h)))}</h2><button class="x" aria-label="Fechar">✕</button></div>
+   <p class="muted" style="margin:0 0 4px">Toque na marcação. Toque de novo para tirar.</p>
+   <div class="tzpick" id="tzSt">${ST.map(btn).join('')}<button type="button" class="full" data-clear="1">Limpar marcação</button></div>
+   <div id="tzAn">${anH()}</div>
+   <div class="fields"><div class="fld full"><label for="obs">Observação</label><textarea id="obs" placeholder="Opcional">${esc(h.obs||'')}</textarea></div></div>
+   <div class="row"><button class="ibtn pri" id="tzOk" type="button">Pronto</button></div>`,false);
+  const sh=document.querySelector('.sheet');
+  const sync=()=>{sh.querySelectorAll('#tzSt [data-k]').forEach(b=>b.setAttribute('aria-pressed',h.st.includes(b.dataset.k)));$('#tzAn').innerHTML=anH();
+    $('#tzAn').querySelectorAll('[data-an]').forEach(b=>b.onclick=()=>{h.an=b.dataset.an;anSel=h.an;save();draw();sync()});save();renderLegend();draw()};
+  $('#tzSt').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+    if(b.dataset.clear){h.st=h.st.filter(k=>SK[k]&&SK[k].cr);delete h.an;sync();toast('Furo '+hn(h)+' sem marcação');return}
+    const k=b.dataset.k;toggle(h,k);if(k==='anomalia'){if(h.st.includes(k)){if(!h.an)h.an=anSel}else delete h.an}sync();
+    toast('Furo '+hn(h)+(h.st.includes(k)?' → ':' sem ')+SK[k].l)};
+  sync();$('#obs').oninput=e=>{h.obs=e.target.value.trim();save()};
+  $('#tzOk').onclick=()=>{sel=-1;closeSheet();draw()};sh.querySelector('.x').onclick=()=>{sel=-1;closeSheet();draw()}}
+function sumSheet(){const{by}=summaryData();const an=live().filter(h=>h.st.includes('anomalia'));
+  openSheet(`<div class="shead"><h2>${esc(P.nome)}</h2><button class="x" aria-label="Fechar">✕</button></div>
+  <h3>Furos marcados</h3><table class="tbl"><tbody>${ST.map(s=>`<tr><td><span class="lb"><span class="sw ring" style="border-color:${s.c}"></span>${esc(s.l)}</span>${by[s.k].length?`<span class="nums">${ranges(by[s.k])}</span>`:''}</td><td class="q">${by[s.k].length}</td></tr>`).join('')}
+  ${AN.map(a=>{const L=an.filter(h=>(h.an||'outra')===a[0]);return L.length?`<tr><td><span class="lb" style="padding-left:26px">↳ ${a[1]}</span><span class="nums">${L.map(hn).join(', ')}</span></td><td class="q">${L.length}</td></tr>`:''}).join('')}
+  <tr><td><span class="lb">Sem marcação</span></td><td class="q">${live().filter(h=>!h.st.some(k=>SK[k]&&!SK[k].cr)).length}</td></tr><tr><td><span class="lb">Total de furos</span></td><td class="q">${live().length}</td></tr></tbody></table>
+  <div class="fields"><div class="fld full"><label for="snm">Nome do polígono</label><input id="snm" value="${esc(P.nome)}"></div></div>
+  <h3>Texto para o grupo</h3><pre class="wa" id="wa">${esc(waText())}</pre><div class="row"><button class="ibtn" id="bCopy">Copiar texto</button></div>
+  <h3>Salvar temporização marcada</h3><label class="chk"><input type="checkbox" id="xLeg" checked>Incluir legenda abaixo do desenho</label>
+  <div class="row"><button class="ibtn pri" id="bPng">Imagem PNG</button><button class="ibtn pri" id="bPdf">PDF</button><button class="ibtn" id="bCsv">Planilha CSV</button></div>
+  <h3>Enviar para a equipe</h3><p class="muted">Envie o polígono pelo WhatsApp; quem receber toca em <b>Receber polígono</b> e as marcações se juntam às dele.</p><div class="row"><button class="ibtn pri" id="bBak">Enviar polígono</button><button class="ibtn" id="bRes">Receber polígono</button></div>
+  <div id="prev" class="preview"></div>`);
+  document.querySelector('.sheet .x').onclick=closeSheet;
+  $('#snm').oninput=e=>{P.nome=e.target.value.trim()||'Polígono';save();renderLegend()};
+  $('#bCopy').onclick=async()=>{const t=waText();try{await navigator.clipboard.writeText(t);toast('Texto copiado')}catch(e){const r=document.createRange();r.selectNodeContents($('#wa'));const s=getSelection();s.removeAllRanges();s.addRange(r);toast('Texto selecionado: copie manualmente')}};
+  const opt=()=>({depth:false,leg:$('#xLeg').checked});
+  $('#bPng').onclick=async()=>{const c=await exportCanvas(opt());c.toBlob(b=>offer(fname('png'),b,c),'image/png')};
+  $('#bPdf').onclick=async()=>{const c=await exportCanvas(opt());const{jsPDF}=window.jspdf||{};if(!jsPDF){toast('Gerador de PDF não carregou');return}const W=c.width,H=c.height;const doc=new jsPDF({orientation:W>H?'l':'p',unit:'px',format:[W,H],hotfixes:['px_scaling']});doc.addImage(c.toDataURL('image/jpeg',.9),'JPEG',0,0,W,H);offer(fname('pdf'),doc.output('blob'),c)};
+  $('#bCsv').onclick=()=>{const rows=[['tempo_ms','marcacao','tipo_anomalia','observacao']];
+    live().slice().sort((a,b)=>String(hn(a)).localeCompare(String(hn(b)),'pt',{numeric:true})).forEach(h=>rows.push([hn(h),h.st.filter(k=>SK[k]&&!SK[k].cr).map(k=>SK[k].l).join(' + '),h.st.includes('anomalia')&&h.an?ANL[h.an][1]:'',h.obs||'']));
+    offer(fname('csv'),'﻿'+rows.map(r=>r.map(v=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';')).join('\r\n'))};
+  $('#bBak').onclick=()=>offer(fname('json').replace('temporizacao','backup'),JSON.stringify({app:'temporizacao',v:1,poly:P}));
+  $('#bRes').onclick=()=>$('#fJson').click()}
+function waText(){const{by}=summaryData();let t=`*${P.nome} – temporização*\n${live().length} furos · ${new Date().toLocaleDateString('pt-BR')}\n`;
+  ST.forEach(s=>{if(by[s.k].length)t+=`\n${s.e} ${s.l} (${by[s.k].length}): ${ranges(by[s.k])}`});
+  const an=live().filter(h=>h.st.includes('anomalia'));if(an.length)t+='\n\n*Anomalias*\n'+AN.map(a=>{const L=an.filter(h=>(h.an||'outra')===a[0]);return L.length?`${a[1]} (${L.length}): ${L.map(hn).join(', ')}`:''}).filter(Boolean).join('\n');
+  const ob=live().filter(h=>h.obs);if(ob.length)t+='\n\n*Observações*\n'+ob.map(h=>`${hn(h)}: ${h.obs}`).join('\n');return t}
+</script>
 </body></html>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
