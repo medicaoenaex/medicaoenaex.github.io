@@ -1137,6 +1137,10 @@ async function tzRender(page,zs){const vp1=page.getViewport({scale:1});const Zs=
   await page.render({canvasContext:x,viewport:v}).promise;const W=c.width,H=c.height,d=x.getImageData(0,0,W,H).data;c.width=c.height=0;
   const N=W*H,ink=new Float32Array(N),yel=new Uint8Array(N);
   for(let i=0,o=0;i<N;i++,o+=4){const r=d[o],g=d[o+1],b=d[o+2];if(r>200&&g>180&&b<120)yel[i]=1;const v2=(b-Math.max(r,g)-20)/120;ink[i]=v2<=0?0:v2>=1?1:v2}
+  /* lines drawn across a dot split it in two: fill thin gaps (up to 3 px) that have yellow on both sides */
+  for(let pass=0;pass<2;pass++){const add=[];for(let y=3;y<H-3;y++)for(let x=3;x<W-3;x++){const i=y*W+x;if(yel[i])continue;
+      const v=(yel[i-W]||yel[i-2*W]||yel[i-3*W])&&(yel[i+W]||yel[i+2*W]||yel[i+3*W]),h=(yel[i-1]||yel[i-2]||yel[i-3])&&(yel[i+1]||yel[i+2]||yel[i+3]);if(v||h)add.push(i)}
+    for(const i of add)yel[i]=1}
   return{W,H,Zs,ink,yel}}
 function tzDots(R){const{W,H,Zs,yel}=R;const N=W*H,seen=new Uint8Array(N),st=new Int32Array(N),out=[];const lo=1.4*Zs,hi=7*Zs;
   for(let i=0;i<N;i++){if(!yel[i]||seen[i])continue;let sp=0;st[sp++]=i;seen[i]=1;let x0=1e9,x1=-1,y0=1e9,y1=-1,a=0;
