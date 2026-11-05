@@ -1030,7 +1030,7 @@ async function usePoly(p){if(saveT)commit();P=p;mem[p.id]=p;lsSet('tz-last',p.id
 
 /* ---------- PDF import ---------- */
 function openPdfSheet(){openSheet(`<div class="shead"><h2>Abrir croqui em PDF</h2><button class="x" aria-label="Fechar">✕</button></div>
-  <p class="muted">O app acha os furos (pontos amarelos) no PDF de temporização e lê o tempo de cada um. Depois é só marcar os círculos. <b>Versão 1</b></p>
+  <p class="muted">O app acha os furos (pontos amarelos ou verdes) no PDF de temporização e lê o tempo de cada um. Depois é só marcar os círculos. <b>Versão 21</b></p>
   <div class="row"><button class="ibtn pri" id="oPick">Escolher PDF</button></div>`);$('#oPick').onclick=()=>{$('#fPdf').click()}}
 $('#bOpen').onclick=openPdfSheet;$('#bPolys').onclick=polySheet;$('#bSum').onclick=()=>P&&sumSheet();
 $('#fPdf').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;closeSheet();busy('Lendo PDF…');
@@ -1366,4 +1366,4 @@ function waText(){const{by}=summaryData();let t=`*${P.nome} – temporização*\
 (function(){const up=usePoly;usePoly=async function(p){const r=await up(p);try{const b=$('#banner');if(p&&p.tz&&!(p.tzv>=2)){b.innerHTML='<span>Este polígono foi lido por uma versão antiga do app e pode estar sem alguns furos (ex.: 2808 do POL 76). <b>Abra o PDF de novo</b> para ler todos.</span><button aria-label="Fechar aviso">✕</button>';b.hidden=false;b.querySelector('button').onclick=()=>b.hidden=true}else if(b&&/versão antiga/.test(b.textContent))b.hidden=true}catch(e){}return r}})();
 </script>
 </body></html>
-<script>if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
+<script>if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});</script><script>try{if('serviceWorker' in navigator&&navigator.serviceWorker.controller){navigator.serviceWorker.addEventListener('controllerchange',function(){try{if(sessionStorage.getItem('swr'))return;sessionStorage.setItem('swr','1')}catch(e){}location.reload()})}}catch(e){}</script>
