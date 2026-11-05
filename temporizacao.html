@@ -1030,7 +1030,7 @@ async function usePoly(p){if(saveT)commit();P=p;mem[p.id]=p;lsSet('tz-last',p.id
 
 /* ---------- PDF import ---------- */
 function openPdfSheet(){openSheet(`<div class="shead"><h2>Abrir croqui em PDF</h2><button class="x" aria-label="Fechar">✕</button></div>
-  <p class="muted">O app acha os furos (pontos amarelos ou verdes) no PDF de temporização e lê o tempo de cada um. Depois é só marcar os círculos. <b>Versão 23</b></p>
+  <p class="muted">O app acha os furos (pontos amarelos ou verdes) no PDF de temporização e lê o tempo de cada um. Depois é só marcar os círculos. <b>Versão 24</b></p>
   <div class="row"><button class="ibtn pri" id="oPick">Escolher PDF</button></div>`);$('#oPick').onclick=()=>{$('#fPdf').click()}}
 $('#bOpen').onclick=openPdfSheet;$('#bPolys').onclick=polySheet;$('#bSum').onclick=()=>P&&sumSheet();
 $('#fPdf').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;closeSheet();busy('Lendo PDF…');
@@ -1241,7 +1241,7 @@ async function tzHoles(doc){let best=null;
   /* size of the circle drawn around a hole: it wraps the dot and its time(s), in page units */
   const ds=best.dots.map(d=>d.s).sort((a,b)=>a-b),rd=ds[ds.length>>1]/2,o=best.off,mxN=Math.max(modeN,...holes.map(h=>String(h.t==null?'':h.t).length)),wl=mxN*TZ_ADV-1;
   const x0=-rd,x1=o[0]+mxN*(R.adv||TZ_ADV)-1,y0=Math.min(-rd,o[1]),y1=Math.max(rd,o[1]+(NL-1)*best.pitch+10),Z=R.Zs;
-  const geo={dx:((x0+x1)/2+.04*(x1-x0))/Z,dy:((y0+y1)/2+.05*(y1-y0))/Z,rx:(x1-x0)/2*(NL>1?1.42:1.3)/Z,ry:(y1-y0)/2*(NL>1?1.42:1.6)/Z};
+  const geo={dx:((x0+x1)/2+.04*(x1-x0))/Z,dy:((y0+y1)/2+.05*(y1-y0))/Z,rx:(x1-x0)/2*(NL>1?1.42:1.3)/Z,ry:(y1-y0)/2*(NL>1?1.42:1.6)/Z,lx:o[0]/Z,ly:o[1]/Z,adv:(R.adv||TZ_ADV)/Z,lh:((NL-1)*best.pitch+10)/Z,rd:rd/Z};
   return{page:best.page,p:best.p,holes,step:m,geo,lines:NL}}
 
 async function importPdf(buf,fileName,readMarks){
@@ -1300,12 +1300,15 @@ async function importPdf(buf,fileName,readMarks){
     b.onclick=()=>{if(!P||P.sample){toast('Abra o PDF de temporização primeiro');return}if(mode==='add')setMode('sel');else{addType='adicional';setMode('add')}}}})();
 function addHint(){const h=$('#hint');h.hidden=false;h.innerHTML='<span><b>Furo adicional:</b> toque no desenho onde o furo foi feito. Depois digite o tempo.</span><button id="hStop">Concluir</button>';$('#hStop').onclick=()=>setMode('sel')}
 (function(){const sm=setMode;setMode=function(m,k){sm(m,k);const b=document.getElementById('tzAdd');if(b)b.setAttribute('aria-pressed',m==='add')}})();
-/* tapping: the dot you touch wins over a neighbour's number lying on top of it */
-function hit(wx,wy){let b=-1,bd=Math.max(9,22/view.s);const G=P.tzg;
+/* tapping: a tap on a hole's number picks that hole; otherwise the dot you touch, then the nearest hole */
+function hit(wx,wy){const G=P.tzg;let b=-1,bd=Math.max(9,22/view.s);
+  if(G&&G.lx!=null){const pad=Math.max(1.2,6/view.s);let bb=-1,bv=1e9;
+    P.holes.forEach((h,i)=>{if(h.ghost||h.add)return;const[cx,cy]=hc(h),dx=cx-G.dx,dy=cy-G.dy,n=Math.max(...[h.tl,...(h.pt||[])].map(v=>String(v||'').length),1);
+      const x0=dx+G.lx-pad,y0=dy+G.ly-pad,x1=dx+G.lx+n*G.adv+pad,y1=dy+G.ly+G.lh+pad;if(wx>=x0&&wx<=x1&&wy>=y0&&wy<=y1){const v=Math.hypot(wx-(x0+x1)/2,(wy-(y0+y1)/2)*1.6);if(v<bv){bv=v;bb=i}}});
+    let bd2=1e9,bi2=-1;P.holes.forEach((h,i)=>{if(h.ghost)return;const[cx,cy]=hc(h);const d=h.add?Math.hypot(cx-wx,cy-wy):Math.hypot(cx-G.dx-wx,cy-G.dy-wy);if(d<bd2){bd2=d;bi2=i}});
+    /* touching a dot itself still wins */const rdot=(G.rd||2)*1.3+2/view.s;if(bi2>=0&&bd2<=rdot)return bi2;if(bb>=0)return bb;if(bi2>=0&&bd2<bd*1.2)return bi2}
   P.holes.forEach((h,i)=>{if(h.ghost)return;const[cx,cy]=hc(h);let d=Math.hypot(cx-wx,cy-wy);
-    if(G&&!h.add){const dx=cx-G.dx,dy=cy-G.dy;d=Math.min(d,Math.hypot(dx-wx,dy-wy)*.55,Math.hypot(cx+G.dx*.6-wx,cy+G.dy*.6-wy)*1.05)}
-    if(d<bd){bd=d;b=i}});return b}
-/* mark by number: type one or more times (1119, 1170 …) and choose the mark */
+    if(G&&!h.add){d=Math.min(d,Math.hypot(cx-G.dx-wx,cy-G.dy-wy)*.55)}if(d<bd){bd=d;b=i}});return b}
 function tzFind(t){t=String(+t);return P.holes.findIndex(h=>!h.ghost&&((h.tl!=null&&String(h.tl)===t)||(h.pt&&h.pt.includes(t))))}
 function tzBatch(list){const found=list.map(t=>[t,tzFind(t)]),ok=found.filter(f=>f[1]>=0).map(f=>P.holes[f[1]]),miss=found.filter(f=>f[1]<0).map(f=>f[0]);
   if(!ok.length){toast('Nenhum furo com '+(list.length>1?'esses tempos':'o tempo '+list[0]));return}
