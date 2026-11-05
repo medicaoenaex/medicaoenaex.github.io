@@ -1030,7 +1030,7 @@ async function usePoly(p){if(saveT)commit();P=p;mem[p.id]=p;lsSet('tz-last',p.id
 
 /* ---------- PDF import ---------- */
 function openPdfSheet(){openSheet(`<div class="shead"><h2>Abrir croqui em PDF</h2><button class="x" aria-label="Fechar">✕</button></div>
-  <p class="muted">O app acha os furos (pontos amarelos ou verdes) no PDF de temporização e lê o tempo de cada um. Depois é só marcar os círculos. <b>Versão 21</b></p>
+  <p class="muted">O app acha os furos (pontos amarelos ou verdes) no PDF de temporização e lê o tempo de cada um. Depois é só marcar os círculos. <b>Versão 22</b></p>
   <div class="row"><button class="ibtn pri" id="oPick">Escolher PDF</button></div>`);$('#oPick').onclick=()=>{$('#fPdf').click()}}
 $('#bOpen').onclick=openPdfSheet;$('#bPolys').onclick=polySheet;$('#bSum').onclick=()=>P&&sumSheet();
 $('#fPdf').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;closeSheet();busy('Lendo PDF…');
@@ -1300,6 +1300,11 @@ async function importPdf(buf,fileName,readMarks){
     b.onclick=()=>{if(!P||P.sample){toast('Abra o PDF de temporização primeiro');return}if(mode==='add')setMode('sel');else{addType='adicional';setMode('add')}}}})();
 function addHint(){const h=$('#hint');h.hidden=false;h.innerHTML='<span><b>Furo adicional:</b> toque no desenho onde o furo foi feito. Depois digite o tempo.</span><button id="hStop">Concluir</button>';$('#hStop').onclick=()=>setMode('sel')}
 (function(){const sm=setMode;setMode=function(m,k){sm(m,k);const b=document.getElementById('tzAdd');if(b)b.setAttribute('aria-pressed',m==='add')}})();
+/* tapping: the dot you touch wins over a neighbour's number lying on top of it */
+function hit(wx,wy){let b=-1,bd=Math.max(9,22/view.s);const G=P.tzg;
+  P.holes.forEach((h,i)=>{if(h.ghost)return;const[cx,cy]=hc(h);let d=Math.hypot(cx-wx,cy-wy);
+    if(G&&!h.add){const dx=cx-G.dx,dy=cy-G.dy;d=Math.min(d,Math.hypot(dx-wx,dy-wy)*.55,Math.hypot(cx+G.dx*.6-wx,cy+G.dy*.6-wy)*1.05)}
+    if(d<bd){bd=d;b=i}});return b}
 function holeSheet(i){const h=P.holes[i];sel=i;draw();
   const btn=s=>`<button type="button" data-k="${s.k}" aria-pressed="${h.st.includes(s.k)}"><span class="ring" style="border-color:${s.c}"></span>${esc(s.l)}</button>`;
   const anH=()=>h.st.includes('anomalia')?'<h3>Tipo de anomalia</h3><div class="tzpick">'+AN.map(a=>`<button type="button" data-an="${a[0]}" aria-pressed="${h.an===a[0]}">${a[1]}</button>`).join('')+'</div>':'';
