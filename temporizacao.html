@@ -1138,7 +1138,7 @@ async function tzRender(page,zs){const vp1=page.getViewport({scale:1});const Zs=
   const c=document.createElement('canvas');c.width=Math.round(v.width);c.height=Math.round(v.height);const x=c.getContext('2d',{willReadFrequently:true});x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
   await page.render({canvasContext:x,viewport:v}).promise;const W=c.width,H=c.height,d=x.getImageData(0,0,W,H).data;c.width=c.height=0;
   const N=W*H,ink=new Float32Array(N),yel=new Uint8Array(N);
-  for(let i=0,o=0;i<N;i++,o+=4){const r=d[o],g=d[o+1],b=d[o+2];if(r>200&&g>180&&b<120)yel[i]=1;const v2=(b-Math.max(r,g)-20)/120;ink[i]=v2<=0?0:v2>=1?1:v2}
+  for(let i=0,o=0;i<N;i++,o+=4){const r=d[o],g=d[o+1],b=d[o+2];if((r>200&&g>180&&b<120)||(g>170&&r<130&&b<130&&g-r>70))yel[i]=1;const v2=(b-Math.max(r,g)-20)/120;ink[i]=v2<=0?0:v2>=1?1:v2}
   /* lines drawn across a dot split it in two: fill thin gaps (up to 3 px) that have yellow on both sides */
   for(let pass=0;pass<2;pass++){const add=[];for(let y=3;y<H-3;y++)for(let x=3;x<W-3;x++){const i=y*W+x;if(yel[i])continue;
       const v=(yel[i-W]||yel[i-2*W]||yel[i-3*W])&&(yel[i+W]||yel[i+2*W]||yel[i+3*W]),h=(yel[i-1]||yel[i-2]||yel[i-3])&&(yel[i+1]||yel[i+2]||yel[i+3]);if(v||h)add.push(i)}
@@ -1216,7 +1216,7 @@ async function tzHoles(doc){let best=null;
   const nc={};reads.forEach(o=>{if(o.r){const n=o.r.sc.length;nc[n]=(nc[n]||0)+1}});const modeN=+Object.entries(nc).sort((a,b)=>b[1]-a[1])[0][0];
   if(NL===1)reads.forEach(o=>{if(o.r&&o.r.sc.length>modeN)o.r.sc=o.r.sc.slice(0,modeN)});
   /* the clear readings give the range of times in this plan; a doubtful reading far outside it is pulled back in */
-  const sure=reads.filter(o=>o.r&&o.r.tot<.6).map(o=>tzDecode(o.r.sc,m)[0]).sort((a,b)=>a-b);const q=p=>sure[Math.min(sure.length-1,Math.floor(p*sure.length))];
+  const sure=reads.filter(o=>o.r&&o.r.tot<1.2).map(o=>tzDecode(o.r.sc,m)[0]).sort((a,b)=>a-b);const q=p=>sure[Math.min(sure.length-1,Math.floor(p*sure.length))];
   const rLo=sure.length>20?q(.01):null,rHi=sure.length>20?q(.99):null,span=rHi!=null?rHi-rLo:0;const A=rLo!=null?Math.max(0,rLo-.15*span):undefined,Zh=rHi!=null?rHi+.15*span:undefined;
   const holes=[];
   if(NL===1){reads.forEach(o=>{const d=o.d;if(!o.r){holes.push({cx:d.cx/R.Zs,cy:d.cy/R.Zs,t:null,cost:1e9});return}
