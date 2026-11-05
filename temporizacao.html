@@ -1030,7 +1030,7 @@ async function usePoly(p){if(saveT)commit();P=p;mem[p.id]=p;lsSet('tz-last',p.id
 
 /* ---------- PDF import ---------- */
 function openPdfSheet(){openSheet(`<div class="shead"><h2>Abrir croqui em PDF</h2><button class="x" aria-label="Fechar">✕</button></div>
-  <p class="muted">O app acha os furos (pontos amarelos ou verdes) no PDF de temporização e lê o tempo de cada um. Depois é só marcar os círculos. <b>Versão 22</b></p>
+  <p class="muted">O app acha os furos (pontos amarelos ou verdes) no PDF de temporização e lê o tempo de cada um. Depois é só marcar os círculos. <b>Versão 23</b></p>
   <div class="row"><button class="ibtn pri" id="oPick">Escolher PDF</button></div>`);$('#oPick').onclick=()=>{$('#fPdf').click()}}
 $('#bOpen').onclick=openPdfSheet;$('#bPolys').onclick=polySheet;$('#bSum').onclick=()=>P&&sumSheet();
 $('#fPdf').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;closeSheet();busy('Lendo PDF…');
@@ -1295,7 +1295,7 @@ async function importPdf(buf,fileName,readMarks){
 </style>
 <script>
 /* Temporização: tocar no furo abre só as cinco marcações */
-(function(){const q=document.getElementById('q');if(q){q.placeholder='Tempo do furo (ex.: 1500)';q.setAttribute('aria-label','Buscar furo pelo tempo')}
+(function(){const q=document.getElementById('q');if(q){q.placeholder='Tempo(s): 1119, 1170';q.setAttribute('aria-label','Marcar furos pelo tempo');q.setAttribute('inputmode','decimal')}
   const f=document.getElementById('fSearch');if(f){const b=document.createElement('button');b.type='button';b.className='ibtn';b.id='tzAdd';b.setAttribute('aria-pressed','false');b.textContent='+ Adicional';f.after(b);
     b.onclick=()=>{if(!P||P.sample){toast('Abra o PDF de temporização primeiro');return}if(mode==='add')setMode('sel');else{addType='adicional';setMode('add')}}}})();
 function addHint(){const h=$('#hint');h.hidden=false;h.innerHTML='<span><b>Furo adicional:</b> toque no desenho onde o furo foi feito. Depois digite o tempo.</span><button id="hStop">Concluir</button>';$('#hStop').onclick=()=>setMode('sel')}
@@ -1305,6 +1305,28 @@ function hit(wx,wy){let b=-1,bd=Math.max(9,22/view.s);const G=P.tzg;
   P.holes.forEach((h,i)=>{if(h.ghost)return;const[cx,cy]=hc(h);let d=Math.hypot(cx-wx,cy-wy);
     if(G&&!h.add){const dx=cx-G.dx,dy=cy-G.dy;d=Math.min(d,Math.hypot(dx-wx,dy-wy)*.55,Math.hypot(cx+G.dx*.6-wx,cy+G.dy*.6-wy)*1.05)}
     if(d<bd){bd=d;b=i}});return b}
+/* mark by number: type one or more times (1119, 1170 …) and choose the mark */
+function tzFind(t){t=String(+t);return P.holes.findIndex(h=>!h.ghost&&((h.tl!=null&&String(h.tl)===t)||(h.pt&&h.pt.includes(t))))}
+function tzBatch(list){const found=list.map(t=>[t,tzFind(t)]),ok=found.filter(f=>f[1]>=0).map(f=>P.holes[f[1]]),miss=found.filter(f=>f[1]<0).map(f=>f[0]);
+  if(!ok.length){toast('Nenhum furo com '+(list.length>1?'esses tempos':'o tempo '+list[0]));return}
+  if(ok.length===1&&!miss.length){const i=P.holes.indexOf(ok[0]);$('#q').blur();sel=i;centerOn(ok[0],3);holeSheet(i);return}
+  const btn=s=>`<button type="button" data-k="${s.k}"><span class="ring" style="border-color:${s.c}"></span>${esc(s.l)}</button>`;
+  openSheet(`<div class="shead"><h2>${ok.length} furos</h2><button class="x" aria-label="Fechar">✕</button></div>
+   <p class="muted" style="margin:0 0 6px"><b>${ok.map(hn).join(', ')}</b>${miss.length?`<br><span style="color:#c8102e">Não encontrados: ${miss.join(', ')}</span>`:''}</p>
+   <p class="muted" style="margin:0 0 4px">Toque na marcação para aplicar em todos. Toque de novo para tirar de todos.</p>
+   <div class="tzpick" id="tzBSt">${ST.map(btn).join('')}<button type="button" class="full" data-clear="1">Limpar marcação</button></div>
+   <div id="tzBAn"></div><div class="row"><button class="ibtn pri" id="tzBOk" type="button">Pronto</button></div>`,false);
+  const sh=document.querySelector('.sheet');
+  const sync=()=>{sh.querySelectorAll('#tzBSt [data-k]').forEach(b=>b.setAttribute('aria-pressed',ok.every(h=>h.st.includes(b.dataset.k))));
+    const an=ok.filter(h=>h.st.includes('anomalia'));$('#tzBAn').innerHTML=an.length?'<h3>Tipo de anomalia</h3><div class="tzpick">'+AN.map(a=>`<button type="button" data-an="${a[0]}" aria-pressed="${an.every(h=>h.an===a[0])}">${a[1]}</button>`).join('')+'</div>':'';
+    $('#tzBAn').querySelectorAll('[data-an]').forEach(b=>b.onclick=()=>{an.forEach(h=>h.an=b.dataset.an);anSel=b.dataset.an;save();draw();sync()});save();renderLegend();draw()};
+  $('#tzBSt').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+    if(b.dataset.clear){ok.forEach(h=>{h.st=h.st.filter(k=>SK[k]&&SK[k].cr);delete h.an;delete h.dt});sync();toast(ok.length+' furos sem marcação');return}
+    const k=b.dataset.k,all=ok.every(h=>h.st.includes(k));ok.forEach(h=>{if(all||!h.st.includes(k))toggle(h,k);if(k==='anomalia'){if(h.st.includes(k)){if(!h.an)h.an=anSel}else delete h.an}});sync();
+    toast(ok.length+' furos '+(all?'sem ':'→ ')+SK[k].l)};
+  sync();const done=()=>{closeSheet();$('#q').value='';draw()};$('#tzBOk').onclick=done;sh.querySelector('.x').onclick=done}
+(function(){const f=document.getElementById('fSearch');if(!f)return;f.onsubmit=e=>{e.preventDefault();if(!P||P.sample){toast('Abra o PDF de temporização primeiro');return}
+  const list=($('#q').value.match(/\d+/g)||[]);if(!list.length)return;$('#q').blur();tzBatch(list)}})();
 function holeSheet(i){const h=P.holes[i];sel=i;draw();
   const btn=s=>`<button type="button" data-k="${s.k}" aria-pressed="${h.st.includes(s.k)}"><span class="ring" style="border-color:${s.c}"></span>${esc(s.l)}</button>`;
   const anH=()=>h.st.includes('anomalia')?'<h3>Tipo de anomalia</h3><div class="tzpick">'+AN.map(a=>`<button type="button" data-an="${a[0]}" aria-pressed="${h.an===a[0]}">${a[1]}</button>`).join('')+'</div>':'';
