@@ -1030,7 +1030,7 @@ async function usePoly(p){if(saveT)commit();P=p;mem[p.id]=p;lsSet('tz-last',p.id
 
 /* ---------- PDF import ---------- */
 function openPdfSheet(){openSheet(`<div class="shead"><h2>Abrir croqui em PDF</h2><button class="x" aria-label="Fechar">✕</button></div>
-  <p class="muted">O app acha os furos (pontos amarelos ou verdes) no PDF de temporização e lê o tempo de cada um. Depois é só marcar os círculos. <b>Versão 24</b></p>
+  <p class="muted">O app acha os furos (pontos amarelos ou verdes) no PDF de temporização e lê o tempo de cada um. Depois é só marcar os círculos. <b>Versão 25</b></p>
   <div class="row"><button class="ibtn pri" id="oPick">Escolher PDF</button></div>`);$('#oPick').onclick=()=>{$('#fPdf').click()}}
 $('#bOpen').onclick=openPdfSheet;$('#bPolys').onclick=polySheet;$('#bSum').onclick=()=>P&&sumSheet();
 $('#fPdf').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;closeSheet();busy('Lendo PDF…');
@@ -1284,7 +1284,7 @@ async function importPdf(buf,fileName,readMarks){
 </script>
 
 <style>
-.seg{display:none!important}
+.seg button[data-mode="add"]{display:none!important}
 .tzpick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0 4px}
 .tzpick button{display:flex;align-items:center;gap:10px;min-height:52px;padding:0 12px;border-radius:10px;border:1px solid var(--line,#d0d4d2);background:var(--surface,#fff);color:inherit;font:600 16px Barlow,Arial,sans-serif;text-align:left}
 .tzpick button[aria-pressed="true"]{background:#1c2224;color:#fff;border-color:#1c2224}
