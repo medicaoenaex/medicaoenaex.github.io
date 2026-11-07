@@ -823,4 +823,4 @@ async function importPdf(buf,fileName,readMarks){
 if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 
-</body></html>
+<script>try{if('serviceWorker' in navigator&&navigator.serviceWorker.controller){navigator.serviceWorker.addEventListener('controllerchange',function(){try{if(sessionStorage.getItem('swr'))return;sessionStorage.setItem('swr','1')}catch(e){}location.reload()})}}catch(e){}</script></body></html>
