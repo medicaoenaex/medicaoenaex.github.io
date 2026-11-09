@@ -360,7 +360,7 @@ function tap(sx,sy){if(!P)return;const wx=(sx-view.ox)/view.s,wy=(sy-view.oy)/vi
   if(mode==='move'){const h=P.holes[moveIdx];if(h){h.x=wx-LABEL_DX;h.y=wy-LABEL_DY;save()}const k=moveIdx;moveIdx=-1;setMode('sel');if(h){sel=k;draw();toast('Furo '+hn(h)+' movido')}return}
   if(mode==='add'){if(wx<0||wy<0||wx>P.w||wy>P.h)return;const X=wx-LABEL_DX,Y=wy-LABEL_DY;
     if(addType==='fora_malha'){
-      if(addSrc<0){const i=hit(wx,wy);if(i>=0&&!P.holes[i].add){addSrc=i;draw();addHint();return}}
+      if(addSrc<0){const i=hit(wx,wy);if(i>=0&&!P.holes[i].add){addSrc=i;draw();addHint();return}toast(i>=0?'Esse furo já foi criado em campo. Para mudar de lugar, abra ele em Marcar.':'Toque primeiro em cima do furo do projeto que saiu da malha.');return}
       if(addSrc>=0){const o=P.holes[addSrc];const keep=o.st.filter(k=>!(SK[k]&&SK[k].cr));P.holes.push({n:o.n,x:X,y:Y,st:['fora_malha',...keep],pm:o.pm||'',pr:o.pr||'',obs:o.obs||'',add:true,of:o.n});o.ghost=true;o.st=[];addSrc=-1;save();renderLegend();draw();addHint();toast('Furo '+o.n+' deslocado (fora da malha)');return}}
     const n=1e5+Math.max(0,...P.holes.filter(h=>h.n>=1e5).map(h=>h.n-1e5))+1;P.holes.push({n,x:X,y:Y,st:[addType],pm:'',pr:'',obs:'',add:true});save();renderLegend();draw();toast('Furo '+hn({n})+' criado: '+SK[addType].l);return}
   const i=hit(wx,wy);
@@ -401,7 +401,7 @@ function camHint(){const h=$('#hint');h.hidden=false;const F=frota();if(!F.inclu
   $('#hDia').onchange=e=>{camDia=e.target.value||todayIso()};$('#hStop').onclick=()=>setMode('sel')}
 document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
 function addHint(){const h=$('#hint');h.hidden=false;const tb=k=>`<button data-t="${k}" style="${addType===k?'':'background:transparent;color:inherit;box-shadow:inset 0 0 0 1px currentColor;opacity:.8'}">${SK[k].l}</button>`;
-  const msg=addType==='adicional'?'Toque onde o furo adicional foi perfurado.':addSrc>=0?'Agora toque onde o furo <b>'+P.holes[addSrc].n+'</b> foi realmente perfurado.':'Toque no furo do projeto que saiu da malha e depois onde ele foi perfurado. Ponto vazio cria um furo novo.';
+  const msg=addType==='adicional'?'Toque onde o furo adicional foi perfurado.':addSrc>=0?'Agora toque onde o furo <b>'+P.holes[addSrc].n+'</b> foi realmente perfurado.':'Toque no furo do projeto que saiu da malha. Depois toque onde ele foi perfurado: o furo é <b>movido</b> para lá, com o mesmo número.';
   h.innerHTML=`<span style="display:flex;flex-direction:column;gap:7px;min-width:0"><span style="display:flex;gap:6px;flex-wrap:wrap">${tb('adicional')}${tb('fora_malha')}</span><span>${msg}</span></span><button id="hStop">Concluir</button>`;
   h.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{addType=b.dataset.t;addSrc=-1;renderLegend();draw();addHint()});$('#hStop').onclick=()=>setMode('sel')}
 function areaHint(){const h=$('#hint');h.hidden=false;h.innerHTML=`<span>${draft.length<3?'Toque em volta dos furos para desenhar a área de carregamento ('+draft.length+' pontos).':draft.length+' pontos. Toque em Concluir para nomear a área.'}</span><span style="display:flex;gap:6px">${draft.length?'<button id="hUndo">Desfazer</button>':''}<button id="hDone">${draft.length>=3?'Concluir':'Cancelar'}</button></span>`;
@@ -427,7 +427,7 @@ function holeSheet(i){const h=P.holes[i];const projOf=()=>{const v=num(h.pp);ret
   <div id="dnote"></div>
   <h3>Fotos</h3><div class="fotos" id="fotos"></div><div class="row"><button class="ibtn" id="bFoto" type="button">Adicionar foto</button></div>
   <div class="muted hlog" id="hlog"></div>
-  ${h.add?'<div class="row"><button class="ibtn" id="bMove">Mudar posição</button><button class="ibtn danger" id="bDel">'+(h.of?'Desfazer deslocamento':'Excluir furo criado')+'</button></div>':''}`,false);
+  ${!h.add?'<div class="row"><button class="ibtn" id="bFora">🔵 Fora da malha: mover furo</button></div>':''}${h.add?'<div class="row"><button class="ibtn" id="bMove">Mudar posição</button><button class="ibtn danger" id="bDel">'+(h.of?'Desfazer deslocamento':'Excluir furo criado')+'</button></div>':''}`,false);
   const sh=document.querySelector('.sheet');
   sh.querySelector('.stgrid').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;const k=b.dataset.k;toggle(h,k);sh.querySelectorAll('.stgrid .chip').forEach(c=>c.setAttribute('aria-pressed',h.st.includes(c.dataset.k)));save();renderLegend();draw();chk()};
   const chk=()=>{proj=projOf();const pm=num(h.pm),pr=num(h.pr),el=$('#dnote');if(proj==null||pm==null){el.innerHTML='';return}
@@ -442,6 +442,7 @@ function holeSheet(i){const h=P.holes[i];const projOf=()=>{const v=num(h.pp);ret
   $('#bFoto').onclick=()=>{fotoTarget=h;$('#fImg').click()};showLog(h);
   $('#hcam').onchange=e=>{const v=e.target.value;if(v){h.cam=v;if(!h.dia){h.dia=todayIso();$('#hdia').value=h.dia}}else{delete h.cam;delete h.dia;$('#hdia').value=''}save();renderLegend();draw()};
   $('#hdia').onchange=e=>{if(e.target.value)h.dia=e.target.value;else delete h.dia;save();draw()};
+  if(!h.add&&$('#bFora'))$('#bFora').onclick=()=>{const k=P.holes.indexOf(h);addType='fora_malha';setMode('add');addSrc=k;sel=k;addHint();draw()};
   if(h.add){$('#bMove').onclick=()=>{const k=P.holes.indexOf(h);closeSheet();moveIdx=k;setMode('move');draw()};const b=$('#bDel');b.onclick=()=>{if(b.dataset.c){P.holes.splice(P.holes.indexOf(h),1);if(h.of){const o=P.holes.find(q=>q.ghost&&q.n===h.of);if(o){o.ghost=false;o.st=h.st.filter(k=>k!=='fora_malha')}}sel=-1;save();renderLegend();closeSheet();draw();toast('Furo '+hn(h)+' excluído')}else{b.dataset.c=1;b.textContent='Toque de novo para excluir'}}}
   sh.querySelector('.x').onclick=closeSheet}
 const when=t=>new Date(t).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
@@ -566,7 +567,7 @@ async function usePoly(p){if(saveT)commit();P=p;mem[p.id]=p;lsSet('cr-last',p.id
 
 /* ---------- PDF import ---------- */
 function openPdfSheet(){openSheet(`<div class="shead"><h2>Abrir croqui em PDF</h2><button class="x" aria-label="Fechar">✕</button></div>
-  <p class="muted">O app lê os furos direto do PDF (Paradigm Terra ou croqui da Vale) e monta a malha para você marcar. <b>Versão 12</b></p>
+  <p class="muted">O app lê os furos direto do PDF (Paradigm Terra ou croqui da Vale) e monta a malha para você marcar. <b>Versão 13</b></p>
   <label class="chk"><input type="checkbox" id="oMarks" ${lsGet('cr-marks')==='0'?'':'checked'}>Ler as marcações coloridas que já estiverem no PDF (repasse, não furado, etc.)</label>
   <div class="row"><button class="ibtn pri" id="oPick">Escolher PDF</button></div>`);$('#oPick').onclick=()=>{lsSet('cr-marks',$('#oMarks').checked?'1':'0');$('#fPdf').click()}}
 $('#bOpen').onclick=openPdfSheet;$('#bPolys').onclick=polySheet;$('#bSum').onclick=()=>P&&sumSheet();
