@@ -727,7 +727,7 @@ const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
 /* field-added holes are stored as 100000+k and shown as Ak */
-const hn=h=>h.tl!=null&&h.tl!==''?h.tl:h.n>=1e5?'A'+(h.n-1e5):h.n;
+const hn=h=>h.tl!=null&&h.tl!==''?h.tl:h.n>=1e5?'A'+(h.n-1e5):h.pf?h.pf+String(h.n).padStart(3,'0'):h.n;
 function ranges(a){if(P&&P.tz){const L=a.map(n=>{const h=P.holes.find(q=>q.n===n);return h?hn(h):n});return L.join(', ')}const N=a.filter(x=>x<1e5),A=a.filter(x=>x>=1e5).map(x=>x-1e5);return[rng0(N),A.length?rng0(A).replace(/(\d+)/g,'A$1'):''].filter(Boolean).join(', ')}
 function rng0(a){a=[...a].sort((x,y)=>x-y);const o=[];for(let i=0;i<a.length;){let j=i;while(j+1<a.length&&a[j+1]===a[j]+1)j++;o.push(j-i>=2?a[i]+'–'+a[j]:j>i?a[i]+', '+a[j]:''+a[i]);i=j+1}return o.join(', ')}
 function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,1600)}
@@ -758,11 +758,22 @@ function segD(px,py,ax,ay,bx,by){const dx=bx-ax,dy=by-ay,L=dx*dx+dy*dy;let t=L?(
 function simplify(p,tol){if(p.length<3)return p;const keep=new Uint8Array(p.length);keep[0]=keep[p.length-1]=1;const st=[[0,p.length-1]];
   while(st.length){const[a,b]=st.pop();let m=-1,mi=-1;for(let i=a+1;i<b;i++){const d=segD(p[i][0],p[i][1],p[a][0],p[a][1],p[b][0],p[b][1]);if(d>m){m=d;mi=i}}if(m>tol){keep[mi]=1;st.push([a,mi],[mi,b])}}
   return p.filter((_,i)=>keep[i]).map(([x,y])=>[Math.round(x*10)/10,Math.round(y*10)/10])}
-function finishStroke(raw){if(!P||raw.length<2)return;const pts=simplify(raw,1.2/view.s),R=Math.max(holeR(),10/view.s),z={id:uid(),rt:1,cam:camSel,dia:camDia,lb:'',pts,hk:[]};let other=0;
+function finishStroke(raw){if(!P||raw.length<2)return;const pts=simplify(raw,1.2/view.s),z={id:uid(),rt:1,cam:camSel,dia:camDia,lb:'',pts,hk:[]};const other=marcaRota(z);
+  P.zones.push(z);save();syncRotas();renderLegend();draw();camHint();toast('Caminho do '+camSel+': '+z.hk.length+' furo'+(z.hk.length===1?'':'s')+' marcado'+(z.hk.length===1?'':'s')+(other?' · '+other+' já eram de outro caminhão':''))}
+const rotaKey=p=>p&&p.arquivo&&!p.sample?'rotas:'+p.arquivo+'|'+Math.round(p.w)+'|'+Math.round(p.h):null;
+function rotaLS(k){try{return JSON.parse(localStorage.getItem(k)||'null')||{r:[],del:[]}}catch(e){return{r:[],del:[]}}}
+function marcaRota(z){const pts=z.pts,R=Math.max(holeR(),10/view.s);z.hk=[];let other=0;
   live().forEach(h=>{const[x,y]=hc(h);let d=1e9;for(let i=1;i<pts.length;i++){d=Math.min(d,segD(x,y,pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1]));if(d<R)break}if(d>=R)return;
-    if(h.cam&&(h.cam!==camSel||(h.dia||'')!==(camDia||''))){other++;return}if(h.cam)return;h.cam=camSel;h.dia=camDia;z.hk.push(h.k)});
-  P.zones.push(z);save();renderLegend();draw();camHint();toast('Caminho do '+camSel+': '+z.hk.length+' furo'+(z.hk.length===1?'':'s')+' marcado'+(z.hk.length===1?'':'s')+(other?' · '+other+' já eram de outro caminhão':''))}
-function dropRota(z){(z.hk||[]).forEach(k=>{const h=P.holes.find(q=>q.k===k);if(h&&h.cam===z.cam&&(h.dia||'')===(z.dia||'')){delete h.cam;delete h.dia}});P.zones.splice(P.zones.indexOf(z),1)}
+    if(h.cam&&(h.cam!==z.cam||(h.dia||'')!==(z.dia||''))){other++;return}if(h.cam)return;h.cam=z.cam;h.dia=z.dia;z.hk.push(h.k)});return other}
+/* the same PDF or photo opened in Medição and in Temporização shares its truck paths */
+function syncRotas(){if(!P)return;const k=rotaKey(P);if(!k)return;const S=rotaLS(k),del=new Set(S.del);let ch=false;
+  P.zones.filter(z=>z.rt&&del.has(z.id)).forEach(z=>{dropRota(z,1);ch=true});const have=new Set(P.zones.filter(z=>z.rt).map(z=>z.id));
+  S.r.forEach(r=>{if(have.has(r.id)||del.has(r.id))return;const z={id:r.id,rt:1,cam:r.cam,dia:r.dia||'',lb:'',pts:r.pts,hk:[]};marcaRota(z);P.zones.push(z);ch=true});
+  try{localStorage.setItem(k,JSON.stringify({r:P.zones.filter(z=>z.rt).map(z=>({id:z.id,cam:z.cam,dia:z.dia||'',pts:z.pts})),del:[...del].slice(-400)}))}catch(e){}
+  if(ch){save();renderLegend();draw();if(mode==='cam')camHint()}}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncRotas()});
+
+function dropRota(z,quiet){if(!quiet){const k=rotaKey(P);if(k){const S=rotaLS(k);S.del.push(z.id);S.r=S.r.filter(r=>r.id!==z.id);try{localStorage.setItem(k,JSON.stringify(S))}catch(e){}}}(z.hk||[]).forEach(k=>{const h=P.holes.find(q=>q.k===k);if(h&&h.cam===z.cam&&(h.dia||'')===(z.dia||'')){delete h.cam;delete h.dia}});P.zones.splice(P.zones.indexOf(z),1)}
 function strokeLine(c,pts,col,u,arrows){if(pts.length<2)return;const lw=Math.max(2.2,3.2*u);c.lineJoin=c.lineCap='round';c.beginPath();pts.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));
   c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=lw+2.4*Math.max(u,.7);c.stroke();c.strokeStyle=col;c.lineWidth=lw;c.stroke();if(!arrows)return;
   const step=70*u;let acc=step*.5;for(let i=1;i<pts.length;i++){const[a,b]=pts[i-1],[x,y]=pts[i],L=Math.hypot(x-a,y-b);let t=acc;while(t<L){const ang=Math.atan2(y-b,x-a),mx=a+(x-a)*t/L,my=b+(y-b)*t/L,s=Math.max(5,7*u);
@@ -879,7 +890,7 @@ function setMode(m,keepBrush){mode=m;document.querySelectorAll('.seg button').fo
 /* ---------- trucks: which truck loaded which holes ---------- */
 const FROTA_DEF=['1113','1038','1039','1044','1045','1148'];
 const CAM_C=['#c2185b','#1e40af','#0f766e','#ea580c','#65a30d','#6b21a8','#0369a1','#a16207'];
-function frota(){const v=lsGet('tz-frota');const L=(v?v.split(/[,;\s]+/):FROTA_DEF).map(s=>s.trim()).filter(Boolean);return L.length?L:FROTA_DEF}
+function frota(){const v=lsGet('frota')||lsGet('tz-frota');const L=(v?v.split(/[,;\s]+/):FROTA_DEF).map(s=>s.trim()).filter(Boolean);return L.length?L:FROTA_DEF}
 function camColor(c){const L=frota();let i=L.indexOf(String(c));if(i<0){i=0;for(const ch of String(c))i=(i*31+ch.charCodeAt(0))>>>0}return CAM_C[i%CAM_C.length]}
 const todayIso=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 const fdia=s=>/^\d{4}-\d{2}-\d{2}$/.test(s||'')?s.slice(8,10)+'/'+s.slice(5,7):(s||'');
@@ -893,8 +904,8 @@ function hull(pts){pts=pts.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);if(pts.leng
 function camHint(){const h=$('#hint');h.hidden=false;const F=frota();if(!F.includes(camSel))camSel=F[0];
   h.innerHTML=`<span style="display:flex;flex-direction:column;gap:7px;min-width:0"><span style="display:flex;gap:6px;flex-wrap:wrap">${F.map(c=>`<button data-c="${esc(c)}" aria-pressed="${c===camSel}" style="${c===camSel?'background:'+camColor(c)+';color:#fff':'background:transparent;color:inherit;box-shadow:inset 0 0 0 1px currentColor;opacity:.85'}">${esc(c)}</button>`).join('')}</span>
   <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="date" id="hDia" aria-label="Dia do carregamento" value="${esc(camDia)}" style="border:0;border-radius:6px;padding:4px 6px;font:inherit;background:var(--bg);color:var(--ink)"><span><b>Arraste o dedo</b> por onde o <b>${esc(camSel)}</b> passou: os furos no caminho ficam marcados para ele. Toque num furo para marcar ou desmarcar. Dois dedos movem e dão zoom.</span></span></span><span style="display:flex;flex-direction:column;gap:6px">${(rotaAt(camSel,camDia)||{pts:[]}).pts.length?'<button id="hRUndo">Desfazer traço</button><button id="hRDel">Apagar caminho</button>':''}<button id="hStop">Concluir</button></span>`;
-  if($('#hRUndo'))$('#hRUndo').onclick=()=>{const z=rotaAt(camSel,camDia);if(!z)return;dropRota(z);save();renderLegend();draw();camHint()};
-  if($('#hRDel'))$('#hRDel').onclick=e=>{const b=e.target;if(!b.dataset.c){b.dataset.c=1;b.textContent='Toque de novo';return}P.zones.filter(z=>z.rt&&z.cam===camSel&&(z.dia||'')===(camDia||'')).forEach(dropRota);save();renderLegend();draw();camHint();toast('Caminho apagado')};
+  if($('#hRUndo'))$('#hRUndo').onclick=()=>{const z=rotaAt(camSel,camDia);if(!z)return;dropRota(z);save();syncRotas();renderLegend();draw();camHint()};
+  if($('#hRDel'))$('#hRDel').onclick=e=>{const b=e.target;if(!b.dataset.c){b.dataset.c=1;b.textContent='Toque de novo';return}P.zones.filter(z=>z.rt&&z.cam===camSel&&(z.dia||'')===(camDia||'')).forEach(z=>dropRota(z));save();syncRotas();renderLegend();draw();camHint();toast('Caminho apagado')};
   h.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{camSel=b.dataset.c;camHint()});
   $('#hDia').onchange=e=>{camDia=e.target.value||todayIso();camHint()};$('#hStop').onclick=()=>setMode('sel')}
 document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
@@ -1004,7 +1015,7 @@ function sumSheet(){const{by,zones,ok}=summaryData();
   <h3>Enviar para a equipe</h3><p class="muted">Os dados ficam neste aparelho. Envie o polígono pelo WhatsApp; quem receber toca em <b>Receber polígono</b> e as marcações se juntam às dele. O arquivo também serve de backup.</p><div class="row"><button class="ibtn pri" id="bBak">Enviar polígono</button><button class="ibtn" id="bRes">Receber polígono</button></div>
   <div id="prev" class="preview"></div>`);
   $('#sp').oninput=e=>{P.proj=e.target.value.trim();save();$('#mtr').innerHTML=metrosTxt()};$('#bDep').onclick=()=>$('#fDep').click();
-  $('#sfro').onchange=e=>{lsSet('tz-frota',e.target.value);e.target.value=frota().join(', ');draw();toast('Frota atualizada')};
+  $('#sfro').onchange=e=>{lsSet('tz-frota',e.target.value);lsSet('frota',e.target.value);e.target.value=frota().join(', ');draw();toast('Frota atualizada')};
   if($('#snme'))$('#snme').oninput=e=>lsSet('tz-nome',e.target.value.trim());$('#stl').oninput=e=>{P.tol=e.target.value.trim();save()};$('#snm').oninput=e=>{P.nome=e.target.value.trim()||'Polígono';save();renderLegend()};
   $('#bCopy').onclick=async()=>{const t=waText();try{await navigator.clipboard.writeText(t);toast('Texto copiado')}catch(e){const r=document.createRange();r.selectNodeContents($('#wa'));const s=getSelection();s.removeAllRanges();s.addRange(r);toast('Texto selecionado: copie manualmente')}};
   const opt=()=>({depth:$('#xDepth').checked,leg:$('#xLeg').checked});
@@ -1068,7 +1079,7 @@ async function usePoly(p){if(saveT)commit();P=p;mem[p.id]=p;lsSet('tz-last',p.id
 
 /* ---------- PDF import ---------- */
 function openPdfSheet(){openSheet(`<div class="shead"><h2>Abrir croqui em PDF</h2><button class="x" aria-label="Fechar">✕</button></div>
-  <p class="muted">O app acha os furos (pontos amarelos ou verdes) no PDF de temporização e lê o tempo de cada um. Depois é só marcar os círculos. <b>Versão 27</b></p>
+  <p class="muted">O app acha os furos (pontos amarelos ou verdes) no PDF de temporização e lê o tempo de cada um. Depois é só marcar os círculos. <b>Versão 28</b></p>
   <div class="row"><button class="ibtn pri" id="oPick">Escolher PDF</button></div>`);$('#oPick').onclick=()=>{$('#fPdf').click()}}
 $('#bOpen').onclick=openPdfSheet;$('#bPolys').onclick=polySheet;$('#bSum').onclick=()=>P&&sumSheet();
 $('#fPdf').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;closeSheet();
@@ -1285,8 +1296,10 @@ async function tzHoles(doc){let best=null;
   return{page:best.page,p:best.p,holes,step:m,geo,lines:NL}}
 
 async function importPdf(buf,fileName,readMarks){
-  const lib=window.pdfjsLib;if(!lib)throw new Error('pdf.js');
-  const doc=await lib.getDocument({data:new Uint8Array(buf),isEvalSupported:false}).promise;busy('Procurando os furos…');const TZ=await tzHoles(doc);const page=TZ?TZ.page:await doc.getPage(1);readMarks=false;
+  const lib=window.pdfjsLib;if(!lib)throw new Error('pdf.js');const copia=buf.slice(0);
+  const doc=await lib.getDocument({data:new Uint8Array(buf),isEvalSupported:false}).promise;busy('Procurando os furos…');const TZ=await tzHoles(doc);
+  /* not a timing plan (no yellow/green dots): read it like the Medição app does */
+  if(!TZ||TZ.holes.length<10){busy('Lendo o croqui…');const p=await medImportPdf(copia,fileName,false);if(p.holes.length>=10)return Object.assign(p,{tz:1,tzPage:1,tzg:null,tzv:2})}const page=TZ?TZ.page:await doc.getPage(1);readMarks=false;
   const vp=page.getViewport({scale:1});const tc=await page.getTextContent();
   const all=tc.items.map(i=>i.str).join('\n');const nm=((all.match(/(?:Blast|Detona\S*)\s*:\s*([^\n]+)/i)||[])[1]||'').replace(/\s*-\s*TEMPORIZA\S*\s*$/i,'')||(all.match(/Page\s*\d+\/\d+:\s*([^\n]+)/)||[])[1];const hcnt=+((all.match(/Hole Count:\s*(\d+)/i)||[])[1]||0);
   const dig=tc.items.filter(i=>/^\d{1,4}$/.test(i.str.trim())).map(i=>{const sz=Math.hypot(i.transform[2],i.transform[3]);const[vx,vy]=vp.convertToViewportPoint(i.transform[4],i.transform[5]);return{n:+i.str.trim(),sz,vx,vy}});
@@ -1304,6 +1317,30 @@ async function importPdf(buf,fileName,readMarks){
     holes.forEach(h=>{const v={};let n=0;for(let dx=2;dx<14;dx+=2)for(let dy=0;dy<10;dy+=2){const px=Math.round((h.x+dx)*Z),py=Math.round((h.y+dy)*Z);if(px<0||py<0||px>=W||py>=H)continue;const o=(py*W+px)*4;const k=classify(im[o],im[o+1],im[o+2]);n++;if(k)v[k]=(v[k]||0)+1}
       let st=null;if((v.perdido||0)>=.4*n)st='perdido';else{delete v.perdido;const b=Object.entries(v).sort((a,b)=>b[1]-a[1])[0];if(b&&b[1]>=.15*n)st=b[0]}if(st)h.st=[st];ringMarks(h,im,ci,W,H,Z)})}
   return{id:uid(),tz:1,tzPage:TZ?TZ.p:1,tzg:TZ?TZ.geo:null,tzv:2,nome:(nm||fileName.replace(/\.pdf$/i,'')).trim(),arquivo:fileName,w:vp.width,h:vp.height,holeCount:hcnt,bg:clean.toDataURL('image/jpeg',.82),holes,zones:[],proj:'',tol:'0,3',created:Date.now(),upd:Date.now()}}
+
+const _usePoly=usePoly;usePoly=async(...a)=>{const r=await _usePoly(...a);try{syncRotas()}catch(e){console.error(e)}return r};
+async function medImportPdf(buf,fileName,readMarks){
+  const lib=window.pdfjsLib;if(!lib)throw new Error('pdf.js');
+  const doc=await lib.getDocument({data:new Uint8Array(buf),isEvalSupported:false}).promise;let page=await doc.getPage(1);
+  let vp=page.getViewport({scale:1});let tc=await page.getTextContent();
+  const all=tc.items.map(i=>i.str).join('\n');let nm=(all.match(/Page\s*\d+\/\d+:\s*([^\n]+)/)||[])[1];const hcnt=+((all.match(/Hole Count:\s*(\d+)/i)||[])[1]||0);
+  const dig=tc.items.filter(i=>/^\d{1,4}$/.test(i.str.trim())).map(i=>{const sz=Math.hypot(i.transform[2],i.transform[3]);const[vx,vy]=vp.convertToViewportPoint(i.transform[4],i.transform[5]);return{n:+i.str.trim(),sz,vx,vy}});
+  const sc={};dig.forEach(d=>{const k=d.sz.toFixed(1);sc[k]=(sc[k]||0)+1});const mode=+Object.entries(sc).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  const seen=new Set();const holes=[];dig.filter(d=>Math.abs(d.sz-mode)<.15).forEach(d=>{if(seen.has(d.n))return;seen.add(d.n);holes.push({n:d.n,x:d.vx,y:d.vy-.92*d.sz,st:[],pm:'',pr:'',obs:'',add:false})});
+  holes.sort((a,b)=>a.n-b.n);
+  if(holes.length<150){busy('Procurando os furos no desenho…');let rh=[];try{rh=await rasterHoles(page,20)}catch(e){console.error(e);toast('Pouca memória para ler o desenho. Feche outros apps e tente de novo.')}if(rh.length>=20&&rh.length>holes.length){holes.length=0;rh.sort((a,b)=>a.n-b.n).forEach(f=>holes.push({n:f.n,pf:f.pf,x:f.cx-LABEL_DX,y:f.cy-LABEL_DY,st:[],pm:'',pr:'',obs:'',add:false}))}busy('Lendo PDF…')}
+  let tzp=0;if(holes.length<20||/TEMPORIZA/i.test(all)){busy('Procurando os furos da temporização…');let TZ=null;try{TZ=await tzHoles(doc)}catch(e){console.error(e)}
+    if(TZ&&TZ.holes.length>=10&&TZ.holes.length>holes.length){tzp=TZ.p||1;page=TZ.page;vp=page.getViewport({scale:1});holes.length=0;const cnt={};TZ.holes.forEach(f=>{if(f.t!=null)cnt[f.t]=(cnt[f.t]||0)+1});let q=0,z=0;
+      TZ.holes.sort((a,b)=>(a.t==null)-(b.t==null)||a.t-b.t||a.cy-b.cy).forEach(f=>{const n=f.t!=null&&cnt[f.t]===1?f.t:60000+(++z);const tl=f.t!=null?String(f.t):'?'+(++q);
+        holes.push({n,tl,x:f.cx+TZ.geo.dx-LABEL_DX,y:f.cy+TZ.geo.dy-LABEL_DY,st:[],pm:'',pr:'',obs:'',add:false})});
+      const t2=(await page.getTextContent()).items.map(i=>i.str).join('\n');nm=((t2.match(/(?:Blast|Detona\S*)\s*:\s*([^\n]+)/i)||[])[1]||'').replace(/\s*-\s*TEMPORIZA\S*\s*$/i,'')||nm;readMarks=false}busy('Lendo PDF…')}
+  const Z=Math.min(3,2400/vp.width);const v2=page.getViewport({scale:Z});const AM=lib.AnnotationMode||{};
+  const render=async(am)=>{const c=document.createElement('canvas');c.width=Math.round(v2.width);c.height=Math.round(v2.height);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);await page.render({canvasContext:x,viewport:v2,annotationMode:am}).promise;return c};
+  const clean=await render(AM.DISABLE??0);
+  if(readMarks&&holes.length){busy('Lendo marcações…');const mk=await render(AM.ENABLE??1);const im=mk.getContext('2d').getImageData(0,0,mk.width,mk.height).data;const W=mk.width,H=mk.height;const ci=clean.getContext('2d').getImageData(0,0,W,H).data;
+    holes.forEach(h=>{const v={};let n=0;for(let dx=2;dx<14;dx+=2)for(let dy=0;dy<10;dy+=2){const px=Math.round((h.x+dx)*Z),py=Math.round((h.y+dy)*Z);if(px<0||py<0||px>=W||py>=H)continue;const o=(py*W+px)*4;const k=classify(im[o],im[o+1],im[o+2]);n++;if(k)v[k]=(v[k]||0)+1}
+      let st=null;if((v.perdido||0)>=.4*n)st='perdido';else{delete v.perdido;const b=Object.entries(v).sort((a,b)=>b[1]-a[1])[0];if(b&&b[1]>=.15*n)st=b[0]}if(st)h.st=[st];ringMarks(h,im,ci,W,H,Z)})}
+  return{id:uid(),...(tzp?{tzPage:tzp}:{}),nome:(nm||fileName.replace(/\.pdf$/i,'')).trim(),arquivo:fileName,w:vp.width,h:vp.height,holeCount:hcnt,bg:clean.toDataURL('image/jpeg',.82),holes,zones:[],proj:'',tol:'0,3',created:Date.now(),upd:Date.now()}}
 
 /* ---------- boot ---------- */
 (async()=>{dbh=await idb();let all=await dbAll();
