@@ -286,16 +286,35 @@ function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);
 async function importImg(f,extra){let bm=null;try{bm=await createImageBitmap(f,{imageOrientation:'from-image'})}catch(e){}
   if(!bm)bm=await new Promise((ok,no)=>{const u=URL.createObjectURL(f),im=new Image();im.onload=()=>ok(im);im.onerror=()=>no(new Error('img'));im.src=u});
   const W0=bm.width,H0=bm.height,k=Math.min(1,2400/Math.max(W0,H0)),cv=document.createElement('canvas');cv.width=Math.round(W0*k);cv.height=Math.round(H0*k);cv.getContext('2d').drawImage(bm,0,0,cv.width,cv.height);
-  const w=1000,h=Math.round(1000*H0/W0);
-  return{id:uid(),...extra,foto:1,nome:f.name.replace(/\.[^.]+$/,'').trim()||'Foto do polígono',arquivo:f.name,w,h,holeCount:0,bg:cv.toDataURL('image/jpeg',.85),holes:[],zones:[],proj:'',tol:'0,3',created:Date.now(),upd:Date.now()}}
+  const w=1000,h=Math.round(1000*H0/W0),holes=fotoFuros(cv,w,h);
+  return{id:uid(),...extra,foto:1,nome:f.name.replace(/\.[^.]+$/,'').trim()||'Foto do polígono',arquivo:f.name,w,h,holeCount:0,bg:cv.toDataURL('image/jpeg',.85),holes,zones:[],proj:'',tol:'0,3',created:Date.now(),upd:Date.now()}}
+function fotoFuros(cv,w,h){try{const W=cv.width,H=cv.height,d=cv.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data,N=W*H,yel=new Uint8Array(N);
+  for(let i=0,o=0;i<N;i++,o+=4){const r=d[o],g=d[o+1],b=d[o+2],mx=Math.max(r,g,b),mn=Math.min(r,g,b),c=mx-mn;if(mx<110||c<55||c/mx<.42)continue;let hu=mx===r?((g-b)/c)%6:mx===g?(b-r)/c+2:(r-g)/c+4;hu*=60;if(hu<0)hu+=360;if(hu>=40&&hu<=160)yel[i]=1}
+  const dots=tzDots({W,H,Zs:Math.max(W,H)/1200,yel});if(dots.length<5)return[];const rows=dots.map(q=>({x:q.cx/W*w,y:q.cy/H*h})).sort((a,b)=>a.y-b.y||a.x-b.x);
+  return rows.map((q,i)=>({n:i+1,tl:'',x:q.x-LABEL_DX,y:q.y-LABEL_DY,st:[],pm:'',pr:'',obs:'',add:false}))}catch(e){console.error(e);return[]}}
 const isImg=f=>/^image\//.test(f.type)||/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name);
-function rotaAt(cam,dia){return P.zones.find(z=>z.rt&&z.cam===cam&&(z.dia||'')===(dia||''))}
-function drawRotas(c,u){for(const z of P.zones){if(!z.rt||!z.pts.length)continue;const col=camColor(z.cam),lw=Math.max(2.2,3.2*u);
-    c.save();c.lineJoin=c.lineCap='round';if(z.pts.length>1){c.beginPath();z.pts.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=lw+2.4*Math.max(u,.7);c.stroke();c.strokeStyle=col;c.lineWidth=lw;c.stroke();
-      for(let i=1;i<z.pts.length;i++){const[a,b]=z.pts[i-1],[x,y]=z.pts[i],L=Math.hypot(x-a,y-b);if(L<12*u)continue;const ang=Math.atan2(y-b,x-a),mx=(a+x)/2,my=(b+y)/2,s=Math.max(5,7*u);c.beginPath();c.moveTo(mx+Math.cos(ang)*s,my+Math.sin(ang)*s);c.lineTo(mx+Math.cos(ang+2.5)*s,my+Math.sin(ang+2.5)*s);c.lineTo(mx+Math.cos(ang-2.5)*s,my+Math.sin(ang-2.5)*s);c.closePath();c.fillStyle=col;c.fill()}}
-    z.pts.forEach(([x,y],i)=>{c.beginPath();c.arc(x,y,(i===0||i===z.pts.length-1?4.2:2.6)*Math.max(u,.8),0,7);c.fillStyle=i===0?'#fff':col;c.fill();c.lineWidth=1.4*Math.max(u,.7);c.strokeStyle=col;c.stroke()});
-    const[x0,y0]=z.pts[0],t=z.cam+(z.dia?' · '+fdia(z.dia):''),fs=Math.max(9,12*u);c.font='700 '+fs+'px Barlow,Arial,sans-serif';c.textAlign='left';c.textBaseline='bottom';const tw=c.measureText(t).width;
-    c.fillStyle='rgba(255,255,255,.9)';c.fillRect(x0+5*u,y0-fs-6*u,tw+6*u,fs+4*u);c.fillStyle=col;c.fillText(t,x0+8*u,y0-4*u);c.restore()}}
+function rotaAt(cam,dia){const L=P.zones.filter(z=>z.rt&&z.cam===cam&&(z.dia||'')===(dia||''));return L[L.length-1]}
+let stroke=null,nnR=null;
+function holeR(){const L=live();if(L.length<3)return 14/view.s;if(nnR&&nnR.P===P&&nnR.n===L.length)return nnR.r;const S=L.length>400?L.filter((_,i)=>i%Math.ceil(L.length/400)===0):L;const P2=L.map(hc),ds=[];
+  S.forEach(h=>{const[a,b]=hc(h);let m=1e9;for(const[x,y]of P2){const d=Math.hypot(x-a,y-b);if(d>.01&&d<m)m=d}if(m<1e9)ds.push(m)});ds.sort((a,b)=>a-b);const r=Math.max(4,(ds[ds.length>>1]||20)*.5);nnR={P,n:L.length,r};return r}
+function segD(px,py,ax,ay,bx,by){const dx=bx-ax,dy=by-ay,L=dx*dx+dy*dy;let t=L?((px-ax)*dx+(py-ay)*dy)/L:0;t=t<0?0:t>1?1:t;return Math.hypot(px-ax-t*dx,py-ay-t*dy)}
+function simplify(p,tol){if(p.length<3)return p;const keep=new Uint8Array(p.length);keep[0]=keep[p.length-1]=1;const st=[[0,p.length-1]];
+  while(st.length){const[a,b]=st.pop();let m=-1,mi=-1;for(let i=a+1;i<b;i++){const d=segD(p[i][0],p[i][1],p[a][0],p[a][1],p[b][0],p[b][1]);if(d>m){m=d;mi=i}}if(m>tol){keep[mi]=1;st.push([a,mi],[mi,b])}}
+  return p.filter((_,i)=>keep[i]).map(([x,y])=>[Math.round(x*10)/10,Math.round(y*10)/10])}
+function finishStroke(raw){if(!P||raw.length<2)return;const pts=simplify(raw,1.2/view.s),R=Math.max(holeR(),10/view.s),z={id:uid(),rt:1,cam:camSel,dia:camDia,lb:'',pts,hk:[]};let other=0;
+  live().forEach(h=>{const[x,y]=hc(h);let d=1e9;for(let i=1;i<pts.length;i++){d=Math.min(d,segD(x,y,pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1]));if(d<R)break}if(d>=R)return;
+    if(h.cam&&(h.cam!==camSel||(h.dia||'')!==(camDia||''))){other++;return}if(h.cam)return;h.cam=camSel;h.dia=camDia;z.hk.push(h.k)});
+  P.zones.push(z);save();renderLegend();draw();camHint();toast('Caminho do '+camSel+': '+z.hk.length+' furo'+(z.hk.length===1?'':'s')+' marcado'+(z.hk.length===1?'':'s')+(other?' · '+other+' já eram de outro caminhão':''))}
+function dropRota(z){(z.hk||[]).forEach(k=>{const h=P.holes.find(q=>q.k===k);if(h&&h.cam===z.cam&&(h.dia||'')===(z.dia||'')){delete h.cam;delete h.dia}});P.zones.splice(P.zones.indexOf(z),1)}
+function strokeLine(c,pts,col,u,arrows){if(pts.length<2)return;const lw=Math.max(2.2,3.2*u);c.lineJoin=c.lineCap='round';c.beginPath();pts.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));
+  c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=lw+2.4*Math.max(u,.7);c.stroke();c.strokeStyle=col;c.lineWidth=lw;c.stroke();if(!arrows)return;
+  const step=70*u;let acc=step*.5;for(let i=1;i<pts.length;i++){const[a,b]=pts[i-1],[x,y]=pts[i],L=Math.hypot(x-a,y-b);let t=acc;while(t<L){const ang=Math.atan2(y-b,x-a),mx=a+(x-a)*t/L,my=b+(y-b)*t/L,s=Math.max(5,7*u);
+      c.beginPath();c.moveTo(mx+Math.cos(ang)*s,my+Math.sin(ang)*s);c.lineTo(mx+Math.cos(ang+2.5)*s,my+Math.sin(ang+2.5)*s);c.lineTo(mx+Math.cos(ang-2.5)*s,my+Math.sin(ang-2.5)*s);c.closePath();c.fillStyle=col;c.fill();t+=step}acc=t-L}}
+function drawRotas(c,u){const seen=new Set(camGroups().map(g=>g.cam+'|'+(g.dia||'')));for(const z of P.zones){if(!z.rt||!z.pts.length)continue;const col=camColor(z.cam);c.save();strokeLine(c,z.pts,col,u,true);
+    const ends=z.pts.length>12?[0,z.pts.length-1]:z.pts.map((_,i)=>i);ends.forEach(i=>{const[x,y]=z.pts[i];c.beginPath();c.arc(x,y,(i===0||i===z.pts.length-1?4.2:2.6)*Math.max(u,.8),0,7);c.fillStyle=i===0?'#fff':col;c.fill();c.lineWidth=1.4*Math.max(u,.7);c.strokeStyle=col;c.stroke()});
+    const key=z.cam+'|'+(z.dia||'');if(!seen.has(key)){seen.add(key);const[x0,y0]=z.pts[0],t=z.cam+(z.dia?' · '+fdia(z.dia):''),fs=Math.max(9,12*u);c.font='700 '+fs+'px Barlow,Arial,sans-serif';c.textAlign='left';c.textBaseline='bottom';const tw=c.measureText(t).width;
+      c.fillStyle='rgba(255,255,255,.9)';c.fillRect(x0+5*u,y0-fs-6*u,tw+6*u,fs+4*u);c.fillStyle=col;c.fillText(t,x0+8*u,y0-4*u)}c.restore()}
+  if(stroke&&stroke.length>1){c.save();strokeLine(c,stroke,camColor(camSel),u,false);c.restore()}}
 function drawOverlay(c,o={}){
   const z=o.unit||1; // world units per css px (for selection outline)
   const CG=camGroups();
@@ -350,13 +369,15 @@ function centerOn(h,minS){const r=stage.getBoundingClientRect();const s=Math.max
 /* ---------- gestures ---------- */
 const ptr=new Map();let g=null;
 stage.addEventListener('pointerdown',e=>{if(e.target!==cv)return;cv.setPointerCapture(e.pointerId);const r=stage.getBoundingClientRect();ptr.set(e.pointerId,{x:e.clientX-r.left,y:e.clientY-r.top});
-  if(ptr.size===1){const p=[...ptr.values()][0];g={t:'pan',x:p.x,y:p.y,ox:view.ox,oy:view.oy,moved:false}}
-  else if(ptr.size===2){const[a,b]=[...ptr.values()];g={t:'pinch',d:Math.hypot(a.x-b.x,a.y-b.y),mx:(a.x+b.x)/2,my:(a.y+b.y)/2,s:view.s,ox:view.ox,oy:view.oy,moved:true}}});
+  if(ptr.size===1){const p=[...ptr.values()][0];g=mode==='cam'?{t:'draw',x:p.x,y:p.y,moved:false,pts:[[(p.x-view.ox)/view.s,(p.y-view.oy)/view.s]]}:{t:'pan',x:p.x,y:p.y,ox:view.ox,oy:view.oy,moved:false}}
+  else if(ptr.size===2){if(stroke){stroke=null;draw()}const[a,b]=[...ptr.values()];g={t:'pinch',d:Math.hypot(a.x-b.x,a.y-b.y),mx:(a.x+b.x)/2,my:(a.y+b.y)/2,s:view.s,ox:view.ox,oy:view.oy,moved:true}}});
 stage.addEventListener('pointermove',e=>{if(!ptr.has(e.pointerId)||!g)return;const r=stage.getBoundingClientRect();ptr.set(e.pointerId,{x:e.clientX-r.left,y:e.clientY-r.top});
-  if(g.t==='pan'&&ptr.size===1){const p=[...ptr.values()][0];const dx=p.x-g.x,dy=p.y-g.y;if(!g.moved&&Math.hypot(dx,dy)>7)g.moved=true;if(g.moved){view.ox=g.ox+dx;view.oy=g.oy+dy;draw()}}
+  if(g.t==='draw'&&ptr.size===1){const p=[...ptr.values()][0];if(!g.moved&&Math.hypot(p.x-g.x,p.y-g.y)>7)g.moved=true;const w=[(p.x-view.ox)/view.s,(p.y-view.oy)/view.s],l=g.pts[g.pts.length-1];if(Math.hypot(w[0]-l[0],w[1]-l[1])*view.s>2.5)g.pts.push(w);if(g.moved){stroke=g.pts;draw()}}
+  else if(g.t==='pan'&&ptr.size===1){const p=[...ptr.values()][0];const dx=p.x-g.x,dy=p.y-g.y;if(!g.moved&&Math.hypot(dx,dy)>7)g.moved=true;if(g.moved){view.ox=g.ox+dx;view.oy=g.oy+dy;draw()}}
   else if(g.t==='pinch'&&ptr.size===2){const[a,b]=[...ptr.values()];const d=Math.hypot(a.x-b.x,a.y-b.y),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;const s=Math.min(Math.max(g.s*d/g.d,.2),40);const wx=(g.mx-g.ox)/g.s,wy=(g.my-g.oy)/g.s;view.s=s;view.ox=mx-wx*s;view.oy=my-wy*s;draw()}});
 function pend(e){if(!ptr.has(e.pointerId))return;const p=ptr.get(e.pointerId);ptr.delete(e.pointerId);
   if(g&&g.t==='pan'&&!g.moved&&e.type==='pointerup')tap(p.x,p.y);
+  if(g&&g.t==='draw'){const pts=g.pts;stroke=null;if(e.type==='pointerup'){if(!g.moved)tap(p.x,p.y);else finishStroke(pts)}else draw()}
   if(ptr.size===1){const q=[...ptr.values()][0];g={t:'pan',x:q.x,y:q.y,ox:view.ox,oy:view.oy,moved:true}}else if(!ptr.size)g=null}
 stage.addEventListener('pointerup',pend);stage.addEventListener('pointercancel',pend);
 stage.addEventListener('wheel',e=>{e.preventDefault();const r=stage.getBoundingClientRect();zoomAt(Math.exp(-e.deltaY*.0015),e.clientX-r.left,e.clientY-r.top)},{passive:false});
@@ -370,7 +391,7 @@ new ResizeObserver(()=>draw()).observe(stage);
 function hit(wx,wy,tight){let b=-1,bd=tight?Math.max(4,13/view.s):Math.max(9,22/view.s);P.holes.forEach((h,i)=>{if(h.ghost)return;const[cx,cy]=hc(h);const d=Math.hypot(cx-wx,cy-wy);if(d<bd){bd=d;b=i}});return b}
 function hitZone(wx,wy){const lim=Math.max(14,30/view.s);let b=-1,bd=lim;P.zones.forEach((z,i)=>{if(!z.lb)return;const[x,y]=zc(z);const d=Math.hypot(x-wx,y-wy);if(d<bd){bd=d;b=i}});return b}
 function tap(sx,sy){if(!P)return;const wx=(sx-view.ox)/view.s,wy=(sy-view.oy)/view.s;
-  if(mode==='cam'){const i=hit(wx,wy,1);if(i<0){if(wx<0||wy<0||wx>P.w||wy>P.h)return;let z=rotaAt(camSel,camDia);if(!z){z={id:uid(),rt:1,cam:camSel,dia:camDia,lb:'',pts:[]};P.zones.push(z)}z.pts.push([wx,wy]);save();draw();camHint();toast('Caminho do '+camSel+': ponto '+z.pts.length);return}const h=P.holes[i];
+  if(mode==='cam'){const i=hit(wx,wy,1);if(i<0){toast('Arraste o dedo por onde o '+camSel+' passou');return}const h=P.holes[i];
     if(h.cam===camSel&&h.dia===camDia){delete h.cam;delete h.dia;toast('Furo '+hn(h)+' sem caminhão')}else{h.cam=camSel;h.dia=camDia;toast('Furo '+hn(h)+' → caminhão '+camSel)}save();renderLegend();draw();return}
   if(mode==='move'){const h=P.holes[moveIdx];if(h){h.x=wx-LABEL_DX;h.y=wy-LABEL_DY;save()}const k=moveIdx;moveIdx=-1;setMode('sel');if(h){sel=k;draw();toast('Furo '+hn(h)+' movido')}return}
   if(mode==='add'){if(wx<0||wy<0||wx>P.w||wy>P.h)return;const X=wx-LABEL_DX,Y=wy-LABEL_DY;
@@ -388,7 +409,7 @@ function tap(sx,sy){if(!P)return;const wx=(sx-view.ox)/view.s,wy=(sy-view.oy)/vi
 function counts(){const c={};ST.forEach(s=>c[s.k]=0);live().forEach(h=>h.st.forEach(k=>{if(k in c)c[k]++}));return c}
 function renderLegend(){const c=counts();$('#legend').innerHTML=ST.map(s=>`<button class="chip" data-k="${s.k}" aria-pressed="${s.cr?mode==='add'&&addType===s.k:brush===s.k}"><span class="sw${s.ring?' ring':''}" style="${s.ring?'border-color':'background'}:${s.c}">${s.deck>1?s.deck:''}</span>${esc(s.l)}<span class="n">${c[s.k]}</span></button>`).join('');
   const L=live(),marked=L.filter(h=>h.st.length).length;$('#pname').textContent=P.nome;
-  $('#pmeta').textContent=`${L.length} furos${P.holeCount&&P.holeCount!==P.holes.filter(h=>!h.add).length?' (PDF diz '+P.holeCount+')':''} · ${marked} marcados${P.zones.length?' · '+P.zones.length+' área'+(P.zones.length>1?'s':''):''}${P.sample?' · exemplo':{on:' · equipe online',off:' · sem conexão',ro:' · só leitura',local:''}[syncState]||''}`}
+  $('#pmeta').textContent=`${L.length} furos${P.holeCount&&P.holeCount!==P.holes.filter(h=>!h.add).length?' (PDF diz '+P.holeCount+')':''} · ${marked} marcados${P.zones.filter(z=>!z.rt).length?' · '+P.zones.filter(z=>!z.rt).length+' área'+(P.zones.filter(z=>!z.rt).length>1?'s':''):''}${P.sample?' · exemplo':{on:' · equipe online',off:' · sem conexão',ro:' · só leitura',local:''}[syncState]||''}`}
 $('#legend').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;const k=b.dataset.k;if(SK[k].cr){addType=k;setMode('add');return}brush=brush===k?null:k;if(brush)setMode('sel',true);renderLegend();brushHint()};
 function brushHint(){const h=$('#hint');if(mode==='cam')return camHint();if(!brush){h.hidden=true;return}const s=SK[brush];h.innerHTML=`<span><span class="sw${s.ring?' ring':''}" style="${s.ring?'border-color':'background'}:${s.c};display:inline-block;vertical-align:-3px;margin-right:6px"></span>Pincel <b>${esc(s.l)}</b>: toque nos furos para marcar ou desmarcar.</span><button id="hStop">Parar</button>`;h.hidden=false;$('#hStop').onclick=()=>{brush=null;renderLegend();brushHint()}}
 function setMode(m,keepBrush){mode=m;document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===m));if(!keepBrush&&m!=='sel'){brush=null;renderLegend()}draft=[];sel=-1;closeSheet();
@@ -411,9 +432,9 @@ function hull(pts){pts=pts.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);if(pts.leng
   up.pop();lo.pop();return lo.concat(up)}
 function camHint(){const h=$('#hint');h.hidden=false;const F=frota();if(!F.includes(camSel))camSel=F[0];
   h.innerHTML=`<span style="display:flex;flex-direction:column;gap:7px;min-width:0"><span style="display:flex;gap:6px;flex-wrap:wrap">${F.map(c=>`<button data-c="${esc(c)}" aria-pressed="${c===camSel}" style="${c===camSel?'background:'+camColor(c)+';color:#fff':'background:transparent;color:inherit;box-shadow:inset 0 0 0 1px currentColor;opacity:.85'}">${esc(c)}</button>`).join('')}</span>
-  <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="date" id="hDia" aria-label="Dia do carregamento" value="${esc(camDia)}" style="border:0;border-radius:6px;padding:4px 6px;font:inherit;background:var(--bg);color:var(--ink)"><span>Toque nos furos que o <b>${esc(camSel)}</b> carregou. Toque fora dos furos para desenhar o <b>caminho</b> dele.</span></span></span><span style="display:flex;flex-direction:column;gap:6px">${(rotaAt(camSel,camDia)||{pts:[]}).pts.length?'<button id="hRUndo">Desfazer ponto</button><button id="hRDel">Apagar caminho</button>':''}<button id="hStop">Concluir</button></span>`;
-  if($('#hRUndo'))$('#hRUndo').onclick=()=>{const z=rotaAt(camSel,camDia);if(!z)return;z.pts.pop();if(!z.pts.length)P.zones.splice(P.zones.indexOf(z),1);save();draw();camHint()};
-  if($('#hRDel'))$('#hRDel').onclick=e=>{const b=e.target;if(!b.dataset.c){b.dataset.c=1;b.textContent='Toque de novo';return}const z=rotaAt(camSel,camDia);if(z)P.zones.splice(P.zones.indexOf(z),1);save();draw();camHint();toast('Caminho apagado')};
+  <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="date" id="hDia" aria-label="Dia do carregamento" value="${esc(camDia)}" style="border:0;border-radius:6px;padding:4px 6px;font:inherit;background:var(--bg);color:var(--ink)"><span><b>Arraste o dedo</b> por onde o <b>${esc(camSel)}</b> passou: os furos no caminho ficam marcados para ele. Toque num furo para marcar ou desmarcar. Dois dedos movem e dão zoom.</span></span></span><span style="display:flex;flex-direction:column;gap:6px">${(rotaAt(camSel,camDia)||{pts:[]}).pts.length?'<button id="hRUndo">Desfazer traço</button><button id="hRDel">Apagar caminho</button>':''}<button id="hStop">Concluir</button></span>`;
+  if($('#hRUndo'))$('#hRUndo').onclick=()=>{const z=rotaAt(camSel,camDia);if(!z)return;dropRota(z);save();renderLegend();draw();camHint()};
+  if($('#hRDel'))$('#hRDel').onclick=e=>{const b=e.target;if(!b.dataset.c){b.dataset.c=1;b.textContent='Toque de novo';return}P.zones.filter(z=>z.rt&&z.cam===camSel&&(z.dia||'')===(camDia||'')).forEach(dropRota);save();renderLegend();draw();camHint();toast('Caminho apagado')};
   h.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{camSel=b.dataset.c;camHint()});
   $('#hDia').onchange=e=>{camDia=e.target.value||todayIso();camHint()};$('#hStop').onclick=()=>setMode('sel')}
 document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
@@ -490,7 +511,7 @@ function zoneSheet(i,isNew){const z=P.zones[i];const n=live().filter(h=>inPoly(.
 
 /* ---------- summary ---------- */
 function summaryData(){const by={};ST.forEach(s=>by[s.k]=[]);live().forEach(h=>h.st.forEach(k=>by[k]&&by[k].push(h.n)));
-  const zones=camGroups().map(g=>({lb:'Caminhão '+g.cam+(g.dia?' · '+fdia(g.dia):''),n:g.holes.length,r:ranges(g.holes.map(h=>h.n))})).concat(P.zones.filter(z=>z.rt).map(z=>({lb:'Rota caminhão '+z.cam+(z.dia?' · '+fdia(z.dia):''),n:z.pts.length+' pontos'}))).concat(P.zones.filter(z=>!z.rt).map(z=>({lb:z.lb||'Área sem nome',n:live().filter(h=>inPoly(...hc(h),z.pts)).length})));
+  const zones=camGroups().map(g=>({lb:'Caminhão '+g.cam+(g.dia?' · '+fdia(g.dia):''),n:g.holes.length,r:ranges(g.holes.map(h=>h.n))})).concat([...new Set(P.zones.filter(z=>z.rt).map(z=>z.cam+'|'+(z.dia||'')))].map(k=>{const[c,d]=k.split('|');return{lb:'Caminho do caminhão '+c+(d?' · '+fdia(d):''),n:'desenhado'}})).concat(P.zones.filter(z=>!z.rt).map(z=>({lb:z.lb||'Área sem nome',n:live().filter(h=>inPoly(...hc(h),z.pts)).length})));
   return{by,zones,ok:live().filter(h=>!h.st.length).length}}
 function waText(){const{by,zones}=summaryData();let t=`*${P.nome} – croqui real*\n${live().length} furos · ${new Date().toLocaleDateString('pt-BR')}\n`;
   ST.forEach(s=>{if(by[s.k].length)t+=`\n${s.e} ${s.l} (${by[s.k].length}): ${ranges(by[s.k])}`});
@@ -584,12 +605,12 @@ async function usePoly(p){if(saveT)commit();P=p;mem[p.id]=p;lsSet('cr-last',p.id
 
 /* ---------- PDF import ---------- */
 function openPdfSheet(){openSheet(`<div class="shead"><h2>Abrir croqui em PDF</h2><button class="x" aria-label="Fechar">✕</button></div>
-  <p class="muted">O app lê os furos direto do PDF (Paradigm Terra ou croqui da Vale) e monta a malha para você marcar. <b>Versão 14</b></p>
+  <p class="muted">O app lê os furos direto do PDF (Paradigm Terra ou croqui da Vale) e monta a malha para você marcar. <b>Versão 15</b></p>
   <label class="chk"><input type="checkbox" id="oMarks" ${lsGet('cr-marks')==='0'?'':'checked'}>Ler as marcações coloridas que já estiverem no PDF (repasse, não furado, etc.)</label>
   <div class="row"><button class="ibtn pri" id="oPick">Escolher PDF</button></div>`);$('#oPick').onclick=()=>{lsSet('cr-marks',$('#oMarks').checked?'1':'0');$('#fPdf').click()}}
 $('#bOpen').onclick=openPdfSheet;$('#bPolys').onclick=polySheet;$('#bSum').onclick=()=>P&&sumSheet();
 $('#fPdf').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;closeSheet();
-  if(isImg(f)){busy('Abrindo foto…');try{const p=await importImg(f,{});ensureKeys(p);await dbPut(p);await usePoly(p);busy();pushRemote(p);setMode('cam');const b=$('#banner');b.innerHTML='<span>Foto aberta. Na aba <b>Caminhão</b>, escolha o caminhão e toque na foto para desenhar o caminho dele. Para marcar furos, use <b>+ Furo</b>.</span><button aria-label="Fechar aviso">✕</button>';b.hidden=false;b.querySelector('button').onclick=()=>b.hidden=true}catch(err){busy();console.error(err);toast('Não consegui abrir esta foto. Tente JPG ou PNG.')}return}
+  if(isImg(f)){busy('Abrindo foto…');try{const p=await importImg(f,{});ensureKeys(p);await dbPut(p);await usePoly(p);busy();pushRemote(p);setMode('cam');const b=$('#banner');b.innerHTML='<span>Foto aberta'+(p.holes.length?': <b>'+p.holes.length+' furos</b> encontrados pelos pontos coloridos':', sem furos reconhecidos (só pontos amarelos ou verdes são lidos)')+'. Na aba <b>Caminhão</b>, escolha o caminhão e arraste o dedo por onde ele passou. Para marcar furos, use <b>+ Furo</b>.</span><button aria-label="Fechar aviso">✕</button>';b.hidden=false;b.querySelector('button').onclick=()=>b.hidden=true}catch(err){busy();console.error(err);toast('Não consegui abrir esta foto. Tente JPG ou PNG.')}return}
   busy('Lendo PDF…');
   try{const p=await importPdf(await f.arrayBuffer(),f.name,lsGet('cr-marks')!=='0');ensureKeys(p);await dbPut(p);await usePoly(p);busy();pushRemote(p);
     toast(p.holes.length?`${p.holes.length} furos lidos`+(p.holeCount&&p.holeCount!==p.holes.length?` (PDF indica ${p.holeCount})`:''):'Nenhum número de furo encontrado');
