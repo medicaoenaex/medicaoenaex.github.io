@@ -413,7 +413,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-15.9';
+const APP_VER='2026-11-15.10';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1877,8 +1877,8 @@ function tabResumo(p){
   const kgL=c=>Object.values(r.cam[c]||{}).reduce((a,b)=>a+b,0);
   const difH=c=>{const d=camDif(p,c,kgL(c));return d?`<b style="color:${d.ok?'var(--ok)':'var(--bad)'}">${d.ok?'✔':'⚠️'} Lançado x saída do caminhão: ${d.txt}</b>`:'<span class="mut">Informe o kg da NF para conferir com o lançado</span>';};
   const CF=[['nf','NF','numeric'],['kgNF','kg na NF / balança','decimal'],['kgRet','kg de retorno / sobra','decimal'],['dens','Densidade do copo (g/cm³)','decimal'],['temp','Temperatura (°C)','decimal'],['oper','Operador',''],['ini','Início','time'],['fim','Fim','time']];
-  h+=`<div class="card"><h2>Controle dos caminhões</h2><p class="mut" style="margin:0 0 6px">Compara o que saiu do caminhão (NF menos retorno) com a soma lançada nos furos. Tolerância ±${fmt(projDe(p).tolCam,1)}% (muda em Projeto).</p>
-  ${cams.length?cams.map((c,ix)=>{const d=(p.cams||{})[c]||{};if(d.nf==null&&(p.nfs||{})[c])d.nf=p.nfs[c];return`<details style="padding:8px 0;border-bottom:1px solid var(--line)" ${camAberto===c?'open':''} data-cd="${esc(c)}"><summary><i class="dot" style="background:${camCor(c)}"></i><b>${esc(c)}</b> — ${fmt(kgL(c))} kg lançados em ${nf(p.holes.filter(x=>x.caminhao===c).length)}<div id="cd${ix}" style="font-size:13px;margin-top:2px">${difH(c)}</div></summary>
+  h+=`<div class="card"><h2 style="display:flex;align-items:center;gap:8px"><span style="flex:1">Controle dos caminhões</span><button class="btn sm" id="camPdfB">📄 PDF</button></h2><p class="mut" style="margin:0 0 6px">Compara o que saiu do caminhão (NF menos retorno) com a soma lançada nos furos. Tolerância ±${fmt(projDe(p).tolCam,1)}% (muda em Projeto).</p>
+  ${cams.length?cams.map((c,ix)=>{const d=(p.cams||{})[c]||{};if(d.nf==null&&(p.nfs||{})[c])d.nf=p.nfs[c];return`<details style="padding:8px 0;border-bottom:1px solid var(--line)" ${camAberto===c?'open':''} data-cd="${esc(c)}"><summary><i class="dot" style="background:${camCor(c)}"></i><b>${esc(c)}</b> — ${fmt(kgL(c))} kg lançados em ${nf(p.holes.filter(x=>kgDoCam(x,c)>0).length)}<div id="cd${ix}" style="font-size:13px;margin-top:2px">${difH(c)}</div></summary>
     <div class="row">${CF.map(([k,t,im])=>`<div><label>${t}</label><input data-cm="${esc(c)}" data-ix="${ix}" data-k="${k}" ${im==='time'?'type="time"':im?`inputmode="${im}"`:''} value="${esc(d[k]??'')}"></div>`).join('')}</div>
     <p class="mut" style="margin:6px 0 0">${Object.entries(r.cam[c]||{}).map(([pr,kg])=>`${esc(pr)} ${fmt(kg)} kg`).join(' · ')||'Nada lançado ainda'}</p></details>`;}).join(''):'<p class="mut">Nenhum caminhão lançado ainda.</p>'}
   <div class="row" style="margin-top:8px"><select id="camNovo">${opts(CAMS.filter(c=>!cams.includes(c)),'','+ Abrir controle de outro caminhão')}</select></div></div>`;
@@ -1888,8 +1888,78 @@ function tabResumo(p){
   document.querySelectorAll('details[data-cd]').forEach(d=>d.ontoggle=()=>{if(d.open)camAberto=d.dataset.cd;else if(camAberto===d.dataset.cd)camAberto=null;});
   document.querySelectorAll('[data-cm]').forEach(inp=>inp.onchange=()=>{const c=inp.dataset.cm,k=inp.dataset.k;p.cams=p.cams||{};p.cams[c]=p.cams[c]||{};const v=inp.value.trim();p.cams[c][k]=v===''?null:(['kgNF','kgRet','dens','temp'].includes(k)?num(v):v);
     if(k==='nf'){p.nfs=p.nfs||{};p.nfs[c]=v;}markP(p.id);save();const el=$('#cd'+inp.dataset.ix);if(el)el.innerHTML=difH(c);});
+  $('#camPdfB').onclick=()=>camPdfMenu(p);
   $('#camNovo').onchange=e=>{const c=e.target.value;if(!c)return;p.cams=p.cams||{};p.cams[c]=p.cams[c]||{};camAberto=c;markP(p.id);save();tabResumo(p);};
   document.querySelectorAll('[data-ac]').forEach(inp=>inp.onchange=()=>{const n=inp.dataset.ac;p.acess=p.acess||{};p.acess[n]=p.acess[n]||{};p.acess[n][inp.dataset.k]=num(inp.value);markP(p.id);save();$('#as'+inp.dataset.ix).innerHTML=saldoH(p.acess[n],+inp.dataset.apl);});
+}
+/* ----- PDF da aba Caminhões e consumo (um caminhão ou todos) ----- */
+function camPdfMenu(p){
+  const r=resumo(p);const cams=[...new Set([...Object.keys(r.cam).filter(c=>c!=='Sem caminhão'),...Object.keys(p.cams||{})])];
+  if(!cams.length){toast('Nenhum caminhão lançado ainda');return;}
+  let sel='';
+  const draw=()=>{openSheet(`<h3>PDF dos caminhões<button class="btn sm" id="cqX">Fechar</button></h3>
+    <p class="mut" style="margin:0 0 8px">Sai NF, kg da NF, retorno, lançado, diferença, densidade, temperatura, operador e os furos de cada caminhão por deck. Em "Todos" entram também o resumo e os acessórios. Funciona sem internet.</p>
+    <label>Caminhão</label><select id="cqC"><option value="">Todos os caminhões (${cams.length})</option>${cams.map(c=>`<option ${sel===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+    <div class="btns"><button class="btn pri" id="cqGo" style="min-height:52px">📄 Gerar PDF</button></div>`);
+    $('#cqX').onclick=closeSheet;$('#cqC').onchange=e=>{sel=e.target.value;};
+    $('#cqGo').onclick=()=>{closeSheet();camPdf(p,sel?[sel]:cams,!sel);};};
+  draw();
+}
+async function camPdf(p,cams,todos){
+  busy('Gerando PDF dos caminhões…');
+  try{
+    const jsPDF=await loadJsPdf();const doc=new jsPDF({unit:'mm',format:'a4',compress:true});
+    const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),M=12;let y=M;
+    const r=resumo(p),pr=projDe(p);
+    const rgb=h=>{const m=/^#?([0-9a-f]{6})$/i.exec(h||'');if(!m)return[120,120,120];const n=parseInt(m[1],16);return[n>>16&255,n>>8&255,n&255];};
+    const T=v=>v==null||v===''?'–':String(v);
+    const cab=()=>{doc.setFillColor(16,42,67);doc.rect(0,0,W,20,'F');doc.setTextColor(255);doc.setFont('helvetica','bold');doc.setFontSize(14);
+      doc.text(`Caminhões e consumo – POL ${p.pol}`,M,9);doc.setFont('helvetica','normal');doc.setFontSize(9);
+      doc.text(`${p.mina||''}${p.cava?' / '+p.cava:''}${p.banco?' · Banco '+p.banco:''} · ${brDate(p.data)}${p.resp?' · '+p.resp:''} · tolerância ±${fmt(pr.tolCam,1)}%`,M,15);doc.setTextColor(20);y=27;};
+    const novaPag=()=>{doc.addPage();cab();};
+    const precisa=h=>{if(y+h>H-14)novaPag();};
+    const titulo=(t,cor)=>{precisa(12);if(cor){doc.setFillColor(...rgb(cor));doc.circle(M+2,y-1.3,2,'F');}doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text(t,M+(cor?6:0),y);doc.setFont('helvetica','normal');y+=5;};
+    // tabela simples: cols=[[título,largura,alinhar]]
+    const tabela=(cols,rows,opt={})=>{const lh=5.6,fs=opt.fs||8.5;doc.setFontSize(fs);
+      const head=()=>{doc.setFillColor(231,236,241);doc.rect(M,y-4,W-2*M,lh,'F');doc.setFont('helvetica','bold');let x=M+1;cols.forEach(([t,w,a])=>{doc.text(t,a==='r'?x+w-2:x,y,{align:a==='r'?'right':'left'});x+=w;});doc.setFont('helvetica','normal');y+=lh;};
+      precisa(lh*2);head();
+      rows.forEach((row,i)=>{if(y+lh>H-14){novaPag();head();}if(row.bold)doc.setFont('helvetica','bold');if(i%2&&!row.bold){doc.setFillColor(247,249,251);doc.rect(M,y-4,W-2*M,lh,'F');}
+        let x=M+1;cols.forEach(([,w,a],k)=>{let t=T(row[k]);while(t.length>1&&doc.getTextWidth(t)>w-2)t=t.slice(0,-2)+'…';if(row.cor&&row.cor[k]){doc.setTextColor(...rgb(row.cor[k]));}doc.text(t,a==='r'?x+w-2:x,y,{align:a==='r'?'right':'left'});doc.setTextColor(20);x+=w;});
+        if(row.bold)doc.setFont('helvetica','normal');y+=lh;});
+      y+=3;};
+    const kgL=c=>Object.values(r.cam[c]||{}).reduce((a,b)=>a+b,0);
+    const furosDe=c=>p.holes.filter(h=>kgDoCam(h,c)>0||(camsDoFuro(h).includes(c)&&!holeKg(h)));
+    cab();
+    if(todos){
+      titulo('Resumo por caminhão');
+      const rows=cams.map(c=>{const d=(p.cams||{})[c]||{};const nfv=d.nf??(p.nfs||{})[c];const sai=num(d.kgNF)!=null?num(d.kgNF)-(num(d.kgRet)||0):null;const df=camDif(p,c,kgL(c));
+        return Object.assign([c,nfv,fmt(num(d.kgNF)),fmt(num(d.kgRet)),sai!=null?fmt(sai):'',fmt(kgL(c)),df?df.txt:'',df?(df.ok?'OK':'FORA'):'',String(furosDe(c).length)],{cor:{7:df?(df.ok?'#2b8a3e':'#c92a2a'):null}});});
+      const tot=cams.reduce((a,c)=>a+kgL(c),0);rows.push(Object.assign(['TOTAL','','','','',fmt(tot),'','',''],{bold:true}));
+      tabela([['Caminhão',24],['NF',18],['kg NF',17,'r'],['Retorno',17,'r'],['Saída',17,'r'],['Lançado',18,'r'],['Diferença',37,'r'],['',12],['Furos',12,'r']],rows);
+      titulo('Consumo lançado (todos os caminhões)');
+      tabela([['Item',60],['Quantidade',30,'r']],[...Object.entries(r.prod).map(([k,v])=>[k,fmt(v)+' kg']),['Booster',fmt(r.booster)+' un'],['Brinel',fmt(r.brinel)+' un'],...Object.entries(r.det).map(([k,v])=>[k,fmt(v)+' un'])]);
+      const ac=acessRows(p,r);if(ac.length){titulo('Acessórios: paiol x aplicado');tabela([['Item',50],['Retirado',25,'r'],['Aplicado',25,'r'],['Devolvido',25,'r'],['Saldo',25,'r']],ac.map(a=>Object.assign([a.n,fmt(a.ret),fmt(a.apl),fmt(a.dev),a.saldo==null?'':fmt(a.saldo)],{cor:{4:a.saldo==null?null:a.saldo===0?'#2b8a3e':'#c92a2a'}})));}
+    }
+    cams.forEach((c,ix)=>{
+      if(todos||ix)novaPag();
+      const d=(p.cams||{})[c]||{};const nfv=d.nf??(p.nfs||{})[c];const df=camDif(p,c,kgL(c));const sai=num(d.kgNF)!=null?num(d.kgNF)-(num(d.kgRet)||0):null;
+      titulo(c,camCor(c));
+      const campos=[['NF',nfv],['kg na NF / balança',fmt(num(d.kgNF))],['kg de retorno / sobra',fmt(num(d.kgRet))],['Saída do caminhão (NF - retorno)',sai!=null?fmt(sai)+' kg':''],['Lançado nos furos',fmt(kgL(c))+' kg'],['Diferença lançado x saída',df?df.txt+(df.ok?' – dentro da tolerância':' – FORA da tolerância'):'informe o kg da NF'],
+        ['Densidade do copo (g/cm³)',d.dens!=null?fmt(num(d.dens),2):''],['Temperatura (°C)',d.temp!=null?fmt(num(d.temp),1):''],['Operador',d.oper],['Início',d.ini],['Fim',d.fim],['Por produto',Object.entries(r.cam[c]||{}).map(([pr,k])=>`${pr} ${fmt(k)} kg`).join(' · ')]];
+      tabela([['Campo',70],['Valor',W-2*M-70]],campos.map(([a,b],i)=>Object.assign([a,b],{cor:i===5&&df?{1:df.ok?'#2b8a3e':'#c92a2a'}:null})),{fs:9.5});
+      const fur=furosDe(c);titulo(`Furos carregados pelo ${c} (${fur.length})`);
+      const rows=[];fur.forEach(h=>{(h.decks||[]).forEach((dk,k)=>{if(deckCam(h,dk)!==c||!deckTemCarga(dk))return;const outros=camsDoFuro(h).filter(x=>x!==c);
+        rows.push([h.id,`Deck ${k+1}/${h.decks.length}`,dk.prod,fmt(num(dk.kg)),ST[h.status].n,h.profMed!=null?fmt(h.profMed,1):'',h.tampao!=null?fmt(h.tampao,1):'',outros.map(camCurto).join(' + ')]);});
+        if(!(h.decks||[]).some(dk=>deckCam(h,dk)===c&&deckTemCarga(dk)))rows.push([h.id,'','','',ST[h.status].n,h.profMed!=null?fmt(h.profMed,1):'',h.tampao!=null?fmt(h.tampao,1):'','']);});
+      rows.push(Object.assign(['TOTAL','','',fmt(kgL(c)),'','','',''],{bold:true}));
+      tabela([['Furo',22],['Deck',20],['Produto',30],['kg',18,'r'],['Status',26],['Prof. (m)',18,'r'],['Tampão',16,'r'],['Outro caminhão no furo',W-2*M-150]],rows);
+      precisa(24);y+=12;doc.setDrawColor(120);[[M,'Operador do caminhão'],[M+(W-2*M)/2+4,'Blaster / responsável']].forEach(([x,t])=>{doc.line(x,y,x+(W-2*M)/2-8,y);doc.setFontSize(8);doc.text(t,x,y+4);});y+=8;
+    });
+    const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(120);doc.text(`Carregamento de Campo · POL ${p.pol} · gerado em ${new Date().toLocaleString('pt-BR')} · página ${i}/${n}`,M,H-6);}
+    doc.setProperties({title:`Caminhões POL ${p.pol}`});
+    const blob=doc.output('blob');busy();
+    await entregarArquivo(blob,`caminhoes-POL${p.pol}-${cams.length===1&&!todos?camCurto(cams[0])+'-':''}${p.data||today()}.pdf`,'application/pdf');
+  }catch(e){busy();console.error(e);toast(/internet|carregar/i.test(e&&e.message||'')?'Não consegui abrir o gerador de PDF. Abra o app uma vez com internet.':'Não consegui gerar o PDF');}
 }
 let camAberto=null;
 function saldoH(a,apl){const ret=num(a.ret);if(ret==null)return'<span class="mut">–</span>';const sd=ret-apl-(num(a.dev)||0);return`<b style="color:${sd===0?'var(--ok)':'var(--bad)'}">${fmt(sd)}</b>`;}
