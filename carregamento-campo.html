@@ -147,7 +147,7 @@ function loadScript(srcs){return new Promise((res,rej)=>{const tryI=i=>{if(i>=sr
 let pdfP=null,xlsxP=null;
 function loadPdf(){return pdfP||(pdfP=(async()=>{if(!window.pdfjsLib)await loadScript(['lib/pdf.min.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js']);if(!window.pdfjsWorker)await loadScript(['lib/pdf.worker.min.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js']);return window.pdfjsLib;})().catch(e=>{pdfP=null;throw e;}));}
 function loadXlsx(){return xlsxP||(xlsxP=(async()=>{if(!window.XLSX)await loadScript(['lib/xlsx.full.min.js','https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js']);return window.XLSX;})().catch(e=>{xlsxP=null;throw e;}));}
-function busy(m){let b=$('#busy');if(!m){if(b)b.remove();return;}if(!b){b=document.createElement('div');b.id='busy';b.style.cssText='position:fixed;inset:0;z-index:50;background:rgba(10,20,30,.55);color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;padding:20px;text-align:center';document.body.appendChild(b);}b.textContent=m;}
+function busy(m){let b=$('#busy');if(!m){if(b)b.remove();return;}if(!b){b=document.createElement('div');b.id='busy';b.style.cssText='position:fixed;inset:0;z-index:50;background:rgba(10,20,30,.55);color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;padding:20px;text-align:center;white-space:pre-line';document.body.appendChild(b);}b.textContent=m;}
 
 let excelP=null;
 function loadExcel(){return excelP||(excelP=(async()=>{if(!window.ExcelJS)await loadScript(['lib/exceljs.min.js','https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js']);return window.ExcelJS;})().catch(e=>{excelP=null;throw e;}));}
@@ -430,7 +430,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-15.13';
+const APP_VER='2026-11-15.14';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1271,17 +1271,6 @@ function mascaraAzul(c){const W=c.width,H=c.height,src=c.getContext('2d').getIma
   for(let k=0;k<W*H;k++){const az=ehAzul(src.data[k*4],src.data[k*4+1],src.data[k*4+2]);const v=az?0:255;td.data[k*4]=td.data[k*4+1]=td.data[k*4+2]=v;td.data[k*4+3]=255;}tx.putImageData(td,0,0);return t;}
 const raioDe=fs=>Math.sqrt(fs.map(s=>s.n).sort((a,b)=>a-b)[Math.floor(fs.length/2)]/Math.PI);
 function vizMed(fs){const d=fs.map(a=>{let m=Infinity;fs.forEach(b=>{if(b!==a){const q=Math.hypot(a.x-b.x,a.y-b.y);if(q<m)m=q;}});return m;}).sort((a,b)=>a-b);return d[d.length>>1];}
-// lê os números azuis da página e agrupa em rótulos de 1 ou 2 linhas (furo com 2 decks tem 2 tempos empilhados)
-async function rotulosOcr(w,t,passes,r){const W=t.width,H=t.height,rot=[];
-  for(const [S,psm] of passes){
-    const big=document.createElement('canvas');big.width=W*S;big.height=H*S;const bx=big.getContext('2d');bx.imageSmoothingEnabled=true;bx.imageSmoothingQuality='high';bx.drawImage(t,0,0,W*S,H*S);
-    await w.setParameters({tessedit_pageseg_mode:psm});const {data}=await w.recognize(big);
-    const ws=[];(data.words||[]).forEach(wd=>{const s=String(wd.text||'').replace(/\D/g,'');if(s.length<2||s.length>5)return;ws.push({s,x:wd.bbox.x0/S,y:wd.bbox.y0/S,h:(wd.bbox.y1-wd.bbox.y0)/S,c:wd.confidence});});
-    const hm=ws.length?ws.map(q=>q.h).sort((a,b)=>a-b)[ws.length>>1]:r;const usado=new Set();
-    ws.sort((a,b)=>a.y-b.y).forEach(a=>{if(usado.has(a))return;usado.add(a);
-      const b=ws.find(q=>!usado.has(q)&&Math.abs(q.x-a.x)<=0.6*hm&&q.y-a.y>=0.8*hm&&q.y-a.y<=1.9*hm);
-      if(b)usado.add(b);rot.push({x:a.x,y:a.y,h:hm,l:[a,b].filter(Boolean)});});}
-  return rot;}
 // aprende onde o PDF escreve o número em relação à bolinha (cada programa põe num lugar) e dá os votos de cada furo
 function votarRotulos(rot,fs,r){let ox=2.1*r,oy=1.7*r;
   if(rot.length>=3){const hist=new Map(),B=Math.max(2,Math.round(r/3)),k=(i,j)=>i+','+j;
@@ -1303,26 +1292,53 @@ function encaixeDetalhe(fsD,fs,nnD,nn,confere){const sm=nn/nnD;if(!(sm>0&&sm<1))
       let num=0,den=0;par.forEach(([i,j])=>{const dx=fsD[i].x-mx,dy=fsD[i].y-my;num+=dx*(fs[j].x-mX)+dy*(fs[j].y-mY);den+=dx*dx+dy*dy;});if(den>0)s=num/den;tx=mX-s*mx;ty=mY-s*my;}
     if(par.length<Math.max(3,fsD.length*0.6))continue;const cf=confere(par),nota=par.length+3*cf;if(!melhor||nota>melhor.nota)melhor={nota,par,cf};}}
     return melhor&&melhor.cf>=Math.max(3,melhor.par.length*0.05)?new Map(melhor.par):null;} // sem números batendo com a página geral, não arrisca
+// lê os números azuis de um recorte da página e agrupa em rótulos de 1 ou 2 linhas (furo com 2 decks tem 2 tempos empilhados)
+function rotulosDePalavras(lista,r){const rot=[];
+  for(const ws of lista){const hm=ws.length?ws.map(q=>q.h).sort((a,b)=>a-b)[ws.length>>1]:r;const usado=new Set();
+    ws.sort((a,b)=>a.y-b.y).forEach(a=>{if(usado.has(a))return;usado.add(a);
+      const b=ws.find(q=>!usado.has(q)&&Math.abs(q.x-a.x)<=0.6*hm&&q.y-a.y>=0.8*hm&&q.y-a.y<=1.9*hm);
+      if(b)usado.add(b);rot.push({x:a.x,y:a.y,h:hm,l:[a,b].filter(Boolean)});});}
+  return rot;}
+// só a área onde há furos (e os números ao lado deles): bem menos imagem para o leitor
+function areaDosFuros(fs,r,W,H){const m=9*r;return{x0:Math.max(0,Math.floor(Math.min(...fs.map(f=>f.x))-m)),y0:Math.max(0,Math.floor(Math.min(...fs.map(f=>f.y))-m)),x1:Math.min(W,Math.ceil(Math.max(...fs.map(f=>f.x))+m)),y1:Math.min(H,Math.ceil(Math.max(...fs.map(f=>f.y))+m))};}
+function trabalhoOcr(mask,a,S,psm){const w=a.x1-a.x0,h=a.y1-a.y0;const big=document.createElement('canvas');big.width=Math.round(w*S);big.height=Math.round(h*S);const bx=big.getContext('2d');bx.imageSmoothingEnabled=true;bx.imageSmoothingQuality='high';bx.drawImage(mask,a.x0,a.y0,w,h,0,0,big.width,big.height);
+  return{big,S,psm,a,peso:big.width*big.height};}
+// vários leitores ao mesmo tempo (o celular tem vários núcleos)
+async function rodarOcr(jobs,onProg){const n=Math.max(1,Math.min(jobs.length,(navigator.hardwareConcurrency||4)>=6?3:2));
+  const ws=await Promise.all(Array.from({length:n},()=>tessWorker()));const total=jobs.reduce((s,j)=>s+j.peso,0);let feito=0;const fila=[...jobs].sort((a,b)=>b.peso-a.peso);
+  await Promise.all(ws.map(async w=>{let psmAt=null;while(fila.length){const j=fila.shift();if(psmAt!==j.psm){await w.setParameters({tessedit_pageseg_mode:j.psm});psmAt=j.psm;}
+    const {data}=await w.recognize(j.big);const out=[];(data.words||[]).forEach(wd=>{const s=String(wd.text||'').replace(/\D/g,'');if(s.length<2||s.length>5)return;out.push({s,x:wd.bbox.x0/j.S+j.a.x0,y:wd.bbox.y0/j.S+j.a.y0,h:(wd.bbox.y1-wd.bbox.y0)/j.S,c:wd.confidence});});
+    j.out=out;j.big=null;feito+=j.peso;onProg(feito/total);}}));
+  await Promise.all(ws.map(w=>w.terminate()));return jobs;}
+// resultado guardado por arquivo: abrir o mesmo PDF de novo é na hora
+const chaveOcr=f=>'ocr|'+f.name+'|'+f.size+'|'+(f.lastModified||0);
+async function ocrGuardado(file){try{const v=await bgGet(chaveOcr(file));if(!v)return null;const o=JSON.parse(v);const img=u=>new Promise((ok,er)=>{const i=new Image();i.onload=()=>{const c=document.createElement('canvas');c.width=i.naturalWidth;c.height=i.naturalHeight;c.getContext('2d').drawImage(i,0,0);ok(c);};i.onerror=er;i.src=u;});
+  o.canvas=await img(o.canvas);o.fundo=o.fundoIgual?o.canvas:await img(o.fundo);return o;}catch(e){return null;}}
+async function guardarOcr(file,res){try{const o={...res,canvas:res.canvas.toDataURL('image/jpeg',.88),fundoIgual:res.fundo===res.canvas};o.fundo=o.fundoIgual?null:res.fundo.toDataURL('image/jpeg',.85);await bgPut(chaveOcr(file),JSON.stringify(o),true);}catch(e){}}
 async function lerPdfTempos(file,onMsg){
+  const g=await ocrGuardado(file);if(g){g.furos.forEach(f=>{delete f.conf;});return g;}
+  const t0=Date.now();const eta=(fr,base)=>{const p=Math.max(1,Math.min(99,Math.round(fr*100)));const gasto=(Date.now()-t0)/1000;const fal=fr>0.08?Math.round(gasto/fr-gasto):null;return `${base}\n${p}%${fal!=null?' · faltam ~'+(fal<60?fal+' s':Math.round(fal/60)+' min'):''}`;};
   onMsg('Abrindo PDF…');const lib=await loadPdf();const doc=await lib.getDocument({data:new Uint8Array(await readBuf(file)),isEvalSupported:false}).promise;
-  const ESC=192/72;let best=null;const pags=[];
-  for(let i=1;i<=doc.numPages;i++){onMsg(`Procurando os furos (página ${i} de ${doc.numPages})…`);const c=await renderPagina(doc,i,ESC);const fs=furosDaImagem(c);
+  const ESC=192/72;let best=null;const pags=[];const NP=doc.numPages;
+  for(let i=1;i<=NP;i++){onMsg(eta(0.1*(i-1)/NP,`Procurando os furos (página ${i} de ${NP})…`));const c=await renderPagina(doc,i,ESC);const fs=furosDaImagem(c);
     const W=c.width,H=c.height,dd=c.getContext('2d').getImageData(0,0,W,H).data;let az=0;for(let k=0;k<W*H;k+=7)if(ehAzul(dd[k*4],dd[k*4+1],dd[k*4+2]))az++;
     const nota=fs.length*(az>200?1:0.2)*(fs.limpo||0);const pg={i,c,fs,nota,az};pags.push(pg);if(!best||nota>best.nota||(nota===best.nota&&i>best.i))best=pg;}
   if(!best||best.fs.length<3)throw new Error('Não achei os furos nesse PDF. Ele precisa ter uma página com as bolinhas dos furos e os tempos escritos ao lado.');
   const {c,fs}=best;const r=raioDe(fs),nn=vizMed(fs);
-  onMsg('Carregando o leitor de números (a 1ª vez pode demorar)…');const w=await tessWorker();
-  onMsg('Lendo os tempos da página geral…');
-  const rot=await rotulosOcr(w,mascaraAzul(c),[[3,'11'],[4,'12']],r);const {votos:vG,off}=votarRotulos(rot,fs,r);const votos=fs.map(()=>[{},{}]);
   // páginas de detalhe (ampliações de partes do fogo): números maiores, leitura mais segura
-  const det=pags.filter(p=>p!==best&&p.az>200&&p.fs.length>=3&&(p.fs.limpo||0)>0.2&&raioDe(p.fs)>1.4*r);let nd=0;
-  for(const p of det){nd++;onMsg(`Lendo os tempos das ampliações (${nd} de ${det.length})…`);
-    const rD=raioDe(p.fs);const rotD=await rotulosOcr(w,mascaraAzul(p.c),[[2,'11'],[3,'12']],rD);const vD=votarRotulos(rotD,p.fs,rD).votos;
+  const det=pags.filter(p=>p!==best&&p.az>200&&p.fs.length>=3&&(p.fs.limpo||0)>0.2&&raioDe(p.fs)>1.4*r);
+  onMsg(eta(0.1,'Carregando o leitor de números (a 1ª vez pode demorar)…'));
+  const aG=areaDosFuros(fs,r,c.width,c.height),mG=mascaraAzul(c);
+  const jobsG=det.length?[trabalhoOcr(mG,aG,3,'11')]:[trabalhoOcr(mG,aG,3,'11'),trabalhoOcr(mG,aG,4,'12')]; // com ampliações, a página geral só confere: 1 leitura basta
+  const jobsD=det.map(p=>{const rD=raioDe(p.fs),a=areaDosFuros(p.fs,rD,p.c.width,p.c.height),m=mascaraAzul(p.c);p.rD=rD;p.jobs=[trabalhoOcr(m,a,2,'11'),trabalhoOcr(m,a,3,'12')];return p.jobs;}).flat();
+  pags.forEach((p,k)=>{if(k>0&&p!==best&&!det.includes(p))p.c=null;}); // libera memória (a 1ª página fica: é o fundo)
+  await rodarOcr([...jobsG,...jobsD],fr=>onMsg(eta(0.12+0.86*fr,`Lendo os tempos de ${1+det.length} página(s)…`)));
+  const {votos:vG,off}=votarRotulos(rotulosDePalavras(jobsG.map(j=>j.out),r),fs,r);const votos=fs.map(()=>[{},{}]);
+  for(const p of det){const vD=votarRotulos(rotulosDePalavras(p.jobs.map(j=>j.out),p.rD),p.fs,p.rD).votos;
     const top=v=>{const e=Object.entries(v).sort((a,b)=>b[1]-a[1]);return e.length?e[0][0]:'';};
     // confere o encaixe: quantos furos têm o mesmo número lido na ampliação e na página geral
     const mp=encaixeDetalhe(p.fs,fs,vizMed(p.fs),nn,par=>par.filter(([i,j])=>{const a=top(vD[i][0]);return a&&a.length>=3&&a===top(vG[j][0]);}).length);if(!mp)continue;
     mp.forEach((j,i)=>vD[i].forEach((v,li)=>Object.entries(v).forEach(([s,n])=>{votos[j][li][s]=(votos[j][li][s]||0)+n;})));}
-  await w.terminate();
   // a página geral só completa os furos que as ampliações não leram (nela os números são pequenos e se sobrepõem)
   votos.forEach((v,i)=>{if(!Object.keys(v[0]).length&&!Object.keys(v[1]).length)votos[i]=vG[i];});
   // número cortado (ex.: "280" de "28050") soma o voto no número completo
@@ -1338,7 +1354,7 @@ async function lerPdfTempos(file,onMsg){
     furos.forEach((f,i)=>{if(!f.ok&&f.t&&f.t2&&+f.t2-+f.t===D&&(votos[i][0][f.t]||0)>=2&&(votos[i][1][f.t2]||0)>=2&&f.t===melhor(votos[i][0]).t)f.ok=true;});}
   // fundo: 1ª página (normalmente a foto de satélite) ou a própria página
   let fundo=best.c;if(best.i!==1){try{const p1=pags[0].c;if(p1.width===c.width&&p1.height===c.height)fundo=p1;}catch(e){}}
-  return{furos,canvas:c,fundo,r,pagina:best.i,off};
+  const res={furos,canvas:c,fundo,r,pagina:best.i,off};(window.__ocrT=window.__ocrT||[]).push(Date.now()-t0);await guardarOcr(file,res);return res;
 }
 function recorteFuro(c,f,r,off){const o0=off||{ox:2.1*r,oy:1.7*r,lh:r};const xa=Math.min(-2*r,o0.ox-r),xb=Math.max(10*r,o0.ox+7*o0.lh),ya=Math.min(-2*r,o0.oy-r),yb=Math.max(4*r,o0.oy+(f.t2?2.6:1.6)*o0.lh);
   const w=Math.round(xb-xa),h=Math.round(yb-ya),x0=Math.max(0,Math.round(f.x+xa)),y0=Math.max(0,Math.round(f.y+ya));const o=document.createElement('canvas');o.width=w*2;o.height=h*2;const g=o.getContext('2d');g.drawImage(c,x0,y0,w,h,0,0,w*2,h*2);g.strokeStyle='#e03131';g.lineWidth=3;g.beginPath();g.arc((f.x-x0)*2,(f.y-y0)*2,r*3,0,7);g.stroke();return o.toDataURL('image/png');} // anel vermelho = furo que está sendo conferido
