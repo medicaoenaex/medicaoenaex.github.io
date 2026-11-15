@@ -1,6 +1,6 @@
 // Medição Enaex: guarda o app e TODAS as bibliotecas no cache para abrir sem sinal no campo.
 // Aumente a versão sempre que publicar um index.html novo.
-const CACHE = 'croqui-real-v30';
+const CACHE = 'croqui-real-v31';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png',
@@ -21,6 +21,21 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || !req.url.startsWith('http')) return;
+  // Carregamento de Campo: rede primeiro (abre sempre a versão publicada), cache só sem sinal
+  const u = new URL(req.url);
+  if (req.mode === 'navigate' && u.origin === self.location.origin && /\/carregamento[^/]*\.html$/.test(u.pathname)) {
+    e.respondWith(caches.open(CACHE).then(async cache => {
+      const key = u.origin + u.pathname;
+      try {
+        const res = await Promise.race([fetch(key, { cache: 'no-cache' }), new Promise((_, no) => setTimeout(() => no(new Error('tempo')), 6000))]);
+        if (res && res.ok) { cache.put(key, res.clone()); return res; }
+        throw new Error('http');
+      } catch (err) {
+        return (await cache.match(key)) || (await cache.match(req, { ignoreSearch: true })) || (await cache.match('./index.html')) || Response.error();
+      }
+    }));
+    return;
+  }
   e.respondWith(caches.open(CACHE).then(async cache => {
     let hit = await cache.match(req, { ignoreSearch: true });
     // Abrir o app sem internet por qualquer endereço do site cai no index.html
