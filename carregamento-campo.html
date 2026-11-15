@@ -413,7 +413,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-15.10';
+const APP_VER='2026-11-15.11';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -685,14 +685,58 @@ function addExtra(p,near,ponto){
   p.holes.push(h);markP(p.id);markF(p.id,h.id);save();renderPoly();editHole(p.holes.length-1);
 }
 
+/* ----- Foto do polígono (drone): acha os furos na foto e afina o encaixe ----- */
+// furo na foto = mancha cinza-azulada redonda (pó da perfuração) com um ponto escuro no meio
+function borrar(a,W,H,s){const r=Math.max(1,Math.round(Math.sqrt(12*s*s/3+1)/2-0.5)),t=new Float32Array(W*H);let o=a.slice?a.slice():Float32Array.from(a);
+  for(let pass=0;pass<3;pass++){for(let y=0;y<H;y++){let acc=0;const b=y*W;for(let x=-r;x<=r;x++)acc+=o[b+Math.min(W-1,Math.max(0,x))];for(let x=0;x<W;x++){t[b+x]=acc/(2*r+1);acc+=o[b+Math.min(W-1,x+r+1)]-o[b+Math.max(0,x-r)];}}
+    for(let x=0;x<W;x++){let acc=0;for(let y=-r;y<=r;y++)acc+=t[Math.min(H-1,Math.max(0,y))*W+x];for(let y=0;y<H;y++){o[y*W+x]=acc/(2*r+1);acc+=t[Math.min(H-1,y+r+1)*W+x]-t[Math.max(0,y-r)*W+x];}}}
+  return o;}
+function mapaFuros(d,W,H){const n=W*H,q=new Float32Array(n),dk=new Float32Array(n);
+  for(let i=0;i<n;i++){const r=d[i*4],g=d[i*4+1],b=d[i*4+2],l=(r+g+b)/3;dk[i]=255-l;q[i]=(b-r)+0.5*(255-l);}
+  const a=borrar(q,W,H,3),b=borrar(q,W,H,9),c=borrar(dk,W,H,3),e=borrar(dk,W,H,9),f=borrar(dk,W,H,1.2),h=borrar(dk,W,H,4),s=new Float32Array(n);
+  for(let i=0;i<n;i++)s[i]=(a[i]-b[i])+0.6*(c[i]-e[i])+0.4*(f[i]-h[i]);return s;}
+const invAf=m=>{const [a,b,c,d,e,f]=m,det=a*d-b*c;return[d/det,-b/det,-c/det,a/det,(c*f-d*e)/det,(b*e-a*f)/det];};
+const apAf=(m,x,y)=>[m[0]*x+m[2]*y+m[4],m[1]*x+m[3]*y+m[5]];
+// ajuste afim (mínimos quadrados) de pontos s -> d
+function ajusteAf(S,D){const n=S.length;if(n<6)return null;let M=[[0,0,0],[0,0,0],[0,0,0]],vx=[0,0,0],vy=[0,0,0];
+  S.forEach(([x,y],i)=>{const v=[x,y,1];for(let a=0;a<3;a++){for(let b=0;b<3;b++)M[a][b]+=v[a]*v[b];vx[a]+=v[a]*D[i][0];vy[a]+=v[a]*D[i][1];}});
+  const sol=v=>{const A=M.map((r,i)=>[...r,v[i]]);for(let i=0;i<3;i++){let p=i;for(let k=i+1;k<3;k++)if(Math.abs(A[k][i])>Math.abs(A[p][i]))p=k;[A[i],A[p]]=[A[p],A[i]];if(Math.abs(A[i][i])<1e-9)return null;for(let k=0;k<3;k++)if(k!==i){const f=A[k][i]/A[i][i];for(let j=i;j<4;j++)A[k][j]-=f*A[i][j];}}return A.map((r,i)=>r[3]/r[i]);};
+  const X=sol(vx),Y=sol(vy);return X&&Y?[X[0],Y[0],X[1],Y[1],X[2],Y[2]]:null;}
+async function afinarPelaFoto(p,img,m){ // m: foto -> mapa (dos 2 toques). Devolve m afinado e quais furos apareceram na foto
+  const hs=p.holes.filter(h=>h.status!=='nao');if(hs.length<8)return null;
+  const im=await new Promise((ok,err)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=err;i.src=img.url;});
+  let F=invAf(m);const esc=Math.hypot(F[0],F[1]);
+  const nnM=(()=>{const d=hs.map(a=>{let mn=Infinity;hs.forEach(b=>{if(b!==a){const q=Math.hypot(a.x-b.x,a.y-b.y);if(q<mn)mn=q;}});return mn;}).sort((a,b)=>a-b);return d[d.length>>1];})();
+  const sp=nnM*esc;if(!(sp>3))return null;
+  const P0=hs.map(h=>apAf(F,h.x,h.y));const x0=Math.max(0,Math.min(...P0.map(q=>q[0]))-2*sp),y0=Math.max(0,Math.min(...P0.map(q=>q[1]))-2*sp),x1=Math.min(img.w,Math.max(...P0.map(q=>q[0]))+2*sp),y1=Math.min(img.h,Math.max(...P0.map(q=>q[1]))+2*sp);
+  if(x1-x0<10||y1-y0<10)return null;
+  let k=28/sp;k=Math.min(k,2600/(x1-x0),2600/(y1-y0),4);const W=Math.round((x1-x0)*k),H=Math.round((y1-y0)*k);
+  const c=document.createElement('canvas');c.width=W;c.height=H;const cx=c.getContext('2d');cx.drawImage(im,x0,y0,x1-x0,y1-y0,0,0,W,H);
+  const s=mapaFuros(cx.getImageData(0,0,W,H).data,W,H);
+  const ord=Float32Array.from(s).sort();const T=0.3*ord[Math.floor(ord.length*0.99)];
+  const toL=([x,y])=>[(x-x0)*k,(y-y0)*k],toF=([x,y])=>[x/k+x0,y/k+y0];
+  let par=[];
+  for(let it=0;it<5;it++){const w=Math.max(2,Math.round((it?0.3:0.45)*sp*k));par=[];
+    hs.forEach((h,i)=>{const [u,v]=toL(apAf(F,h.x,h.y));const ui=Math.round(u),vi=Math.round(v);if(ui<w||vi<w||ui>=W-w||vi>=H-w)return;let bm=-Infinity,bu=0,bv=0;
+      for(let yy=vi-w;yy<=vi+w;yy++)for(let xx=ui-w;xx<=ui+w;xx++){const z=s[yy*W+xx];if(z>bm){bm=z;bu=xx;bv=yy;}}
+      if(bm>T)par.push([i,toF([bu,bv])]);});
+    if(par.length<Math.max(6,hs.length*0.25))return{m,achados:[],nao:hs.map(h=>h.id),fraco:true};
+    const err=par.map(([i,q])=>{const pp=apAf(F,hs[i].x,hs[i].y);return Math.hypot(pp[0]-q[0],pp[1]-q[1]);});const lim=[...err].sort((a,b)=>a-b)[Math.floor(err.length*0.8)];
+    const usa=par.filter((_,j)=>err[j]<=lim);const nf=ajusteAf(usa.map(([i])=>[hs[i].x,hs[i].y]),usa.map(([,q])=>q));if(!nf)break;
+    const e2=Math.hypot(nf[0],nf[1]),e3=Math.hypot(nf[2],nf[3]);if(e2/esc<0.7||e2/esc>1.4||e3/esc<0.7||e3/esc>1.4)break; // deformou demais: fica com o encaixe dos toques
+    F=nf;}
+  const achados=new Set(par.filter(([i,q])=>{const pp=apAf(F,hs[i].x,hs[i].y);return Math.hypot(pp[0]-q[0],pp[1]-q[1])<0.25*sp;}).map(([i])=>hs[i].id));
+  return{m:invAf(F),achados:[...achados],nao:hs.filter(h=>!achados.has(h.id)).map(h=>h.id)};
+}
+
 /* ----- Croqui de fundo: carregar e posicionar ----- */
 async function bgMenu(p){
   const opts2=p.bg?`<button class="btn" id="bRe">Reposicionar o croqui atual</button>`:'';
-  openSheet(`<h3>Croqui de fundo<button class="btn sm" id="bClose">Fechar</button></h3><p class="mut">Escolha o PDF do croqui ou uma foto. Depois você toca em 2 furos no desenho para o app encaixar o croqui nos furos.</p><div class="btns" style="flex-direction:column"><button class="btn pri" id="bPick">Escolher PDF ou foto</button>${opts2}</div>`);
+  openSheet(`<h3>Croqui de fundo<button class="btn sm" id="bClose">Fechar</button></h3><p class="mut">Escolha o PDF do croqui ou uma foto (pode ser a foto do drone). Depois você toca em 2 furos no desenho para o app encaixar. Na foto, o app procura os outros furos sozinho e acerta o encaixe.</p><div class="btns" style="flex-direction:column"><button class="btn pri" id="bPick">Escolher PDF ou foto</button>${opts2}</div>`);
   $('#bClose').onclick=closeSheet;
-  if($('#bRe'))$('#bRe').onclick=async()=>{const url=await bgGet(p.id);if(!url){toast('Croqui não encontrado neste aparelho');return;}calibrar(p,{url,w:p.bg.w,h:p.bg.h});};
+  if($('#bRe'))$('#bRe').onclick=async()=>{const url=await bgGet(p.id);if(!url){toast('Croqui não encontrado neste aparelho');return;}calibrar(p,{url,w:p.bg.w,h:p.bg.h,foto:!!p.bg.foto});};
   $('#bPick').onclick=async()=>{const file=await pickFile('.pdf,image/*');if(!file)return;
-    try{const img=/\.pdf$/i.test(file.name)?await pdfPageToImage(await readBuf(file)):await imageFileToImage(file);calibrar(p,img);}catch(e){busy();toast(e.message||'Não consegui abrir o arquivo');}};
+    try{const pdf=/\.pdf$/i.test(file.name);const img=pdf?await pdfPageToImage(await readBuf(file)):await imageFileToImage(file);if(!pdf)img.foto=true;calibrar(p,img);}catch(e){busy();toast(e.message||'Não consegui abrir o arquivo');}};
 }
 function calibrar(p,img){
   if(p.holes.length<2){toast('O polígono precisa de pelo menos 2 furos');return;}
@@ -720,7 +764,17 @@ function calibrar(p,img){
       if(den<1){toast('Os dois toques estão no mesmo lugar');return;}
       const sr=(dqx*dpx+dqy*dpy)/den,si=(dqy*dpx-dqx*dpy)/den;
       const e1=q1[0]-(sr*p1[0]-si*p1[1]),f1=q1[1]-(si*p1[0]+sr*p1[1]);
-      p.bg={w:img.w,h:img.h,m:[sr,si,-si,sr,e1,f1],on:true};const ok=await bgPut(p.id,img.url);save();closeSheet();tab='mapa';renderPoly();toast(ok?'Croqui encaixado':'Encaixado, mas o aparelho não guardou a imagem');};
+      let m=[sr,si,-si,sr,e1,f1],res=null;
+      if(img.foto){busy('Procurando os furos na foto…');try{res=await afinarPelaFoto(p,img,m);}catch(e){console.error(e);}busy();if(res&&!res.fraco)m=res.m;}
+      p.bg={w:img.w,h:img.h,m,on:true,foto:!!img.foto};if(res&&!res.fraco)p.bg.semFoto=res.nao;else delete p.bg.semFoto;
+      const ok=await bgPut(p.id,img.url);save();closeSheet();tab='mapa';renderPoly();
+      if(!ok)toast('Encaixado, mas o aparelho não guardou a imagem');
+      else if(res&&!res.fraco){const n=res.achados.length,t=n+res.nao.length;
+        openSheet(`<h3>Foto encaixada<button class="btn sm" id="fOk">OK</button></h3><p><b>${n} de ${t}</b> furos do croqui foram achados na foto e usados para acertar o encaixe.</p>
+        ${res.nao.length?`<p class="mut">Sem furo visível na foto (pode ser furo coberto, sombra, máquina em cima ou furo não perfurado). Confira no mapa: eles ficam com um anel laranja.</p><p style="max-height:30vh;overflow:auto">${res.nao.map(esc).join(', ')}</p>`:''}
+        <p class="mut">A foto de drone nunca é perfeita (ângulo, lente). Se algum furo ficar fora do lugar, use “Reposicionar” e toque em 2 furos mais afastados.</p>`);$('#fOk').onclick=closeSheet;}
+      else if(img.foto)toast('Foto encaixada pelos 2 toques (não consegui achar furos suficientes na foto para afinar)');
+      else toast('Croqui encaixado');};
   };
   draw();
 }
@@ -766,9 +820,10 @@ function tabMapa(p){
   const g=geom(p),r=g.r;
   let s='';
   if(g.useBg){const m=p.bg.m;s+=`<g transform="translate(${g.pad+g.off-g.minX} ${g.pad-g.minY})"><image href="${g.bgUrl}" width="${p.bg.w}" height="${p.bg.h}" transform="matrix(${m.join(' ')})" preserveAspectRatio="none" opacity="0.95"/></g>`;}
+  const semFoto=g.useBg&&p.bg.semFoto?new Set(p.bg.semFoto):null; // furo do croqui sem furo visível na foto do drone
   p.holes.forEach((h,i)=>{const cx=g.X(h.x),cy=g.Y(h.y),c=corFuro(h);
     const lbl=h.n!=null?h.n:h.id;const agua=h.agua!=='seca';const sl=selMode&&selSet.has(i);
-    s+=`<g data-i="${i}">${sl?`<circle cx="${cx}" cy="${cy}" r="${r*1.45}" fill="none" stroke="#fab005" stroke-width="${r*0.35}" pointer-events="none"/>`:''}${(h.cond||[]).length?`<circle cx="${cx+r*0.8}" cy="${cy-r*0.8}" r="${r*0.32}" fill="#7a4b00" stroke="#fff" stroke-width="${r*0.08}" pointer-events="none"/>`:''}<circle data-i="${i}" cx="${cx}" cy="${cy}" r="${r}" fill="${c}" fill-opacity="${g.useBg?0.85:1}" stroke="${agua?'#1971c2':'#fff'}" stroke-width="${agua?r*0.32:r*0.12}"/>${meiaLua(h,cx,cy,r)}`+
+    s+=`<g data-i="${i}">${semFoto&&semFoto.has(h.id)?`<circle cx="${cx}" cy="${cy}" r="${r*1.7}" fill="none" stroke="#f76707" stroke-width="${r*0.22}" stroke-dasharray="${r*0.5} ${r*0.3}" pointer-events="none"/>`:''}${sl?`<circle cx="${cx}" cy="${cy}" r="${r*1.45}" fill="none" stroke="#fab005" stroke-width="${r*0.35}" pointer-events="none"/>`:''}${(h.cond||[]).length?`<circle cx="${cx+r*0.8}" cy="${cy-r*0.8}" r="${r*0.32}" fill="#7a4b00" stroke="#fff" stroke-width="${r*0.08}" pointer-events="none"/>`:''}<circle data-i="${i}" cx="${cx}" cy="${cy}" r="${r}" fill="${c}" fill-opacity="${g.useBg?0.85:1}" stroke="${agua?'#1971c2':'#fff'}" stroke-width="${agua?r*0.32:r*0.12}"/>${meiaLua(h,cx,cy,r)}`+
     `<text data-i="${i}" x="${cx}" y="${cy+r*0.3}" text-anchor="middle" font-size="${r*0.8}" fill="#fff" font-weight="700" pointer-events="none">${esc(String(lbl).slice(-4))}</text>`+
     (rotulos?(corPor==='tempo'?(temTempo(h)?[(h.tempos&&h.tempos.length>1?h.tempos.map(v=>fmt(v)).join('/'):fmt(h.tempo))+' ms']:[]):rotuloFuro(h)).map((t,k)=>`<text x="${cx}" y="${cy+r*(1.5+k*0.56)}" text-anchor="middle" font-size="${r*0.5}" fill="${corPor!=='tempo'&&k===0&&h.caminhao?camCor(h.caminhao):'#14202b'}" font-weight="700" stroke="#fff" stroke-width="${r*0.15}" paint-order="stroke" pointer-events="none">${esc(t)}</text>`).join(''):'')+`</g>`;});
   const lines={};p.holes.forEach(h=>{if(h.line&&lines[h.line]==null)lines[h.line]=h.y;});
@@ -781,7 +836,7 @@ function tabMapa(p){
   ${corPor==='tempo'&&p.holes.some(temTempo)?`<div class="card" style="padding:10px;margin-bottom:8px"><div class="row" style="align-items:center"><button class="btn sm pri" id="simPlay" style="flex:0 0 auto">▶ Simular sequência</button><input type="range" id="simR" min="0" max="1000" value="${simK==null?1000:Math.round(simK*1000)}" style="flex:1 1 120px;padding:0"><b id="simLbl" style="flex:0 0 auto;min-width:70px;text-align:right">${simK==null?'todos':''}</b></div></div>`:''}
   ${corPor==='caminhao'?`<div class="card" style="padding:10px;margin-bottom:8px"><label style="margin-top:0">Marcar caminhão tocando nos furos</label><div class="row"><select id="pinSel">${opts(camOpts,pincel||'','— desligado (toque abre o furo) —')}</select></div><p class="mut" style="margin:6px 0 0">${pincel?`Toque nos furos que o <b style="color:${camCor(pincel)}">${esc(pincel)}</b> carregou. Tocar de novo desmarca.`:'Escolha um caminhão para marcar vários furos rápido.'}</p></div>`:''}
   <div class="legend">${legendaHTML(p)}</div>
-  <div class="btns" style="margin:0 0 8px"><button class="btn sm" id="zOut">− Zoom</button><button class="btn sm" id="zIn">+ Zoom</button><button class="btn sm pri" id="nextP">Próximo pendente</button>${p.bg?`<button class="btn sm" id="bgT">${g.bgOn?'Ocultar croqui':'Mostrar croqui'}</button>`:''}<button class="btn sm" id="rotT">${rotulos?'Ocultar caminhão/carga':'Mostrar caminhão/carga'}</button><button class="btn sm" id="expC">Gerar croqui (imagem)</button><button class="btn sm" id="expP">📄 Croqui em PDF</button><button class="btn sm" id="vozM">🎤 Falar</button><button class="btn sm ${selMode?'pri':''}" id="selT">${selMode?'Sair da seleção':'Selecionar vários'}</button>${podeDesfazer(p)?`<button class="btn sm" id="undo">↶ Desfazer</button>`:''}${p.geo?`<button class="btn sm ${gpsOn?'pri':''}" id="gpsT">📍 ${gpsOn?'GPS ligado':'Onde estou'}</button>`:''}</div>
+  <div class="btns" style="margin:0 0 8px"><button class="btn sm" id="zOut">− Zoom</button><button class="btn sm" id="zIn">+ Zoom</button><button class="btn sm pri" id="nextP">Próximo pendente</button><button class="btn sm" id="fotoP">📷 Foto do polígono</button>${p.bg?`<button class="btn sm" id="bgT">${g.bgOn?'Ocultar croqui':'Mostrar croqui'}</button>`:''}<button class="btn sm" id="rotT">${rotulos?'Ocultar caminhão/carga':'Mostrar caminhão/carga'}</button><button class="btn sm" id="expC">Gerar croqui (imagem)</button><button class="btn sm" id="expP">📄 Croqui em PDF</button><button class="btn sm" id="vozM">🎤 Falar</button><button class="btn sm ${selMode?'pri':''}" id="selT">${selMode?'Sair da seleção':'Selecionar vários'}</button>${podeDesfazer(p)?`<button class="btn sm" id="undo">↶ Desfazer</button>`:''}${p.geo?`<button class="btn sm ${gpsOn?'pri':''}" id="gpsT">📍 ${gpsOn?'GPS ligado':'Onde estou'}</button>`:''}</div>
   <div class="row" style="margin:0 0 8px;gap:6px"><input id="busca" placeholder="Buscar furo (nº)" style="flex:1 1 120px"><button class="btn sm" id="buscaGo" style="flex:0 0 auto">Abrir furo</button></div>
   ${gpsOn?`<div class="hint" id="gpsInfo" style="margin:0 0 8px">Procurando sinal do GPS…</div>`:''}
   <div class="mapwrap" id="mw"><svg id="map" viewBox="0 0 ${g.W} ${g.H}" width="${g.W*pxPerM*zoom}" height="${g.H*pxPerM*zoom}">${s}</svg></div>
@@ -798,6 +853,7 @@ function tabMapa(p){
   if($('#pinSel'))$('#pinSel').onchange=e=>{pincel=e.target.value||null;if(pincel){selMode=false;selSet.clear();}tabMapa(p);};
   $('#zIn').onclick=()=>{zoom=Math.min(4,zoom*1.4);tabMapa(p);};
   $('#zOut').onclick=()=>{zoom=Math.max(.4,zoom/1.4);tabMapa(p);};
+  $('#fotoP').onclick=()=>bgMenu(p);
   if($('#bgT'))$('#bgT').onclick=()=>{p.bg.on=!g.bgOn;save();tabMapa(p);};
   $('#nextP').onclick=()=>{const i=p.holes.findIndex(h=>h.status==='pendente');if(i<0)toast('Nenhum furo pendente');else editHole(i);};
   $('#expC').onclick=()=>exportCroqui(p);$('#expP').onclick=()=>croquiPdfMenu(p);
@@ -1169,57 +1225,109 @@ async function renderPagina(doc,i,esc){const page=await doc.getPage(i);const vp=
 function furosDaImagem(c){
   const W=c.width,H=c.height,d=c.getContext('2d').getImageData(0,0,W,H).data;const m=new Uint8Array(W*H);
   for(let i=0;i<W*H;i++){const r=d[i*4],g=d[i*4+1],b=d[i*4+2];if(ehDot(r,g,b))m[i]=1;}
-  const tudo=manchas(m,W,H);let ms=tudo.filter(s=>s.n>=12&&s.w<=3*s.h&&s.h<=3*s.w&&s.n>=0.45*s.w*s.h);
+  const tudo=manchas(m,W,H);const faixas=tudo.filter(s=>s.w>W*0.15&&s.h<H*0.2); // faixa colorida do título: os "buracos" das letras não são furos
+  const naFaixa=s=>faixas.some(f=>Math.abs(s.x-f.x)<=f.w/2&&Math.abs(s.y-f.y)<=f.h/2+2);
+  let ms=tudo.filter(s=>s.n>=12&&s.w<=3*s.h&&s.h<=3*s.w&&s.n>=0.45*s.w*s.h&&!naFaixa(s));
   if(!ms.length)return[];
   const ns=ms.map(s=>s.n).sort((a,b)=>a-b),med=ns[Math.floor(ns.length/2)];
   ms=ms.filter(s=>s.n>=med*0.45&&s.n<=med*2.2);
-  const cor=tudo.reduce((a,s)=>a+s.n,0),dots=ms.reduce((a,s)=>a+s.n,0);ms.limpo=cor?dots/cor:0; // página "limpa" = quase só bolinhas
+  const cor=tudo.reduce((a,s)=>a+(faixas.includes(s)||naFaixa(s)?0:s.n),0),dots=ms.reduce((a,s)=>a+s.n,0);ms.limpo=cor?dots/cor:0; // página "limpa" = quase só bolinhas
   return ms;
 }
-async function lerPdfTempos(file,onMsg){
-  onMsg('Abrindo PDF…');const lib=await loadPdf();const doc=await lib.getDocument({data:new Uint8Array(await readBuf(file)),isEvalSupported:false}).promise;
-  const ESC=192/72;let best=null;
-  for(let i=1;i<=doc.numPages;i++){onMsg(`Procurando os furos (página ${i} de ${doc.numPages})…`);const c=await renderPagina(doc,i,ESC);const fs=furosDaImagem(c);
-    const W=c.width,H=c.height,dd=c.getContext('2d').getImageData(0,0,W,H).data;let az=0;for(let k=0;k<W*H;k+=7)if(ehAzul(dd[k*4],dd[k*4+1],dd[k*4+2]))az++;
-    const nota=fs.length*(az>200?1:0.2)*(fs.limpo||0);if(!best||nota>best.nota||(nota===best.nota&&i>best.i))best={i,c,fs,nota};}
-  if(!best||best.fs.length<3)throw new Error('Não achei os furos nesse PDF. Ele precisa ter uma página com as bolinhas dos furos e os tempos escritos ao lado.');
-  const {c,fs}=best,W=c.width,H=c.height;const r=Math.sqrt(fs.map(s=>s.n).sort((a,b)=>a-b)[Math.floor(fs.length/2)]/Math.PI);
-  // máscara só com o texto azul
-  const src=c.getContext('2d').getImageData(0,0,W,H),t=document.createElement('canvas');t.width=W;t.height=H;const tx=t.getContext('2d'),td=tx.createImageData(W,H);
-  for(let k=0;k<W*H;k++){const az=ehAzul(src.data[k*4],src.data[k*4+1],src.data[k*4+2]);const v=az?0:255;td.data[k*4]=td.data[k*4+1]=td.data[k*4+2]=v;td.data[k*4+3]=255;}tx.putImageData(td,0,0);
-  onMsg('Carregando o leitor de números (a 1ª vez pode demorar)…');const w=await tessWorker();
-  const votos=fs.map(()=>({}));
-  const passes=[[3,'11'],[4,'12']];let pn=0;
-  for(const [S,psm] of passes){pn++;onMsg(`Lendo os tempos (passada ${pn} de ${passes.length})…`);
+function mascaraAzul(c){const W=c.width,H=c.height,src=c.getContext('2d').getImageData(0,0,W,H),t=document.createElement('canvas');t.width=W;t.height=H;const tx=t.getContext('2d'),td=tx.createImageData(W,H);
+  for(let k=0;k<W*H;k++){const az=ehAzul(src.data[k*4],src.data[k*4+1],src.data[k*4+2]);const v=az?0:255;td.data[k*4]=td.data[k*4+1]=td.data[k*4+2]=v;td.data[k*4+3]=255;}tx.putImageData(td,0,0);return t;}
+const raioDe=fs=>Math.sqrt(fs.map(s=>s.n).sort((a,b)=>a-b)[Math.floor(fs.length/2)]/Math.PI);
+function vizMed(fs){const d=fs.map(a=>{let m=Infinity;fs.forEach(b=>{if(b!==a){const q=Math.hypot(a.x-b.x,a.y-b.y);if(q<m)m=q;}});return m;}).sort((a,b)=>a-b);return d[d.length>>1];}
+// lê os números azuis da página e agrupa em rótulos de 1 ou 2 linhas (furo com 2 decks tem 2 tempos empilhados)
+async function rotulosOcr(w,t,passes,r){const W=t.width,H=t.height,rot=[];
+  for(const [S,psm] of passes){
     const big=document.createElement('canvas');big.width=W*S;big.height=H*S;const bx=big.getContext('2d');bx.imageSmoothingEnabled=true;bx.imageSmoothingQuality='high';bx.drawImage(t,0,0,W*S,H*S);
     await w.setParameters({tessedit_pageseg_mode:psm});const {data}=await w.recognize(big);
-    (data.words||[]).forEach(wd=>{const s=String(wd.text||'').replace(/\D/g,'');if(s.length<2||s.length>5)return;const x=wd.bbox.x0/S,y=wd.bbox.y0/S;
-      let bi=-1,bd=Infinity;fs.forEach((f,i)=>{const dd=Math.hypot(x-f.x-2.1*r,y-f.y-1.7*r);if(dd<bd){bd=dd;bi=i;}});
-      if(bi>=0&&bd<1.3*r){const v=votos[bi];v[s]=(v[s]||0)+(wd.confidence>70?2:1);}});}
+    const ws=[];(data.words||[]).forEach(wd=>{const s=String(wd.text||'').replace(/\D/g,'');if(s.length<2||s.length>5)return;ws.push({s,x:wd.bbox.x0/S,y:wd.bbox.y0/S,h:(wd.bbox.y1-wd.bbox.y0)/S,c:wd.confidence});});
+    const hm=ws.length?ws.map(q=>q.h).sort((a,b)=>a-b)[ws.length>>1]:r;const usado=new Set();
+    ws.sort((a,b)=>a.y-b.y).forEach(a=>{if(usado.has(a))return;usado.add(a);
+      const b=ws.find(q=>!usado.has(q)&&Math.abs(q.x-a.x)<=0.6*hm&&q.y-a.y>=0.8*hm&&q.y-a.y<=1.9*hm);
+      if(b)usado.add(b);rot.push({x:a.x,y:a.y,h:hm,l:[a,b].filter(Boolean)});});}
+  return rot;}
+// aprende onde o PDF escreve o número em relação à bolinha (cada programa põe num lugar) e dá os votos de cada furo
+function votarRotulos(rot,fs,r){let ox=2.1*r,oy=1.7*r;
+  if(rot.length>=3){const hist=new Map(),B=Math.max(2,Math.round(r/3)),k=(i,j)=>i+','+j;
+    rot.forEach(q=>fs.forEach(f=>{const dx=q.x-f.x,dy=q.y-f.y;if(Math.abs(dx)<10*r&&Math.abs(dy)<10*r){const kk=k(Math.round(dx/B),Math.round(dy/B));hist.set(kk,(hist.get(kk)||0)+1);}}));
+    let mx=0;hist.forEach((_,kk)=>{const [i,j]=kk.split(',').map(Number);let s=0;for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)s+=hist.get(k(i+a,j+b))||0;if(s>mx){mx=s;ox=i*B;oy=j*B;}});}
+  const votos=fs.map(()=>[{},{}]);
+  rot.forEach(q=>{let bi=-1,bd=Infinity;fs.forEach((f,i)=>{const dd=Math.hypot(q.x-f.x-ox,q.y-f.y-oy);if(dd<bd){bd=dd;bi=i;}});
+    if(bi>=0&&bd<Math.max(1.3*r,0.9*q.h))q.l.forEach((wd,li)=>{const v=votos[bi][li];v[wd.s]=(v[wd.s]||0)+(wd.c>70?2:1);});});
+  return{votos,off:{ox,oy,lh:rot.length?rot[0].h:r}};}
+// página de detalhe (zoom de um pedaço): acha escala e deslocamento que levam as bolinhas dela às da página geral
+function encaixeDetalhe(fsD,fs,nnD,nn,confere){const sm=nn/nnD;if(!(sm>0&&sm<1))return null;const B=nn*0.5;let melhor=null;
+  for(let ks=-6;ks<=6;ks++){const s0=sm*(1+ks*0.02),h=new Map();
+  for(const a of fsD)for(const b of fs){const tx=b.x-s0*a.x,ty=b.y-s0*a.y,kk=Math.round(tx/B)+','+Math.round(ty/B);h.set(kk,(h.get(kk)||0)+1);}
+  const cand=[...h.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8);
+  for(const [tk] of cand){let s=s0,[tx,ty]=tk.split(',').map(v=>+v*B),par=[];
+    for(let it=0;it<4;it++){par=[];fsD.forEach((a,i)=>{const X=s*a.x+tx,Y=s*a.y+ty;let bj=-1,bd=Infinity;fs.forEach((b,j)=>{const d=Math.hypot(b.x-X,b.y-Y);if(d<bd){bd=d;bj=j;}});if(bd<nn*0.35)par.push([i,bj]);});
+      if(par.length<3)break; // ajusta escala e deslocamento por mínimos quadrados
+      const n=par.length;let sx=0,sy=0,sX=0,sY=0;par.forEach(([i,j])=>{sx+=fsD[i].x;sy+=fsD[i].y;sX+=fs[j].x;sY+=fs[j].y;});const mx=sx/n,my=sy/n,mX=sX/n,mY=sY/n;
+      let num=0,den=0;par.forEach(([i,j])=>{const dx=fsD[i].x-mx,dy=fsD[i].y-my;num+=dx*(fs[j].x-mX)+dy*(fs[j].y-mY);den+=dx*dx+dy*dy;});if(den>0)s=num/den;tx=mX-s*mx;ty=mY-s*my;}
+    if(par.length<Math.max(3,fsD.length*0.6))continue;const cf=confere(par),nota=par.length+3*cf;if(!melhor||nota>melhor.nota)melhor={nota,par,cf};}}
+    return melhor&&melhor.cf>=Math.max(3,melhor.par.length*0.05)?new Map(melhor.par):null;} // sem números batendo com a página geral, não arrisca
+async function lerPdfTempos(file,onMsg){
+  onMsg('Abrindo PDF…');const lib=await loadPdf();const doc=await lib.getDocument({data:new Uint8Array(await readBuf(file)),isEvalSupported:false}).promise;
+  const ESC=192/72;let best=null;const pags=[];
+  for(let i=1;i<=doc.numPages;i++){onMsg(`Procurando os furos (página ${i} de ${doc.numPages})…`);const c=await renderPagina(doc,i,ESC);const fs=furosDaImagem(c);
+    const W=c.width,H=c.height,dd=c.getContext('2d').getImageData(0,0,W,H).data;let az=0;for(let k=0;k<W*H;k+=7)if(ehAzul(dd[k*4],dd[k*4+1],dd[k*4+2]))az++;
+    const nota=fs.length*(az>200?1:0.2)*(fs.limpo||0);const pg={i,c,fs,nota,az};pags.push(pg);if(!best||nota>best.nota||(nota===best.nota&&i>best.i))best=pg;}
+  if(!best||best.fs.length<3)throw new Error('Não achei os furos nesse PDF. Ele precisa ter uma página com as bolinhas dos furos e os tempos escritos ao lado.');
+  const {c,fs}=best;const r=raioDe(fs),nn=vizMed(fs);
+  onMsg('Carregando o leitor de números (a 1ª vez pode demorar)…');const w=await tessWorker();
+  onMsg('Lendo os tempos da página geral…');
+  const rot=await rotulosOcr(w,mascaraAzul(c),[[3,'11'],[4,'12']],r);const {votos:vG,off}=votarRotulos(rot,fs,r);const votos=fs.map(()=>[{},{}]);
+  // páginas de detalhe (ampliações de partes do fogo): números maiores, leitura mais segura
+  const det=pags.filter(p=>p!==best&&p.az>200&&p.fs.length>=3&&(p.fs.limpo||0)>0.2&&raioDe(p.fs)>1.4*r);let nd=0;
+  for(const p of det){nd++;onMsg(`Lendo os tempos das ampliações (${nd} de ${det.length})…`);
+    const rD=raioDe(p.fs);const rotD=await rotulosOcr(w,mascaraAzul(p.c),[[2,'11'],[3,'12']],rD);const vD=votarRotulos(rotD,p.fs,rD).votos;
+    const top=v=>{const e=Object.entries(v).sort((a,b)=>b[1]-a[1]);return e.length?e[0][0]:'';};
+    // confere o encaixe: quantos furos têm o mesmo número lido na ampliação e na página geral
+    const mp=encaixeDetalhe(p.fs,fs,vizMed(p.fs),nn,par=>par.filter(([i,j])=>{const a=top(vD[i][0]);return a&&a.length>=3&&a===top(vG[j][0]);}).length);if(!mp)continue;
+    mp.forEach((j,i)=>vD[i].forEach((v,li)=>Object.entries(v).forEach(([s,n])=>{votos[j][li][s]=(votos[j][li][s]||0)+n;})));}
   await w.terminate();
-  const furos=fs.map((f,i)=>{const e=Object.entries(votos[i]).sort((a,b)=>b[1]-a[1]);const t=e.length?e[0][0]:'';const ok=!!t&&t.length>=3&&e[0][1]>=3&&(e.length<2||e[0][1]>=2*e[1][1]);return{x:f.x,y:f.y,t,ok,alt:e.slice(1,3).map(q=>q[0])};});
+  // a página geral só completa os furos que as ampliações não leram (nela os números são pequenos e se sobrepõem)
+  votos.forEach((v,i)=>{if(!Object.keys(v[0]).length&&!Object.keys(v[1]).length)votos[i]=vG[i];});
+  // número cortado (ex.: "280" de "28050") soma o voto no número completo
+  votos.forEach(vv=>vv.forEach(v=>{Object.keys(v).forEach(a=>{const l=Object.keys(v).filter(b=>b.length>a.length&&b.startsWith(a)).sort((x,y)=>v[y]-v[x])[0];if(l){v[l]+=v[a]/2;delete v[a];}});}));
+  const melhor=v=>{const e=Object.entries(v).sort((a,b)=>b[1]-a[1]);const t=e.length?e[0][0]:'';return{t,ok:!!t&&t.length>=3&&e[0][1]>=3&&(e.length<2||e[0][1]>=2*e[1][1]),alt:e.slice(1,3).map(q=>q[0])};};
+  let furos=fs.map((f,i)=>{const a=melhor(votos[i][0]),b=melhor(votos[i][1]);return{x:f.x,y:f.y,t:a.t,t2:b.t,ok:a.ok&&(!b.t||b.ok),alt:a.alt};});
+  // 2 tempos por furo: a diferença entre eles costuma ser a mesma em todo o fogo; usa isso para escolher entre leituras parecidas
+  const dc={};furos.forEach(f=>{if(f.t&&f.t2){const d=+f.t2-+f.t;if(d>0)dc[d]=(dc[d]||0)+1;}});const dm=Object.entries(dc).sort((a,b)=>b[1]-a[1])[0];
+  if(dm&&dm[1]>=furos.length*0.3){const D=+dm[0];furos.forEach((f,i)=>{if(f.t&&f.t2&&+f.t2-+f.t===D)return;let bs=-1,ba=null,bb=null;
+    for(const [a,na] of Object.entries(votos[i][0]))for(const [b,nb] of Object.entries(votos[i][1]))if(+b-+a===D&&na+nb>bs){bs=na+nb;ba=a;bb=b;}
+    if(ba){f.t=ba;f.t2=bb;f.ok=false;}});
+    // par lido certinho (2º = 1º + diferença padrão) é uma conferência por si só
+    furos.forEach((f,i)=>{if(!f.ok&&f.t&&f.t2&&+f.t2-+f.t===D&&(votos[i][0][f.t]||0)>=2&&(votos[i][1][f.t2]||0)>=2&&f.t===melhor(votos[i][0]).t)f.ok=true;});}
   // fundo: 1ª página (normalmente a foto de satélite) ou a própria página
-  let fundo=best.c;if(best.i!==1){try{const p1=await renderPagina(doc,1,ESC);if(p1.width===W&&p1.height===H)fundo=p1;}catch(e){}}
-  return{furos,canvas:c,fundo,r,pagina:best.i};
+  let fundo=best.c;if(best.i!==1){try{const p1=pags[0].c;if(p1.width===c.width&&p1.height===c.height)fundo=p1;}catch(e){}}
+  return{furos,canvas:c,fundo,r,pagina:best.i,off};
 }
-function recorteFuro(c,f,r){const w=Math.round(12*r),h=Math.round(6*r),x0=Math.max(0,Math.round(f.x-2*r)),y0=Math.max(0,Math.round(f.y-2*r));const o=document.createElement('canvas');o.width=w*2;o.height=h*2;o.getContext('2d').drawImage(c,x0,y0,w,h,0,0,w*2,h*2);return o.toDataURL('image/png');}
+function recorteFuro(c,f,r,off){const o0=off||{ox:2.1*r,oy:1.7*r,lh:r};const xa=Math.min(-2*r,o0.ox-r),xb=Math.max(10*r,o0.ox+7*o0.lh),ya=Math.min(-2*r,o0.oy-r),yb=Math.max(4*r,o0.oy+(f.t2?2.6:1.6)*o0.lh);
+  const w=Math.round(xb-xa),h=Math.round(yb-ya),x0=Math.max(0,Math.round(f.x+xa)),y0=Math.max(0,Math.round(f.y+ya));const o=document.createElement('canvas');o.width=w*2;o.height=h*2;const g=o.getContext('2d');g.drawImage(c,x0,y0,w,h,0,0,w*2,h*2);g.strokeStyle='#e03131';g.lineWidth=3;g.beginPath();g.arc((f.x-x0)*2,(f.y-y0)*2,r*3,0,7);g.stroke();return o.toDataURL('image/png');} // anel vermelho = furo que está sendo conferido
 // tela de conferência: o usuário confirma os números duvidosos antes de usar
 function conferirOcr(res,aoFim){
   const F=res.furos;let soDuv=true;
   const lens={};F.forEach(f=>{if(f.t)lens[f.t.length]=(lens[f.t.length]||0)+1;});const lenMod=+(Object.entries(lens).sort((a,b)=>b[1]-a[1])[0]||[0])[0];
   const draw=()=>{const cnt={};F.forEach(f=>{if(f.t)cnt[f.t]=(cnt[f.t]||0)+1;});
-    const duv=F.map((f,i)=>[f,i]).filter(([f])=>!f.ok||!f.t||cnt[f.t]>1||!/^\d{3,5}$/.test(f.t)||(lenMod&&f.t.length!==lenMod&&!f.conf));
+    const com2=F.filter(f=>f.t&&f.t2),difs={};com2.forEach(f=>{const d=+f.t2-+f.t;difs[d]=(difs[d]||0)+1;});const dMod=com2.length>F.length/2?+(Object.entries(difs).sort((a,b)=>b[1]-a[1])[0]||[null])[0]:null; // 2 tempos por furo: a diferença costuma ser sempre a mesma
+    const duv=F.map((f,i)=>[f,i]).filter(([f])=>!f.ok||!f.t||cnt[f.t]>1||!/^\d{3,5}$/.test(f.t)||(f.conf?false:(dMod!=null?(!f.t2||+f.t2-+f.t!==dMod):(lenMod&&f.t.length!==lenMod))));
     const lista=soDuv?duv:F.map((f,i)=>[f,i]);
     openSheet(`<h3>Conferir tempos lidos<button class="btn sm" id="ocX">Cancelar</button></h3>
     <p style="margin:0">${nf(F.length)} achados na página ${res.pagina} · <b style="color:${duv.length?'var(--bad)':'var(--ok)'}">${duv.length} para conferir</b></p>
-    <p class="mut" style="margin:4px 0 8px">Olhe o número ao lado da bolinha na imagem e corrija se estiver errado. Furo sem tempo pode ficar vazio.</p>
+    <p class="mut" style="margin:4px 0 8px">Olhe o número ao lado da bolinha na imagem e corrija se estiver errado. Furo com 2 tempos (2 decks): escreva os dois com barra, ex.: 12000/12037. Furo sem tempo pode ficar vazio.</p>
     <div class="seg" id="ocM" style="margin-bottom:8px"><button data-m="1" class="${soDuv?'on':''}">Só duvidosos (${duv.length})</button><button data-m="0" class="${soDuv?'':'on'}">Todos (${F.length})</button></div>
-    <div style="max-height:50vh;overflow:auto">${lista.map(([f,i])=>`<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)"><img src="${recorteFuro(res.canvas,f,res.r)}" style="height:${Math.round(12*res.r)}px;max-width:55%;border:1px solid var(--line);border-radius:6px;background:#fff"><input data-o="${i}" inputmode="numeric" value="${esc(f.t)}" style="flex:1;${(!f.ok||cnt[f.t]>1)?'border-color:var(--bad)':''}">${cnt[f.t]>1?'<span class="mut">repetido</span>':''}</div>`).join('')||'<p class="mut">Nada para conferir.</p>'}</div>
+    <div style="max-height:50vh;overflow:auto">${lista.map(([f,i])=>`<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)"><img src="${recorteFuro(res.canvas,f,res.r,res.off)}" style="height:${Math.round(12*res.r)}px;max-width:55%;object-fit:contain;border:1px solid var(--line);border-radius:6px;background:#fff"><input data-o="${i}" inputmode="decimal" value="${esc(f.t+(f.t2?'/'+f.t2:''))}" style="flex:1;${(!f.ok||cnt[f.t]>1)?'border-color:var(--bad)':''}">${cnt[f.t]>1?'<span class="mut">repetido</span>':''}</div>`).join('')||'<p class="mut">Nada para conferir.</p>'}</div>
     <div class="btns"><button class="btn pri" id="ocOk">Usar estes tempos</button></div>`);
     $('#ocX').onclick=closeSheet;
     document.querySelectorAll('#ocM button').forEach(b=>b.onclick=()=>{soDuv=b.dataset.m==='1';draw();});
-    document.querySelectorAll('[data-o]').forEach(inp=>inp.onchange=()=>{const f=F[+inp.dataset.o];f.t=inp.value.replace(/\D/g,'');f.ok=true;f.conf=true;});
-    $('#ocOk').onclick=()=>{document.querySelectorAll('[data-o]').forEach(inp=>{const f=F[+inp.dataset.o];f.t=inp.value.replace(/\D/g,'');});
+    const lerInp=(f,v)=>{const ps=String(v).split(/[^\d]+/).filter(Boolean);f.t=ps[0]||'';f.t2=ps[1]||'';};
+    document.querySelectorAll('[data-o]').forEach(inp=>inp.onchange=()=>{const f=F[+inp.dataset.o];lerInp(f,inp.value);f.ok=true;f.conf=true;});
+    $('#ocOk').onclick=()=>{document.querySelectorAll('[data-o]').forEach(inp=>{const f=F[+inp.dataset.o];lerInp(f,inp.value);});
       const rep=Object.entries(F.reduce((a,f)=>{if(f.t)a[f.t]=(a[f.t]||0)+1;return a;},{})).filter(([,n])=>n>1);
       const fim=()=>{closeSheet();aoFim(F.filter(f=>f.t));};
       if(rep.length)confirmBox(`Há tempo repetido (${rep.map(r=>r[0]).slice(0,5).join(', ')}). No plano isso significa furos detonando juntos. Usar mesmo assim?`,fim,'Usar');else fim();};};
@@ -1230,10 +1338,10 @@ async function pdfTemposFluxo(destino){ // destino: polígono existente (encaixa
   try{const res=await lerPdfTempos(file,m=>busy(m));busy();
     return await new Promise(ok=>conferirOcr(res,F=>{
       const xs=F.map(f=>f.x),ys=F.map(f=>f.y),mg=res.r*14;const x0=Math.max(0,Math.min(...xs)-mg),y0=Math.max(0,Math.min(...ys)-mg),x1=Math.min(res.fundo.width,Math.max(...xs)+mg),y1=Math.min(res.fundo.height,Math.max(...ys)+mg);
-      const T=F.map(f=>({id:f.t,x:f.x-x0,y:f.y-y0,tempo:+f.t,tempos:null}));
+      const T=F.map(f=>({id:f.t,x:f.x-x0,y:f.y-y0,tempo:+f.t,tempos:f.t2?[+f.t,+f.t2]:null}));
       if(destino){tzEncaixar(destino,T);ok(true);return;}
       const cc=document.createElement('canvas');cc.width=Math.round(x1-x0);cc.height=Math.round(y1-y0);cc.getContext('2d').drawImage(res.fundo,x0,y0,cc.width,cc.height,0,0,cc.width,cc.height);
-      ok({holes:T.map(t=>{const h=novoFuro(t.id,t.x,t.y,null);h.tempo=t.tempo;return h;}),bg:{url:cc.toDataURL('image/jpeg',.8),w:cc.width,h:cc.height},nome:file.name.replace(/\.pdf$/i,''),resumo:`tempos lidos do PDF (${T.length} furos, conferidos)`});}));
+      ok({holes:T.map(t=>{const h=novoFuro(t.id,t.x,t.y,null);h.tempo=t.tempo;if(t.tempos)h.tempos=t.tempos;return h;}),bg:{url:cc.toDataURL('image/jpeg',.8),w:cc.width,h:cc.height},nome:file.name.replace(/\.pdf$/i,''),resumo:`tempos lidos do PDF (${T.length} furos, conferidos)`});}));
   }catch(e){busy();console.error(e);toast(e.message&&e.message.length<160?e.message:'Não consegui ler o PDF');return null;}
 }
 
