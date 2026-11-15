@@ -148,6 +148,8 @@ function busy(m){let b=$('#busy');if(!m){if(b)b.remove();return;}if(!b){b=docume
 
 let excelP=null;
 function loadExcel(){return excelP||(excelP=(async()=>{if(!window.ExcelJS)await loadScript(['lib/exceljs.min.js','https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js']);return window.ExcelJS;})().catch(e=>{excelP=null;throw e;}));}
+let jspdfP=null;
+function loadJsPdf(){return jspdfP||(jspdfP=(async()=>{if(!(window.jspdf&&window.jspdf.jsPDF))await loadScript(['lib/jspdf.umd.min.js','https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js']);return window.jspdf.jsPDF;})().catch(e=>{jspdfP=null;throw e;}));}
 async function entregarArquivo(blob,nome,tipo){
   try{const file=new File([blob],nome,{type:tipo});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:nome});return true;}}catch(e){if(e&&e.name==='AbortError')return true;}
   try{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();a.remove();toast('Arquivo gerado: '+nome);return true;}catch(e){toast('Este navegador bloqueou o download. Abra o app pelo link do GitHub.');return false;}
@@ -411,7 +413,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-15.8';
+const APP_VER='2026-11-15.9';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -656,12 +658,12 @@ function renderPoly(){
 }
 const p0=()=>cur();
 function polyMenu(){
-  openSheet(`<h3>Polígono<button class="btn sm" id="mClose">Fechar</button></h3><div class="btns" style="flex-direction:column"><button class="btn" id="mPlE">Gerar planilha de carregamento (Excel)</button><button class="btn" id="mPlI">Importar planilha preenchida</button><button class="btn" id="mTz">Importar tempos de detonação</button><button class="btn" id="mMed">Atualizar com a medição (Medição Enaex)</button><button class="btn pri" id="mProj">Projeto de carregamento (carga, tampão, tolerância)</button><button class="btn" id="mPrint">Relatório completo (imprimir / PDF)</button><button class="btn" id="mLote">Lotes em uso (produto, booster, detonador)</button><button class="btn" id="mEdit">Editar dados (mina, POL, data…)</button><button class="btn" id="mAdd">Adicionar furo extra</button><button class="btn" id="mBg">${p0().bg?'Trocar / reposicionar croqui de fundo':'Colocar croqui de fundo (PDF ou foto)'}</button>${p0().bg?'<button class="btn" id="mBgDel">Remover croqui de fundo</button>':''}<button class="btn" id="mCsv">Exportar furos (CSV / Excel)</button><button class="btn bad" id="mDel">Excluir polígono</button></div>`);
+  openSheet(`<h3>Polígono<button class="btn sm" id="mClose">Fechar</button></h3><div class="btns" style="flex-direction:column"><button class="btn" id="mPlE">Gerar planilha de carregamento (Excel)</button><button class="btn" id="mPlI">Importar planilha preenchida</button><button class="btn" id="mTz">Importar tempos de detonação</button><button class="btn" id="mMed">Atualizar com a medição (Medição Enaex)</button><button class="btn pri" id="mProj">Projeto de carregamento (carga, tampão, tolerância)</button><button class="btn" id="mPrint">Relatório completo (imprimir / PDF)</button><button class="btn" id="mCpdf">Croqui em PDF (A4 / A3)</button><button class="btn" id="mLote">Lotes em uso (produto, booster, detonador)</button><button class="btn" id="mEdit">Editar dados (mina, POL, data…)</button><button class="btn" id="mAdd">Adicionar furo extra</button><button class="btn" id="mBg">${p0().bg?'Trocar / reposicionar croqui de fundo':'Colocar croqui de fundo (PDF ou foto)'}</button>${p0().bg?'<button class="btn" id="mBgDel">Remover croqui de fundo</button>':''}<button class="btn" id="mCsv">Exportar furos (CSV / Excel)</button><button class="btn bad" id="mDel">Excluir polígono</button></div>`);
   const p=cur();
   $('#mClose').onclick=closeSheet;
   $('#mEdit').onclick=()=>{closeSheet();go('editpoly');};
   $('#mProj').onclick=()=>editProjeto(p);
-  $('#mPrint').onclick=()=>{closeSheet();imprimir(p);};
+  $('#mPrint').onclick=()=>{closeSheet();imprimir(p);};$('#mCpdf').onclick=()=>{closeSheet();croquiPdfMenu(p);};
   $('#mLote').onclick=()=>editLotes(p);
   $('#mTz').onclick=()=>tzMenu(p);
   $('#mMed').onclick=()=>atualizarMedicao(p);
@@ -779,7 +781,7 @@ function tabMapa(p){
   ${corPor==='tempo'&&p.holes.some(temTempo)?`<div class="card" style="padding:10px;margin-bottom:8px"><div class="row" style="align-items:center"><button class="btn sm pri" id="simPlay" style="flex:0 0 auto">▶ Simular sequência</button><input type="range" id="simR" min="0" max="1000" value="${simK==null?1000:Math.round(simK*1000)}" style="flex:1 1 120px;padding:0"><b id="simLbl" style="flex:0 0 auto;min-width:70px;text-align:right">${simK==null?'todos':''}</b></div></div>`:''}
   ${corPor==='caminhao'?`<div class="card" style="padding:10px;margin-bottom:8px"><label style="margin-top:0">Marcar caminhão tocando nos furos</label><div class="row"><select id="pinSel">${opts(camOpts,pincel||'','— desligado (toque abre o furo) —')}</select></div><p class="mut" style="margin:6px 0 0">${pincel?`Toque nos furos que o <b style="color:${camCor(pincel)}">${esc(pincel)}</b> carregou. Tocar de novo desmarca.`:'Escolha um caminhão para marcar vários furos rápido.'}</p></div>`:''}
   <div class="legend">${legendaHTML(p)}</div>
-  <div class="btns" style="margin:0 0 8px"><button class="btn sm" id="zOut">− Zoom</button><button class="btn sm" id="zIn">+ Zoom</button><button class="btn sm pri" id="nextP">Próximo pendente</button>${p.bg?`<button class="btn sm" id="bgT">${g.bgOn?'Ocultar croqui':'Mostrar croqui'}</button>`:''}<button class="btn sm" id="rotT">${rotulos?'Ocultar caminhão/carga':'Mostrar caminhão/carga'}</button><button class="btn sm" id="expC">Gerar croqui (imagem)</button><button class="btn sm" id="vozM">🎤 Falar</button><button class="btn sm ${selMode?'pri':''}" id="selT">${selMode?'Sair da seleção':'Selecionar vários'}</button>${podeDesfazer(p)?`<button class="btn sm" id="undo">↶ Desfazer</button>`:''}${p.geo?`<button class="btn sm ${gpsOn?'pri':''}" id="gpsT">📍 ${gpsOn?'GPS ligado':'Onde estou'}</button>`:''}</div>
+  <div class="btns" style="margin:0 0 8px"><button class="btn sm" id="zOut">− Zoom</button><button class="btn sm" id="zIn">+ Zoom</button><button class="btn sm pri" id="nextP">Próximo pendente</button>${p.bg?`<button class="btn sm" id="bgT">${g.bgOn?'Ocultar croqui':'Mostrar croqui'}</button>`:''}<button class="btn sm" id="rotT">${rotulos?'Ocultar caminhão/carga':'Mostrar caminhão/carga'}</button><button class="btn sm" id="expC">Gerar croqui (imagem)</button><button class="btn sm" id="expP">📄 Croqui em PDF</button><button class="btn sm" id="vozM">🎤 Falar</button><button class="btn sm ${selMode?'pri':''}" id="selT">${selMode?'Sair da seleção':'Selecionar vários'}</button>${podeDesfazer(p)?`<button class="btn sm" id="undo">↶ Desfazer</button>`:''}${p.geo?`<button class="btn sm ${gpsOn?'pri':''}" id="gpsT">📍 ${gpsOn?'GPS ligado':'Onde estou'}</button>`:''}</div>
   <div class="row" style="margin:0 0 8px;gap:6px"><input id="busca" placeholder="Buscar furo (nº)" style="flex:1 1 120px"><button class="btn sm" id="buscaGo" style="flex:0 0 auto">Abrir furo</button></div>
   ${gpsOn?`<div class="hint" id="gpsInfo" style="margin:0 0 8px">Procurando sinal do GPS…</div>`:''}
   <div class="mapwrap" id="mw"><svg id="map" viewBox="0 0 ${g.W} ${g.H}" width="${g.W*pxPerM*zoom}" height="${g.H*pxPerM*zoom}">${s}</svg></div>
@@ -798,7 +800,7 @@ function tabMapa(p){
   $('#zOut').onclick=()=>{zoom=Math.max(.4,zoom/1.4);tabMapa(p);};
   if($('#bgT'))$('#bgT').onclick=()=>{p.bg.on=!g.bgOn;save();tabMapa(p);};
   $('#nextP').onclick=()=>{const i=p.holes.findIndex(h=>h.status==='pendente');if(i<0)toast('Nenhum furo pendente');else editHole(i);};
-  $('#expC').onclick=()=>exportCroqui(p);
+  $('#expC').onclick=()=>exportCroqui(p);$('#expP').onclick=()=>croquiPdfMenu(p);
   if($('#simPlay'))ligaSimulacao(p);
   $('#rotT').onclick=()=>{rotulos=!rotulos;tabMapa(p);};
   $('#vozM').onclick=()=>vozNoMapa(p);
@@ -903,6 +905,35 @@ async function croquiCanvas(p){
     }else if(corPor==='desvio'){const cf=conferencia(p);Object.entries(DV).forEach(([k,v])=>item(v.c,`${v.n} – ${nf(cf.n[k])}`));item('#102a43',`Carga: projeto ${fmt(cf.kgProj)} kg · executado ${fmt(cf.kgExec)} kg`);
     }else{Object.entries(ST).forEach(([k,v])=>item(v.c,`${v.n} – ${nf(res.st[k])}`));item('#1971c2',`Com água – ${nf(res.agua)}`);}
     return c;
+}
+/* ----- Croqui em PDF (A4 ou A3), gerado direto no celular ----- */
+function croquiPdfMenu(p){
+  let fol=(S.ui&&S.ui.pdfFolha)||'a4',cor=corPor==='caminhao'?'caminhao':'status';
+  const draw=()=>{openSheet(`<h3>Croqui em PDF<button class="btn sm" id="cpX">Fechar</button></h3>
+    <p class="mut" style="margin:0 0 8px">Sai só o croqui: cabeçalho (mina, POL, data), o mapa com o croqui de fundo e a legenda. Funciona sem internet.</p>
+    <label>Tamanho da folha</label><div class="seg" id="cpF"><button data-f="a4" class="${fol==='a4'?'on':''}">A4</button><button data-f="a3" class="${fol==='a3'?'on':''}">A3</button></div>
+    <label>Cores dos furos</label><div class="seg" id="cpC"><button data-c="status" class="${cor==='status'?'on':''}">Status</button><button data-c="caminhao" class="${cor==='caminhao'?'on':''}">Caminhão</button><button data-c="desvio" class="${cor==='desvio'?'on':''}">Projeto</button><button data-c="tempo" class="${cor==='tempo'?'on':''}">Tempo</button></div>
+    <div class="btns"><button class="btn pri" id="cpGo" style="min-height:52px">📄 Gerar PDF ${fol.toUpperCase()}</button></div>`);
+    $('#cpX').onclick=closeSheet;
+    document.querySelectorAll('#cpF button').forEach(b=>b.onclick=()=>{fol=b.dataset.f;draw();});
+    document.querySelectorAll('#cpC button').forEach(b=>b.onclick=()=>{cor=b.dataset.c;draw();});
+    $('#cpGo').onclick=()=>{S.ui=Object.assign(S.ui||{},{pdfFolha:fol});save();closeSheet();croquiPdf(p,fol,cor);};};
+  draw();
+}
+async function croquiPdf(p,folha,cor){
+  busy('Gerando PDF do croqui…');const antes=corPor;
+  try{
+    const jsPDF=await loadJsPdf();
+    if(cor)corPor=cor;let c;try{c=await croquiCanvas(p);}finally{corPor=antes;}
+    const land=c.width>=c.height;const doc=new jsPDF({orientation:land?'landscape':'portrait',unit:'mm',format:folha||'a4',compress:true});
+    const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),m=8;
+    const k=Math.min((W-2*m)/c.width,(H-2*m-5)/c.height);const w=c.width*k,h=c.height*k;
+    doc.addImage(c.toDataURL('image/jpeg',.92),'JPEG',(W-w)/2,m,w,h,undefined,'FAST');
+    doc.setFontSize(7);doc.setTextColor(120);doc.text(`Carregamento de Campo · POL ${p.pol} · gerado em ${new Date().toLocaleString('pt-BR')}`,m,H-4);
+    doc.setProperties({title:`Croqui POL ${p.pol}`,subject:`${p.mina||''} ${brDate(p.data)}`});
+    const blob=doc.output('blob');busy();
+    await entregarArquivo(blob,`croqui-POL${p.pol}-${p.data||today()}-${(folha||'a4').toUpperCase()}.pdf`,'application/pdf');
+  }catch(e){corPor=antes;busy();console.error(e);toast(/internet|carregar/i.test(e&&e.message||'')?'Não consegui abrir o gerador de PDF. Abra o app uma vez com internet.':'Não consegui gerar o PDF');}
 }
 async function exportCroqui(p){
   busy('Gerando croqui…');
