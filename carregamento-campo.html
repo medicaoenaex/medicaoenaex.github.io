@@ -162,7 +162,7 @@ async function entregarArquivo(blob,nome,tipo){
 const bgCache={};let dbP=null;
 function db(){return dbP||(dbP=new Promise(res=>{try{const r=indexedDB.open('carregamentoCampo',2);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('bg'))d.createObjectStore('bg');if(!d.objectStoreNames.contains('foto'))d.createObjectStore('foto');};r.onsuccess=()=>res(r.result);r.onerror=()=>res(null);}catch(e){res(null);}}));}
 async function bgGet(id){if(id in bgCache)return bgCache[id];const d=await db();if(!d)return bgCache[id]=null;return new Promise(res=>{try{const q=d.transaction('bg').objectStore('bg').get(id);q.onsuccess=()=>res(bgCache[id]=q.result||null);q.onerror=()=>res(null);}catch(e){res(null);}});}
-async function bgPut(id,url){bgCache[id]=url;const d=await db();if(!d)return false;return new Promise(res=>{try{const t=d.transaction('bg','readwrite');t.objectStore('bg').put(url,id);t.oncomplete=()=>res(true);t.onerror=()=>res(false);}catch(e){res(false);}});}
+async function bgPut(id,url,daNuvem){bgCache[id]=url;if(!daNuvem){const y=SY();y.bq=y.bq||{};y.bq[id]=Date.now();}const d=await db();if(!d)return false;return new Promise(res=>{try{const t=d.transaction('bg','readwrite');t.objectStore('bg').put(url,id);t.oncomplete=()=>res(true);t.onerror=()=>res(false);}catch(e){res(false);}});}
 async function bgDel(id){bgCache[id]=null;const d=await db();if(!d)return;try{d.transaction('bg','readwrite').objectStore('bg').delete(id);}catch(e){}}
 // fotos dos furos (ficam só neste aparelho)
 async function fotoGet(k){const d=await db();if(!d)return[];return new Promise(res=>{try{const q=d.transaction('foto').objectStore('foto').get(k);q.onsuccess=()=>res(q.result||[]);q.onerror=()=>res([]);}catch(e){res([]);}});}
@@ -219,9 +219,20 @@ function markAll(p){markP(p.id);p.holes.forEach(h=>markF(p.id,h.id));}
 function markDel(p){const y=SY();y.del=y.del||{};y.del[p.id]=polyDoc(p);y.dp[p.id]=Date.now();Object.keys(y.df).forEach(k=>{if(k.startsWith(p.id+'\u0001'))delete y.df[k];});syncLogo();}
 const GEO=['id','x','y','line','n','profProj','obsCroqui','cargaProj','tempo','tempos'];
 const DYN=['status','profMed','agua','aguaM','decks','booster','brinel','detTipo','detQtd','tampao','caminhao','obs','cond','lotes','hist','ts','por'];
-const PK=['lotes','cams','acess','check','situ','geo','pos','detAt'];
-function polyDoc(p){const ex={};PK.forEach(k=>{if(p[k]!=null)ex[k]=p[k];});return{...ex,dvtProg:p.dvtProg??null,proj:p.proj||null,mina:p.mina,cava:p.cava,pol:p.pol,banco:p.banco,data:p.data,resp:p.resp,nfs:p.nfs||{},esp:p.esp||null,criado:p.criado||null,holes:p.holes.map(h=>{const o={};GEO.forEach(k=>{if(h[k]!=null)o[k]=h[k];});return o;})};}
+const PK=['lotes','cams','acess','check','situ','geo','pos','detAt','bg'];
+function polyDoc(p){const ex={};PK.forEach(k=>{if(p[k]!=null)ex[k]=p[k];});if(ex.bg){ex.bg={...ex.bg};delete ex.bg.on;} /* mostrar/ocultar croqui é de cada celular */return{...ex,dvtProg:p.dvtProg??null,proj:p.proj||null,mina:p.mina,cava:p.cava,pol:p.pol,banco:p.banco,data:p.data,resp:p.resp,nfs:p.nfs||{},esp:p.esp||null,criado:p.criado||null,holes:p.holes.map(h=>{const o={};GEO.forEach(k=>{if(h[k]!=null)o[k]=h[k];});return o;})};}
 function furoDoc(h){const o={};DYN.forEach(k=>o[k]=h[k]??null);return o;}
+// cada parte do polígono vira um "caminho"; o celular manda só os caminhos que mudou desde a última sincronização
+// assim dois colegas mexendo no mesmo polígono (caminhões diferentes, furos extras, checklist) não apagam o trabalho um do outro
+const SUBK=['cams','acess','check','nfs','situ','pos','lotes','proj'];
+const hsh=v=>{const t=JSON.stringify(v??null);let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return(h>>>0).toString(36)+t.length.toString(36);};
+function mapaDoc(doc){const m={};Object.keys(doc||{}).forEach(k=>{const v=doc[k];
+  if(k==='holes'&&Array.isArray(v))v.forEach(h=>{if(h&&h.id!=null)m['holes\u0001'+h.id]=hsh(h);});
+  else if(SUBK.includes(k)&&v&&typeof v==='object'&&!Array.isArray(v))Object.keys(v).forEach(q=>m[k+'\u0001'+q]=hsh(v[q]));
+  else m[k]=hsh(v);});return m;}
+function mudancas(pid,doc){const y=SY();y.ph=y.ph||{};const base=y.ph[pid],cur=mapaDoc(doc);
+  const ks=base?[...new Set([...Object.keys(base),...Object.keys(cur)])].filter(k=>base[k]!==cur[k]):Object.keys(cur);
+  return ks.map(k=>k.split('\u0001'));}
 let syncT=null,syncing=false,syncMsg='';
 function syncLogo(){clearTimeout(syncT);if(SY().token)syncT=setTimeout(syncNow,2500);}
 function pendentes(){const y=SY();return Object.keys(y.dp).length+Object.keys(y.df).length;}
@@ -235,13 +246,13 @@ async function syncNow(){
   const y=SY();if(!y.token||syncing)return;
   syncing=true;const t0=Date.now();
   try{
-    const polys=Object.keys(y.dp).map(id=>{const p=S.polys.find(x=>x.id===id);if(p)return{id,doc:polyDoc(p)};if(y.del&&y.del[id])return{id,doc:y.del[id],excluido:true};return null;}).filter(Boolean);
+    const polys=Object.keys(y.dp).map(id=>{const p=S.polys.find(x=>x.id===id);if(p){const doc=polyDoc(p);return{id,doc,mud:mudancas(id,doc)};}if(y.del&&y.del[id])return{id,doc:y.del[id],excluido:true};return null;}).filter(Boolean);
     const furos=[];Object.keys(y.df).forEach(k=>{const [pid,fid]=k.split('\u0001');const p=S.polys.find(x=>x.id===pid);const h=p&&p.holes.find(q=>q.id===fid);if(h){const doc=furoDoc(h);if(h.ts&&!doc.por)doc.por=h.por=meuNome();furos.push({poly_id:pid,furo_id:fid,doc,ts:h.ts||1});}});
     const d=await api({acao:'sync',token:y.token,desde:y.desde||null,polys,furos});
     // limpa só o que foi enviado e não mudou de novo durante o envio
     Object.keys(y.dp).forEach(k=>{if(y.dp[k]<=t0){delete y.dp[k];if(y.del)delete y.del[k];}});
     Object.keys(y.df).forEach(k=>{if(y.df[k]<=t0)delete y.df[k];});
-    aplicarRemoto(d);setTimeout(enviarFotos,300);
+    aplicarRemoto(d);setTimeout(nuvemArquivos,300);
     y.desde=d.agora;y.ultima=Date.now();if(d.usuario)y.nome=d.usuario.nome;syncMsg='';
     save();
   }catch(e){
@@ -254,12 +265,14 @@ function aplicarRemoto(d){
   const y=SY();let mudou=false;
   (d.polys||[]).forEach(rp=>{
     if(y.dp[rp.id])return; // tenho alteração local ainda não enviada
+    y.ph=y.ph||{};if(!rp.excluido)y.ph[rp.id]=mapaDoc(rp.doc||{});
     const i=S.polys.findIndex(x=>x.id===rp.id);
     if(rp.excluido){if(i>=0){S.polys.splice(i,1);if(S.cur===rp.id&&view==='poly'){S.cur=null;view='home';}mudou=true;}return;}
     const doc=rp.doc||{};
     if(i<0){const np={id:rp.id,...Object.fromEntries(PK.filter(k=>doc[k]!=null).map(k=>[k,doc[k]])),dvtProg:doc.dvtProg??null,proj:doc.proj||null,criado:doc.criado||Date.now(),mina:doc.mina,cava:doc.cava,pol:doc.pol,banco:doc.banco,data:doc.data,resp:doc.resp,nfs:doc.nfs||{},esp:doc.esp,
         holes:(doc.holes||[]).map(g=>Object.assign(novoFuro(g.id,g.x,g.y,g.profProj,g.line,g.n),g.obsCroqui?{obsCroqui:g.obsCroqui}:{},g.cargaProj!=null?{cargaProj:g.cargaProj}:{},g.tempo!=null?{tempo:g.tempo,tempos:g.tempos||null}:{}))};S.polys.push(np);mudou=true;return;}
-    const p=S.polys[i];['mina','cava','pol','banco','data','resp','esp','proj','dvtProg',...PK].forEach(k=>p[k]=doc[k]);p.nfs=doc.nfs||{};
+    const p=S.polys[i];const bgOn=p.bg?p.bg.on:undefined;['mina','cava','pol','banco','data','resp','esp','proj','dvtProg',...PK].forEach(k=>p[k]=doc[k]);p.nfs=doc.nfs||{};
+    if(p.bg){p.bg={...p.bg,on:bgOn!==false};}else delete p.bg;
     const byId=new Map(p.holes.map(h=>[h.id,h]));
     (doc.holes||[]).forEach(g=>{const h=byId.get(g.id);if(h){GEO.forEach(k=>{if(g[k]!==undefined)h[k]=g[k];});}else p.holes.push(Object.assign(novoFuro(g.id,g.x,g.y,g.profProj,g.line,g.n),g.obsCroqui?{obsCroqui:g.obsCroqui}:{},g.tempo!=null?{tempo:g.tempo,tempos:g.tempos||null}:{}));});
     mudou=true;
@@ -302,7 +315,8 @@ function bindSyncBox(){
     $('#syEnt').textContent='Aguarde…';
     try{const d=await api(body);syF.senha='';syF.cod='';y.token=d.token;y.nome=d.nome;y.login=d.login;
       // primeira vez: manda tudo que já existe neste celular
-      S.polys.forEach(p=>markAll(p));syncMsg='';save();atualizaTelaSync();syncNow();toast('Conectado à equipe');}
+      S.polys.forEach(p=>markAll(p));const yb=SY();yb.bq=yb.bq||{};for(const p of S.polys)if(p.bg&&!(p.bg.v&&yb.bgv&&yb.bgv[p.id]===p.bg.v))yb.bq[p.id]=Date.now();
+      syncMsg='';save();atualizaTelaSync();await filaTodasFotos();syncNow();toast('Conectado à equipe');}
     catch(e){syncMsg=e instanceof TypeError?'Não consegui falar com a base. Confira a internet. (Dentro do app do Claude a base online não funciona — use o link do GitHub.)':e.message;atualizaTelaSync();}
   };
 }
@@ -416,7 +430,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-15.12';
+const APP_VER='2026-11-15.13';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -674,7 +688,7 @@ function polyMenu(){
   $('#mPlI').onclick=()=>{closeSheet();importarPlanilha(p);};
   $('#mAdd').onclick=()=>{closeSheet();addExtra(p);};
   $('#mBg').onclick=()=>{closeSheet();bgMenu(p);};
-  if($('#mBgDel'))$('#mBgDel').onclick=()=>confirmBox('Remover o croqui de fundo deste polígono?',()=>{delete p.bg;bgDel(p.id);save();renderPoly();},'Remover');
+  if($('#mBgDel'))$('#mBgDel').onclick=()=>confirmBox('Remover o croqui de fundo deste polígono?',()=>{delete p.bg;bgDel(p.id);const y=SY();if(y.bq)delete y.bq[p.id];markP(p.id);save();renderPoly();},'Remover');
   $('#mCsv').onclick=()=>exportBox('Furos (CSV)',`POL${p.pol}-${p.data}.csv`,csv(p),'text/csv');
   $('#mDel').onclick=()=>confirmBox(`Excluir POL ${p.pol} e todos os lançamentos? Isso não pode ser desfeito.`,()=>{markDel(p);S.polys=S.polys.filter(x=>x.id!==p.id);S.cur=null;save();go('home');},'Excluir');
 }
@@ -770,7 +784,7 @@ function calibrar(p,img){
       let m=[sr,si,-si,sr,e1,f1],res=null;
       if(img.foto){busy('Procurando os furos na foto…');try{res=await afinarPelaFoto(p,img,m);}catch(e){console.error(e);}busy();if(res&&!res.fraco)m=res.m;}
       p.bg={w:img.w,h:img.h,m,on:true,foto:!!img.foto};if(res&&!res.fraco)p.bg.semFoto=res.nao;else delete p.bg.semFoto;
-      const ok=await bgPut(p.id,img.url);save();closeSheet();tab='mapa';renderPoly();
+      const ok=await bgPut(p.id,img.url);markP(p.id);save();closeSheet();tab='mapa';renderPoly();
       if(!ok)toast('Encaixado, mas o aparelho não guardou a imagem');
       else if(res&&!res.fraco){const n=res.achados.length,t=n+res.nao.length;
         openSheet(`<h3>Foto encaixada<button class="btn sm" id="fOk">OK</button></h3><p><b>${n} de ${t}</b> furos do croqui foram achados na foto e usados para acertar o encaixe.</p>
@@ -1099,7 +1113,8 @@ async function fotosFuro(p,h){
   rem();
   const bt=$('#hFoto');if(bt)bt.onclick=async()=>{const file=await pickFile('image/*');if(!file)return;
     try{const im=await imageFileToImage(file,1280);arr=await fotoGet(k);const ts=Date.now();arr.push({ts,url:im.url});const ok=await fotoPut(k,arr);pinta(arr);
-      if(ok&&SY().token&&!SY().fotoOff){filaFoto(p.id,h.id,ts);enviarFotos();toast('Foto guardada e enviada para a equipe');}else toast(ok?'Foto guardada neste celular':'Aparelho sem espaço para a foto');}catch(e){toast('Não consegui abrir a foto');}};
+      if(ok)filaFoto(p.id,h.id,ts);
+      if(ok&&SY().token&&!SY().fotoOff){enviarFotos();toast('Foto guardada e enviada para a equipe');}else toast(ok?'Foto guardada neste celular (sobe para a nuvem quando você entrar na conta da equipe)':'Aparelho sem espaço para a foto');}catch(e){toast('Não consegui abrir a foto');}};
 }
 
 /* ===== GPS (só para polígono importado com coordenadas UTM) ===== */
@@ -1767,12 +1782,28 @@ function camFuro(p,i,meu,voz){
 const fotosRem={};let fotoEnviando=false;
 function filaFoto(pid,hid,ts){const y=SY();y.fq=y.fq||{};y.fq[pid+'|'+hid+'|'+ts]=1;save();}
 async function enviarFotos(){
-  const y=SY();if(!y.token||fotoEnviando||!y.fq)return;const ks=Object.keys(y.fq).slice(0,4);if(!ks.length)return;fotoEnviando=true;
-  try{for(const k of ks){const [pid,hid,ts]=k.split('|');const arr=await fotoGet(pid+'|'+hid);const f=arr.find(x=>String(x.ts)===ts);if(!f){delete y.fq[k];continue;}
+  const y=SY();if(!y.token||fotoEnviando||!y.fq)return;const ks=Object.keys(y.fq).slice(0,40);if(!ks.length)return;fotoEnviando=true;
+  try{for(const k of ks){if(!SY().token)break;const [pid,hid,ts]=k.split('|');const arr=await fotoGet(pid+'|'+hid);const f=arr.find(x=>String(x.ts)===ts);if(!f){delete y.fq[k];continue;}
       const r=await api({acao:'foto_enviar',token:y.token,poly_id:pid,furo_id:hid,ts:+ts,img:f.url.split(',')[1]});if(r&&r.ok){delete y.fq[k];f.nuvem=true;await fotoPut(pid+'|'+hid,arr);}}
     save();}
   catch(e){if(/desconhecida/i.test(e.message||''))y.fotoOff=true;}finally{fotoEnviando=false;}
 }
+// todas as fotos deste celular que ainda não subiram (inclusive as tiradas antes de entrar na conta)
+async function filaTodasFotos(){const d=await db();if(!d)return;const ks=await new Promise(res=>{try{const q=d.transaction('foto').objectStore('foto').getAllKeys();q.onsuccess=()=>res(q.result||[]);q.onerror=()=>res([]);}catch(e){res([]);}});
+  const y=SY();y.fq=y.fq||{};for(const k of ks){const arr=await fotoGet(k);arr.forEach(f=>{if(!f.nuvem)y.fq[k+'|'+f.ts]=1;});}save();}
+// croqui de fundo / foto do drone: sobe a imagem e baixa a dos colegas
+let croquiOcupado=false;
+async function nuvemCroquis(){const y=SY();if(!y.token||croquiOcupado||y.croquiOff)return;croquiOcupado=true;y.bq=y.bq||{};y.bgv=y.bgv||{};
+  try{for(const pid of Object.keys(y.bq)){const p=S.polys.find(x=>x.id===pid);const url=p&&p.bg?await bgGet(pid):null;if(!url){delete y.bq[pid];continue;}
+      const v=y.bq[pid];const r=await api({acao:'croqui_enviar',token:y.token,poly_id:pid,v,img:url.split(',')[1]});
+      if(r&&r.ok){if(y.bq[pid]===v)delete y.bq[pid];if(p.bg){p.bg.v=v;y.bgv[pid]=v;markP(pid);}}}
+    for(const p of S.polys){if(!p.bg||!p.bg.v||y.bgv[p.id]===p.bg.v||y.bq[p.id])continue;
+      const r=await api({acao:'croqui_url',token:y.token,poly_id:p.id});if(!r||!r.url)continue;
+      const b=await (await fetch(r.url)).blob();const url=await new Promise((ok,er)=>{const f=new FileReader();f.onload=()=>ok(f.result);f.onerror=er;f.readAsDataURL(b);});
+      if(await bgPut(p.id,url,true)){y.bgv[p.id]=p.bg.v;if(view==='poly'&&S.cur===p.id&&$('#sheet').classList.contains('hidden'))renderPoly();}}
+    save();}
+  catch(e){if(/desconhecida/i.test(e.message||''))y.croquiOff=true;console.error(e);}finally{croquiOcupado=false;}}
+async function nuvemArquivos(){await nuvemCroquis();await enviarFotos();}
 async function listarFotos(pid,forca){
   const y=SY();if(!y.token||y.fotoOff)return[];const c=fotosRem[pid];if(c&&!forca&&Date.now()-c.t<5*60e3)return c.l;
   try{const r=await api({acao:'foto_listar',token:y.token,poly_id:pid});fotosRem[pid]={t:Date.now(),l:r.fotos||[]};return fotosRem[pid].l;}catch(e){return c?c.l:[];}
@@ -2149,7 +2180,7 @@ function csv(p){
 
 render();
 if(SY().token)setTimeout(syncNow,800);
-setTimeout(checarAtualizacao,1500);setTimeout(guardarParaOffline,2500);
+setTimeout(checarAtualizacao,1500);setTimeout(()=>{if(SY().token)filaTodasFotos().then(()=>nuvemArquivos());},5000);setTimeout(guardarParaOffline,2500);
 // usa o mesmo service worker do site (Medição) para abrir sem sinal mesmo se o Medição nunca foi aberto neste celular
 try{if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.getRegistration().then(r=>{if(!r)navigator.serviceWorker.register('sw.js').catch(()=>{});}).catch(()=>{});}catch(e){}
 </script>
