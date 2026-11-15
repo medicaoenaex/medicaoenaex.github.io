@@ -124,7 +124,7 @@ const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth
 const fmtC=n=>String(Math.round(n*1000)/1000).replace('.',',');
 const brDate=s=>s?s.split('-').reverse().join('/'):'';
 const dayOf=ts=>{if(!ts)return '';const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
-function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),2200);}
+function toast(m,ms){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),ms||2200);}
 const cur=()=>S.polys.find(p=>p.id===S.cur);
 const opts=(arr,v,blank)=>(blank?`<option value="">${blank}</option>`:'')+arr.map(a=>`<option ${a===v?'selected':''}>${esc(a)}</option>`).join('');
 const holeKg=h=>(h.decks||[]).reduce((s,d)=>s+(num(d.kg)||0),0);
@@ -332,12 +332,13 @@ function renderHome(){
     h+=`<div class="card poly" data-id="${p.id}"><div style="flex:1"><b>POL ${esc(p.pol)}</b> · ${esc(p.mina)}${p.cava?' / '+esc(p.cava):''}${p.banco?' · Banco '+esc(p.banco):''}<div class="mut">${brDate(p.data)} · ${c}/${t} carregados${p.resp?' · '+esc(p.resp):''} <span class="chip" style="background:${SITU[situDe(p)].c}">${SITU[situDe(p)].n}</span></div><div class="bar"><i style="width:${t?c/t*100:0}%"></i></div></div><span style="font-size:22px;color:var(--mut)">›</span></div>`;});
   if(S.polys.length)h+=`<div class="card" id="painel">${painelHTML()}</div>`;
   h+=`<div class="card" id="syncBox">${syncBoxHTML()}</div>`;
+  h+=`<div class="card" id="vozCard">${vozCardHTML()}</div>`;
   h+=`<div class="card"><h2>Backup</h2><p class="mut" style="margin:0">Os dados ficam só neste aparelho. Faça backup no fim do turno e restaure em outro celular se precisar.</p><div class="btns"><button class="btn" id="bkp">Gerar backup</button><button class="btn" id="rst">Restaurar backup</button></div></div>`;
   $('#app').innerHTML=h;
   $('#novo').onclick=()=>go('novo');$('#goCam').onclick=()=>go('cam');$('#goInd').onclick=()=>go('indic');
   document.querySelectorAll('.poly').forEach(el=>el.onclick=()=>{mapScroll.x=mapScroll.y=0;pincel=null;selMode=false;selSet.clear();gpsStop();S.cur=el.dataset.id;save();tab='mapa';go('poly');});
   $('#bkp').onclick=()=>exportBox('Backup','backup-carregamento-'+today()+'.json',JSON.stringify(S),'application/json');
-  $('#rst').onclick=restoreBox;bindSyncBox();
+  $('#rst').onclick=restoreBox;bindSyncBox();bindVozCard();
   if($('#painel'))bindPainel();
   if($('#hq')){$('#hq').oninput=e=>{homeQ=e.target.value;const pos=e.target.selectionStart;renderHome();const n=$('#hq');n.focus();try{n.setSelectionRange(pos,pos);}catch(_){}};$('#hs').onchange=e=>{homeSitu=e.target.value;renderHome();};}
 }
@@ -1207,12 +1208,13 @@ function vozNum(tk,i){ // lê número a partir do token i: "2,5" "2 vírgula 5" 
   let t=tk[i];if(t==null)return null;let v=/^\d/.test(t)?num(t):null;if(v==null&&t in NUMP)v=NUMP[t];if(v==null)return null;let used=1;
   if((tk[i+1]==='virgula'||tk[i+1]==='ponto')&&tk[i+2]!=null&&/^\d+$/.test(tk[i+2])){v=num(t+'.'+tk[i+2]);used=3;}
   else if(tk[i+1]==='e'&&(tk[i+2]==='meio'||tk[i+2]==='meia')){v+=0.5;used=3;}
+  else if(tk[i+1]==='meio'||(tk[i+1]==='meia'&&!/^\d/.test(tk[i+2]||''))){v+=0.5;used=2;}
   else if(VOZ_UN_M.has(tk[i+1])&&tk[i+2]==='e'&&(tk[i+3]==='meio'||tk[i+3]==='meia')){v+=0.5;used=4;}
   return{v,used};
 }
 function parseVoz(txt,camList){
   let s=vozNorm(txt).replace(/(\d)\s*(kg|m)\b/g,'$1 $2').replace(/(\d)[.,](?=\d)/g,'$1\u0001').replace(/[.,;:!?()]/g,' ').replace(/\u0001/g,',');
-  const tk=s.trim().split(/\s+/).filter(Boolean);const r={};const usado=new Set();
+  const tk=vozExtenso(s.trim().split(/\s+/).filter(Boolean));const r={};const usado=new Set();
   const kwAt=tk.map(vozKw);const camN=tk.map(w=>/^(caminhao|caminhoes|umt|umb|cam)$/.test(w));
   // furo e caminhão primeiro (os números deles não são carga)
   for(let i=0;i<tk.length;i++){
@@ -1246,25 +1248,90 @@ function parseVoz(txt,camList){
   if(r.kg==null&&soltos.length===1&&r.furo)r.kg=soltos[0];
   return r;
 }
+/* ----- números falados por extenso ("trinta e dois", "cento e oitenta") viram algarismos ----- */
+const VOZ_NW=(()=>{const o={zero:0,um:1,uma:1,dois:2,duas:2,tres:3,quatro:4,cinco:5,seis:6,sete:7,oito:8,nove:9,dez:10,onze:11,doze:12,treze:13,quatorze:14,catorze:14,quinze:15,dezesseis:16,dezasseis:16,dezessete:17,dezoito:18,dezenove:19,
+  vinte:20,trinta:30,quarenta:40,cinquenta:50,cincoenta:50,sessenta:60,setenta:70,oitenta:80,noventa:90,cem:100,cento:100,duzentos:200,duzentas:200,trezentos:300,trezentas:300,quatrocentos:400,quinhentos:500,seiscentos:600,setecentos:700,oitocentos:800,novecentos:900,mil:1000};return o;})();
+const vozSlot=v=>v>=1000?1000:v>=100?100:v>=20?10:1;
+function vozExtenso(tk){const out=[];
+  for(let i=0;i<tk.length;i++){const w=tk[i];if(!(w in VOZ_NW)){out.push(w);continue;}
+    let v=VOZ_NW[w],slot=vozSlot(v),j=i+1;
+    if(w==='mil'){v=1000;slot=1000;}
+    for(;;){if(tk[j]==='mil'&&v<1000){v*=1000;slot=1000;j++;continue;}
+      const k=tk[j]==='e'?j+1:j;const n=tk[k];if(!(n in VOZ_NW)||n==='mil')break;const nv=VOZ_NW[n];
+      if(vozSlot(nv)>=slot)break;
+      v+=nv;slot=vozSlot(nv);j=k+1;}
+    out.push(String(v));i=j-1;}
+  return out;}
+/* ----- voz sem internet: Vosk (roda no próprio celular) ----- */
+const VOZ_CACHE='carregamento-voz-v1',VOZ_LIB='lib/vosk/vosk.js',VOZ_MODELO='lib/vosk/vosk-model-small-pt-0.3.tar.gz';
+const vozModo=()=>{try{return localStorage.getItem('carregamento.vozModo')||'auto';}catch(e){return'auto';}};
+async function vozCache(){try{return await caches.open(VOZ_CACHE);}catch(e){return null;}}
+async function vozOfflinePronta(){const c=await vozCache();if(!c)return false;return !!(await c.match(VOZ_LIB))&&!!(await c.match(VOZ_MODELO));}
+async function baixarVozOffline(prog){
+  const c=await vozCache();if(!c)throw new Error('Este navegador não deixa guardar a voz');
+  try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist();}catch(e){}
+  const pega=async(url,peso,base)=>{const r=await fetch(url,{cache:'no-cache'});if(!r.ok)throw new Error('Não consegui baixar ('+r.status+')');
+    const tot=+r.headers.get('content-length')||0;const rd=r.body&&r.body.getReader();if(!rd){const b=await r.blob();await c.put(url,new Response(b));return;}
+    const parts=[];let n=0;for(;;){const {done,value}=await rd.read();if(done)break;parts.push(value);n+=value.length;if(tot)prog(base+peso*n/tot);}
+    await c.put(url,new Response(new Blob(parts),{headers:{'content-type':url.endsWith('.js')?'text/javascript':'application/gzip'}}));};
+  await pega(VOZ_LIB,0.15,0);await pega(VOZ_MODELO,0.85,0.15);prog(1);
+}
+async function apagarVozOffline(){try{await caches.delete(VOZ_CACHE);}catch(e){}vozModel=null;}
+let vozModel=null,vozModelP=null;
+async function vozCarregarModelo(){
+  if(vozModel)return vozModel;if(vozModelP)return vozModelP;
+  vozModelP=(async()=>{const c=await vozCache();
+    if(!window.Vosk){const r=c&&await c.match(VOZ_LIB);const src=r?URL.createObjectURL(await r.blob()):VOZ_LIB;
+      await new Promise((ok,er)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>er(new Error('Não consegui abrir a voz do celular'));document.head.appendChild(s);});}
+    const r=c&&await c.match(VOZ_MODELO);if(!r)throw new Error('A voz sem internet ainda não foi baixada neste celular');
+    const url=URL.createObjectURL(await r.blob());const m=await Vosk.createModel(url,-1);vozModel=m;return m;})();
+  try{return await vozModelP;}finally{vozModelP=null;}
+}
+// só palavras que existem no vocabulário do modelo pequeno de português ("booster" ele ouve como "buster")
+const VOZ_GRAM=JSON.stringify('zero um uma dois duas três quatro cinco seis sete oito nove dez onze doze treze quatorze catorze quinze dezesseis dezessete dezoito dezenove vinte trinta quarenta cinquenta sessenta setenta oitenta noventa cem cento duzentos duzentas trezentos trezentas quatrocentos quinhentos seiscentos setecentos oitocentos novecentos mil e meio meia vírgula ponto furo buraco número tampão tampa buster bus detonador detonadores espoleta espoletas profundidade medida água seco seca úmido úmida molhado sem com de do da carregado carregada perdido repasse não carga carreguei quilos quilo metros metro caminhão total'.split(' ').concat(['[unk]']));
+// liga o microfone e manda o áudio para o Vosk; devolve {parar()}
+async function vozOfflineIniciar(st,mostra){
+  const model=await vozCarregarModelo();
+  const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1}});
+  const AC=window.AudioContext||window.webkitAudioContext;const ctx=new AC();const src=ctx.createMediaStreamSource(stream);
+  let semG=false;try{semG=localStorage.getItem('carregamento.vozGram')==='0';}catch(e){}
+  let rec;try{rec=semG?new model.KaldiRecognizer(ctx.sampleRate):new model.KaldiRecognizer(ctx.sampleRate,VOZ_GRAM);}catch(e){rec=new model.KaldiRecognizer(ctx.sampleRate);}
+  let ultimo=0;
+  rec.on('result',m=>{const t=(m.result&&m.result.text||'').trim();ultimo=Date.now();if(t){st.finais.push(t);}st.interim='';mostra();});
+  rec.on('partialresult',m=>{const t=(m.result&&m.result.partial||'').trim();if(t!==st.interim){st.interim=t;mostra();}});
+  const proc=ctx.createScriptProcessor(4096,1,1);proc.onaudioprocess=e=>{try{rec.acceptWaveform(e.inputBuffer);}catch(_){}};
+  src.connect(proc);proc.connect(ctx.destination);
+  return{parar:()=>new Promise(ok=>{const t0=Date.now();try{rec.retrieveFinalResult();}catch(e){}
+    const fim=()=>{try{proc.disconnect();src.disconnect();}catch(e){}stream.getTracks().forEach(t=>t.stop());try{ctx.close();}catch(e){}try{rec.remove();}catch(e){}ok();};
+    const chk=()=>{if(ultimo>=t0||Date.now()-t0>1500){if(st.interim){st.finais.push(st.interim);st.interim='';}fim();}else setTimeout(chk,100);};chk();})};
+}
 let vozAtiva=null;
 function vozOuvir(ok){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){toast('Este navegador não tem reconhecimento de voz. Use o Chrome no Android.');return;}
   if(vozAtiva){vozAtiva.parar(true);}
-  if(navigator.onLine===false){toast('Sem internet: a voz do celular precisa de sinal. Lance pela ficha do furo.');return;}
   const pn=document.createElement('div');pn.id='vozPn';
   pn.style.cssText='position:fixed;left:8px;right:8px;bottom:12px;z-index:60;background:#14202b;color:#fff;border-radius:14px;padding:14px;box-shadow:0 8px 28px rgba(0,0,0,.35);font-size:15px';
-  pn.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span id="vozDot" style="width:12px;height:12px;border-radius:50%;background:#e03131;flex:0 0 auto"></span><b style="flex:1">Ouvindo… fale com calma, na ordem que quiser</b></div>
+  pn.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span id="vozDot" style="width:12px;height:12px;border-radius:50%;background:#868e96;flex:0 0 auto"></span><b style="flex:1" id="vozTit">Preparando o microfone…</b></div>
   <div id="vozTx" style="min-height:44px;background:rgba(255,255,255,.08);border-radius:8px;padding:8px;line-height:1.35"><span style="opacity:.6">ex.: "furo 32, tampão 2,5, booster 1, 180 quilos"</span></div>
   <div id="vozSt" style="font-size:12px;opacity:.75;margin:6px 0 8px"></div>
   <div style="display:flex;gap:8px"><button class="btn" id="vozCan" style="flex:1">Cancelar</button><button class="btn ok" id="vozOk" style="flex:2">✓ Pronto</button></div>`;
   document.body.appendChild(pn);
-  const st={finais:[],sessao:[],interim:'',parado:false,cancel:false,rec:null,reinicios:0,t0:Date.now(),erroRede:false};
+  const st={finais:[],sessao:[],interim:'',parado:false,cancel:false,rec:null,reinicios:0,erroRede:false,feito:false,motor:null,off:null};
   const texto=()=>[...st.finais,...st.sessao,st.interim].join(' ').replace(/\s+/g,' ').trim();
   const mostra=()=>{const t=texto();const tx=$('#vozTx');if(tx&&t)tx.textContent=t;};
-  const fecha=()=>{clearTimeout(st.tmax);pn.remove();if(vozAtiva===api)vozAtiva=null;};
-  const entrega=()=>{if(st.feito)return;st.feito=true;fecha();if(st.cancel)return;const t=texto();if(!t){toast(st.erroRede?'A voz precisa de internet neste celular':'Não ouvi nada. Toque em 🎤 e fale de novo.');return;}ok(t);};
+  const status=(tit,info,cor)=>{const a=$('#vozTit'),b=$('#vozSt'),d=$('#vozDot');if(a&&tit!=null)a.textContent=tit;if(b&&info!=null)b.textContent=info;if(d&&cor)d.style.background=cor;};
+  const fecha=()=>{clearTimeout(st.tmax);clearTimeout(st.tfim);pn.remove();if(vozAtiva===api)vozAtiva=null;};
+  const entrega=()=>{if(st.feito)return;st.feito=true;fecha();if(st.cancel)return;const t=texto();
+    if(!t){toast(st.erroRede?'Sem internet para a voz do Google. Baixe a voz sem internet na tela inicial.':'Não ouvi nada. Toque em 🎤 e fale de novo.');return;}ok(t);};
+  // ---- motor do celular (Vosk) ----
+  const usarOffline=async(porque)=>{st.motor='off';status('Carregando a voz do celular…',porque||'','#868e96');
+    try{st.off=await vozOfflineIniciar(st,mostra);}catch(e){st.cancel=true;fecha();st.feito=true;
+      toast(e&&e.name==='NotAllowedError'?'Libere o microfone para este site':(e.message||'Não consegui ligar a voz do celular'));return;}
+    if(st.parado){st.off.parar().then(entrega);return;}
+    status('Ouvindo (voz do celular, sem internet)… fale na ordem que quiser','Fale devagar, um número de cada vez. Toque em Pronto no fim.','#e03131');try{navigator.vibrate&&navigator.vibrate(40);}catch(_){}};
+  // ---- motor do Google (Chrome) ----
   const novo=()=>{const rec=new SR();rec.lang='pt-BR';rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=1;
+    rec.onstart=()=>status('Ouvindo… fale com calma, na ordem que quiser',null,'#e03131');
     rec.onresult=e=>{const fin=[];let it='';for(let i=0;i<e.results.length;i++){const x=e.results[i];const t=(x[0]&&x[0].transcript||'').trim();if(!t)continue;
         if(x.isFinal===false){it+=' '+t;continue;}
         // Chrome no Android às vezes repete o texto anterior crescendo: fica só a versão mais longa
@@ -1272,22 +1339,45 @@ function vozOuvir(ok){
       st.sessao=fin;st.interim=it.trim();mostra();};
     rec.onerror=e=>{const er=e.error;
       if(er==='not-allowed'||er==='service-not-allowed'){st.parado=true;st.cancel=true;fecha();toast('Libere o microfone para este site (cadeado ao lado do endereço)');return;}
-      if(er==='network'){st.erroRede=true;st.parado=true;const s=$('#vozSt');if(s)s.textContent='Sem conexão com o serviço de voz.';return;}
+      if(er==='network'){st.erroRede=true;st.trocar=true;return;}
       if(er==='audio-capture'){st.parado=true;st.cancel=true;fecha();toast('Microfone ocupado por outro app');return;}
       // no-speech / aborted: só segue ouvindo
     };
     rec.onend=()=>{st.finais.push(...st.sessao);st.sessao=[];if(st.interim){st.finais.push(st.interim);st.interim='';}
+      if(st.trocar&&!st.parado){st.trocar=false;vozOfflinePronta().then(p=>{if(p&&!st.parado)usarOffline('Sem internet: troquei para a voz do celular.');else{st.parado=true;entrega();}});return;}
       if(st.parado){entrega();return;}
       // o Android encerra sozinho depois de uma pausa: liga de novo até tocar em Pronto
       st.reinicios++;if(st.reinicios>40){entrega();return;}
       setTimeout(()=>{if(st.parado){entrega();return;}try{st.rec=novo();st.rec.start();}catch(e){entrega();}},150);};
     return rec;};
-  const api={parar(cancel){st.parado=true;if(cancel)st.cancel=true;try{st.rec&&st.rec.stop();}catch(e){}clearTimeout(st.tfim);st.tfim=setTimeout(()=>{if(document.body.contains(pn))entrega();},2500);}};
+  const api={parar(cancel){if(st.parado&&!cancel)return;st.parado=true;if(cancel)st.cancel=true;
+    if(st.motor==='off'){if(st.off)st.off.parar().then(entrega);return;}
+    try{st.rec&&st.rec.stop();}catch(e){}clearTimeout(st.tfim);st.tfim=setTimeout(()=>{if(document.body.contains(pn))entrega();},2500);}};
   vozAtiva=api;
-  $('#vozOk').onclick=()=>{$('#vozSt').textContent='Terminando…';api.parar(false);};
+  $('#vozOk').onclick=()=>{status(null,'Terminando…');api.parar(false);};
   $('#vozCan').onclick=()=>{api.parar(true);fecha();};
   st.tmax=setTimeout(()=>api.parar(false),90000);
-  try{st.rec=novo();st.rec.start();try{navigator.vibrate&&navigator.vibrate(40);}catch(_){}}catch(e){fecha();toast('Não consegui ligar o microfone');}
+  (async()=>{const modo=vozModo();const pronta=await vozOfflinePronta();
+    const semNet=navigator.onLine===false;
+    if(modo==='offline'||(!SR&&pronta)||(semNet&&pronta&&modo!=='google')){if(modo!=='offline'&&semNet)status(null,'Sem internet: usando a voz do celular.');usarOffline(modo==='offline'?'':'Sem internet: usando a voz do celular.');return;}
+    if(!SR){fecha();st.feito=true;toast('Este navegador não tem voz. Baixe a voz sem internet na tela inicial.');return;}
+    if(semNet){fecha();st.feito=true;toast('Sem internet: baixe a voz sem internet na tela inicial (com sinal) para usar a voz no campo.');return;}
+    st.motor='google';try{st.rec=novo();st.rec.start();try{navigator.vibrate&&navigator.vibrate(40);}catch(_){}}catch(e){fecha();st.feito=true;toast('Não consegui ligar o microfone');}})();
+}
+function vozCardHTML(){return`<h2>Voz sem internet</h2><p class="mut" style="margin:0 0 6px">Com sinal, a voz usa o Google. Para falar os lançamentos no campo sem sinal, baixe a voz do celular uma vez (32 MB, com Wi-Fi de preferência).</p>
+  <div id="vozInfo" class="mut" style="margin:0 0 6px">Verificando…</div>
+  <div class="row" style="gap:6px;align-items:center"><select id="vozModoSel" style="flex:1 1 160px"><option value="auto">Automático (Google com sinal, celular sem sinal)</option><option value="offline">Sempre a voz do celular</option><option value="google">Sempre o Google</option></select></div>
+  <div class="btns" id="vozBtns"></div>`;}
+async function bindVozCard(){
+  const sel=$('#vozModoSel');if(!sel)return;sel.value=vozModo();sel.onchange=()=>{try{localStorage.setItem('carregamento.vozModo',sel.value);}catch(e){}toast('Voz: '+sel.options[sel.selectedIndex].text);};
+  const pronta=await vozOfflinePronta();const info=$('#vozInfo'),bt=$('#vozBtns');if(!info||!bt)return;
+  if(pronta){info.innerHTML='✅ Voz sem internet baixada neste celular.';bt.innerHTML='<button class="btn" id="vozTeste">🎤 Testar a voz do celular</button><button class="btn" id="vozDel">Apagar (libera 32 MB)</button>';
+    $('#vozTeste').onclick=()=>{const m=vozModo();try{localStorage.setItem('carregamento.vozModo','offline');}catch(e){}vozOuvir(t=>{const r=parseVoz(t,[...CAMS]);toast('Ouvi: "'+t+'"'+(Object.keys(r).length?' → '+Object.entries(r).map(([k,v])=>k+' '+v).join(', '):''),5000);});try{localStorage.setItem('carregamento.vozModo',m);}catch(e){}};
+    $('#vozDel').onclick=()=>confirmBox('Apagar a voz sem internet deste celular?',async()=>{await apagarVozOffline();renderHome();},'Apagar');}
+  else{info.textContent='Ainda não baixada neste celular.';bt.innerHTML='<button class="btn pri" id="vozBaixar">⬇️ Baixar voz sem internet (32 MB)</button>';
+    $('#vozBaixar').onclick=async()=>{const b=$('#vozBaixar');b.disabled=true;
+      try{await baixarVozOffline(f=>{b.textContent='Baixando… '+Math.round(f*100)+'%';});toast('Voz sem internet pronta');renderHome();}
+      catch(e){b.disabled=false;b.textContent='⬇️ Tentar de novo';toast(navigator.onLine===false?'Precisa de internet para baixar':e.message||'Falhou o download');}};}
 }
 function aplicaVoz(p,f,r){
   if(r.kg!=null){const pr=projDe(p);const prod=r.prod||(f.decks[0]&&f.decks[0].prod)||pr.prod||'';f.decks=[{prod,kg:r.kg}];}
