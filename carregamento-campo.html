@@ -409,6 +409,21 @@ function lerLista(){
   else{const mx=Math.min(...hs.map(h=>h.x)),my=Math.min(...hs.map(h=>h.y));hs.forEach(h=>{h.x-=mx;h.y-=my;});hs.geo={mx,my};}
   return hs;
 }
+/* caminhão por deck: d.cam vale para o deck; sem d.cam o deck é do caminhão do furo (h.caminhao) */
+const deckCam=(h,d)=>(d&&d.cam)||h.caminhao||'';
+const deckTemCarga=d=>d&&(num(d.kg)>0||!!d.prod);
+function camsDoFuro(h){const s=[];(h.decks||[]).forEach(d=>{if(!deckTemCarga(d)&&!d.cam)return;const c=deckCam(h,d);if(c&&!s.includes(c))s.push(c);});if(!s.length&&h.caminhao)s.push(h.caminhao);return s;}
+const kgDoCam=(h,c)=>(h.decks||[]).reduce((t,d)=>t+(deckCam(h,d)===c?(num(d.kg)||0):0),0);
+const camsPoly=p=>[...new Set(p.holes.flatMap(camsDoFuro))];
+const camsTxt=h=>camsDoFuro(h).map(camCurto).join(' + ');
+function normCams(h){if(!h.decks)return h;if(!h.caminhao){const c=h.decks.map(d=>d.cam).find(Boolean);if(c)h.caminhao=c;}h.decks.forEach(d=>{if(!d.cam||d.cam===h.caminhao)delete d.cam;});return h;}
+// lança a carga de um caminhão no furo sem apagar o que outro caminhão já colocou
+function lancarCarga(h,cam,prod,kg){
+  const outros=(h.decks||[]).filter(d=>deckTemCarga(d)&&deckCam(h,d)!==cam);
+  const meu=kg!=null?[{prod,kg}]:(h.decks||[]).filter(d=>deckCam(h,d)===cam).map(d=>({prod:d.prod,kg:d.kg}));
+  if(!outros.length){h.decks=meu;h.caminhao=cam;}
+  else{outros.forEach(d=>d.cam=deckCam(h,d));h.decks=[...outros,...meu.map(d=>Object.assign(d,{cam}))].slice(0,3);if(!h.caminhao)h.caminhao=outros[0].cam;}
+  return normCams(h);}
 function novoFuro(id,x,y,prof,line,n){return{id:String(id),x,y,line:line||null,n:n||null,profProj:prof,profMed:null,agua:'seca',aguaM:null,status:'pendente',decks:[],booster:null,brinel:null,detTipo:'',detQtd:null,tampao:null,caminhao:'',obs:'',cond:[],lotes:null,ts:null};}
 
 
@@ -687,7 +702,7 @@ const camCurto=c=>(c||'').replace(/^UM[TB]\s*/,'');
 let corPor=(S.ui&&S.ui.corPor)||'caminhao',pincel=null,rotulos=true;
 function setCorPor(v){corPor=v;S.ui=Object.assign(S.ui||{},{corPor:v});save();}
 const nf=n=>n===1?'1 furo':n+' furos';
-function rotuloFuro(h){const kg=holeKg(h);return[h.caminhao?camCurto(h.caminhao):'',kg?fmt(kg)+' kg':''].filter(Boolean);} // pincel = caminhão sendo marcado no mapa
+function rotuloFuro(h){const kg=holeKg(h);return[camsTxt(h),kg?fmt(kg)+' kg':''].filter(Boolean);} // pincel = caminhão sendo marcado no mapa
 function geom(p,crop){
   const bgOn=!!(p.bg&&p.bg.on!==false);const bgUrl=p.bg?(bgCache[p.id]||null):null;const useBg=bgOn&&!!bgUrl;
   const pts=p.holes.map(h=>[h.x,h.y]);
@@ -700,15 +715,17 @@ function geom(p,crop){
   return{bgOn,bgUrl,useBg,minX,minY,r,pad,off,W:maxX-minX+pad*2+off,H:maxY-minY+pad*2,X:x=>x-minX+pad+off,Y:y=>y-minY+pad};
 }
 function corFuro(h){
-  if(corPor==='caminhao'){if(h.status==='perdido'||h.status==='nao')return ST[h.status].c;return camCor(h.caminhao);}
+  if(corPor==='caminhao'){if(h.status==='perdido'||h.status==='nao')return ST[h.status].c;return camCor(camsDoFuro(h)[0]||'');}
   if(corPor==='desvio')return DV[desvio(cur(),h).c].c;
   if(corPor==='tempo'){if(h.status==='perdido'||h.status==='nao')return'#343a40';if(!temTempo(h))return'#b8c0c8';const [t0,t1]=faixaTempo(cur());return corTempo(h.tempo,t0,t1);}
   return ST[h.status].c;
 }
+function meiaLua(h,cx,cy,r){if(corPor!=='caminhao'||h.status==='perdido'||h.status==='nao')return'';const cs=camsDoFuro(h);if(cs.length<2)return'';const q=r*0.92;
+  return`<path d="M${cx} ${cy-q}A${q} ${q} 0 0 1 ${cx} ${cy+q}Z" fill="${camCor(cs[1])}" pointer-events="none"/><line x1="${cx}" y1="${cy-q}" x2="${cx}" y2="${cy+q}" stroke="#fff" stroke-width="${r*0.06}" pointer-events="none"/>`;}
 function legendaHTML(p){
   if(corPor==='tempo'){const a=analiseTempo(p);if(!a.com.length)return'<span class="mut">Sem tempos — importe em Temporização</span>';return`<span style="display:inline-flex;align-items:center;gap:6px">${fmt(a.t0)} ms<i style="display:inline-block;width:110px;height:10px;border-radius:5px;background:linear-gradient(90deg,${[0,.25,.5,.75,1].map(k=>corTempo(a.t0+k*(a.t1-a.t0),a.t0,a.t1)).join(',')})"></i>${fmt(a.t1)} ms</span><span><i class="dot" style="background:#b8c0c8"></i>Sem tempo ${a.sem.length}</span><span><i class="dot" style="background:#343a40"></i>Perdido / não carregar</span>${a.rep.length?`<span>⚠️ ${a.rep.length} tempo(s) repetido(s)</span>`:''}`;}
   if(corPor==='desvio'){const r=conferencia(p);return Object.entries(DV).map(([k,v])=>`<span><i class="dot" style="background:${v.c}"></i>${v.n} ${r.n[k]}</span>`).join('');}
-  if(corPor==='caminhao'){const cnt={};p.holes.forEach(h=>{const k=h.caminhao||'';cnt[k]=(cnt[k]||0)+1;});
+  if(corPor==='caminhao'){const cnt={};p.holes.forEach(h=>{const cs=camsDoFuro(h);(cs.length?cs:['']).forEach(k=>{cnt[k]=(cnt[k]||0)+1;});});
     return Object.keys(cnt).sort((a,b)=>(a===''?1:0)-(b===''?1:0)||a.localeCompare(b)).map(k=>`<span><i class="dot" style="background:${camCor(k)}"></i>${k?esc(k):'Sem caminhão'} ${cnt[k]}</span>`).join('')+`<span><i class="dot" style="background:${ST.perdido.c}"></i>Perdido / não carregar</span>`;}
   const cnt={};Object.keys(ST).forEach(k=>cnt[k]=0);p.holes.forEach(h=>cnt[h.status]++);
   return Object.entries(ST).map(([k,v])=>`<span><i class="dot" style="background:${v.c}"></i>${v.n} ${cnt[k]}</span>`).join('')+`<span><i class="dot" style="background:#fff;border:3px solid #1971c2"></i>Com água</span>`;
@@ -720,7 +737,7 @@ function tabMapa(p){
   if(g.useBg){const m=p.bg.m;s+=`<g transform="translate(${g.pad+g.off-g.minX} ${g.pad-g.minY})"><image href="${g.bgUrl}" width="${p.bg.w}" height="${p.bg.h}" transform="matrix(${m.join(' ')})" preserveAspectRatio="none" opacity="0.95"/></g>`;}
   p.holes.forEach((h,i)=>{const cx=g.X(h.x),cy=g.Y(h.y),c=corFuro(h);
     const lbl=h.n!=null?h.n:h.id;const agua=h.agua!=='seca';const sl=selMode&&selSet.has(i);
-    s+=`<g data-i="${i}">${sl?`<circle cx="${cx}" cy="${cy}" r="${r*1.45}" fill="none" stroke="#fab005" stroke-width="${r*0.35}" pointer-events="none"/>`:''}${(h.cond||[]).length?`<circle cx="${cx+r*0.8}" cy="${cy-r*0.8}" r="${r*0.32}" fill="#7a4b00" stroke="#fff" stroke-width="${r*0.08}" pointer-events="none"/>`:''}<circle data-i="${i}" cx="${cx}" cy="${cy}" r="${r}" fill="${c}" fill-opacity="${g.useBg?0.85:1}" stroke="${agua?'#1971c2':'#fff'}" stroke-width="${agua?r*0.32:r*0.12}"/>`+
+    s+=`<g data-i="${i}">${sl?`<circle cx="${cx}" cy="${cy}" r="${r*1.45}" fill="none" stroke="#fab005" stroke-width="${r*0.35}" pointer-events="none"/>`:''}${(h.cond||[]).length?`<circle cx="${cx+r*0.8}" cy="${cy-r*0.8}" r="${r*0.32}" fill="#7a4b00" stroke="#fff" stroke-width="${r*0.08}" pointer-events="none"/>`:''}<circle data-i="${i}" cx="${cx}" cy="${cy}" r="${r}" fill="${c}" fill-opacity="${g.useBg?0.85:1}" stroke="${agua?'#1971c2':'#fff'}" stroke-width="${agua?r*0.32:r*0.12}"/>${meiaLua(h,cx,cy,r)}`+
     `<text data-i="${i}" x="${cx}" y="${cy+r*0.3}" text-anchor="middle" font-size="${r*0.8}" fill="#fff" font-weight="700" pointer-events="none">${esc(String(lbl).slice(-4))}</text>`+
     (rotulos?(corPor==='tempo'?(temTempo(h)?[(h.tempos&&h.tempos.length>1?h.tempos.map(v=>fmt(v)).join('/'):fmt(h.tempo))+' ms']:[]):rotuloFuro(h)).map((t,k)=>`<text x="${cx}" y="${cy+r*(1.5+k*0.56)}" text-anchor="middle" font-size="${r*0.5}" fill="${corPor!=='tempo'&&k===0&&h.caminhao?camCor(h.caminhao):'#14202b'}" font-weight="700" stroke="#fff" stroke-width="${r*0.15}" paint-order="stroke" pointer-events="none">${esc(t)}</text>`).join(''):'')+`</g>`;});
   const lines={};p.holes.forEach(h=>{if(h.line&&lines[h.line]==null)lines[h.line]=h.y;});
@@ -728,7 +745,7 @@ function tabMapa(p){
   const fs=falhaSet(p);if(fs.size)p.holes.forEach(h=>{if(!fs.has(String(h.id).toUpperCase()))return;const cx=g.X(h.x),cy=g.Y(h.y),q=r*1.15;s+=`<path d="M${cx-q} ${cy-q}L${cx+q} ${cy+q}M${cx+q} ${cy-q}L${cx-q} ${cy+q}" stroke="#000" stroke-width="${r*0.3}" pointer-events="none"/>`;});
   s+=`<g id="gpsG" pointer-events="none"></g>`;lastGeom=g;
   const pxPerM=19/r;
-  const camOpts=[...new Set([...CAMS,...p.holes.map(h=>h.caminhao).filter(Boolean)])];
+  const camOpts=[...new Set([...CAMS,...camsPoly(p)])];
   $('#tabBox').innerHTML=`<div class="seg" id="corPor" style="margin-bottom:8px"><button data-c="status" class="${corPor==='status'?'on':''}">Status</button><button data-c="caminhao" class="${corPor==='caminhao'?'on':''}">Caminhão</button><button data-c="desvio" class="${corPor==='desvio'?'on':''}">Projeto</button><button data-c="tempo" class="${corPor==='tempo'?'on':''}">Tempo</button></div>
   ${corPor==='tempo'&&p.holes.some(temTempo)?`<div class="card" style="padding:10px;margin-bottom:8px"><div class="row" style="align-items:center"><button class="btn sm pri" id="simPlay" style="flex:0 0 auto">▶ Simular sequência</button><input type="range" id="simR" min="0" max="1000" value="${simK==null?1000:Math.round(simK*1000)}" style="flex:1 1 120px;padding:0"><b id="simLbl" style="flex:0 0 auto;min-width:70px;text-align:right">${simK==null?'todos':''}</b></div></div>`:''}
   ${corPor==='caminhao'?`<div class="card" style="padding:10px;margin-bottom:8px"><label style="margin-top:0">Marcar caminhão tocando nos furos</label><div class="row"><select id="pinSel">${opts(camOpts,pincel||'','— desligado (toque abre o furo) —')}</select></div><p class="mut" style="margin:6px 0 0">${pincel?`Toque nos furos que o <b style="color:${camCor(pincel)}">${esc(pincel)}</b> carregou. Tocar de novo desmarca.`:'Escolha um caminhão para marcar vários furos rápido.'}</p></div>`:''}
@@ -743,7 +760,7 @@ function tabMapa(p){
   $('#map').onclick=e=>{if(Date.now()-mapIgnora<600)return;
     if(moverFuro){const h=p.holes.find(q=>q.id===moverFuro);moverFuro=null;const q=mapPonto(e,g);if(h&&q){h.x=q.x;h.y=q.y;histAdd(h,'Posição ajustada no croqui');markP(p.id);markF(p.id,h.id);save();toast('Furo '+h.id+' movido');}tabMapa(p);return;}
     const a=e.target.getAttribute('data-i');if(a==null)return;const i=+a;
-    if(corPor==='caminhao'&&pincel){const h=p.holes[i];pushUndo(p,[h],'caminhão no furo '+h.id);if(h.caminhao===pincel){h.caminhao='';}else{h.caminhao=pincel;if(h.status==='pendente')h.status='carregado';}carimbaLotes(p,h);histAdd(h,'Caminhão pelo mapa: '+(h.caminhao||'(sem)'));h.ts=Date.now();h.por=meuNome();markF(p.id,h.id);save();tabMapa(p);return;}
+    if(corPor==='caminhao'&&pincel){const h=p.holes[i];const cs=camsDoFuro(h);if(cs.length>1){toast('Furo '+h.id+' tem '+cs.length+' caminhões (um por deck). Ajuste na ficha do furo.',3500);editHole(i);return;}pushUndo(p,[h],'caminhão no furo '+h.id);(h.decks||[]).forEach(d=>delete d.cam);if(h.caminhao===pincel){h.caminhao='';}else{h.caminhao=pincel;if(h.status==='pendente')h.status='carregado';}carimbaLotes(p,h);histAdd(h,'Caminhão pelo mapa: '+(h.caminhao||'(sem)'));h.ts=Date.now();h.por=meuNome();markF(p.id,h.id);save();tabMapa(p);return;}
     if(selMode){selSet.has(i)?selSet.delete(i):selSet.add(i);tabMapa(p);return;}
     editHole(i);};
   document.querySelectorAll('#corPor button').forEach(b=>b.onclick=()=>{setCorPor(b.dataset.c);if(corPor!=='caminhao')pincel=null;tabMapa(p);});
@@ -826,7 +843,7 @@ async function croquiCanvas(p){
     const g=geom(p,true),r=g.r;
     const K=Math.min(2600/g.W,40/r,6000/g.H);           // px por unidade
     const res=resumo(p);
-    const cams=[...new Set(p.holes.map(h=>h.caminhao).filter(Boolean))].sort();
+    const cams=camsPoly(p).sort();
     const legL=corPor==='tempo'?5:corPor==='caminhao'?Math.max(1,cams.length)+3:corPor==='desvio'?Object.keys(DV).length+1:Object.keys(ST).length+1;
     const top=130,legH=40+legL*44,Wc=Math.max(1100,Math.round(g.W*K)),Hc=top+Math.round(g.H*K)+legH;
     const c=document.createElement('canvas');c.width=Wc;c.height=Hc;const x=c.getContext('2d');
@@ -837,17 +854,18 @@ async function croquiCanvas(p){
     x.save();x.translate(0,top);x.scale(K,K);x.beginPath();x.rect(0,0,g.W,g.H);x.clip();
     if(g.useBg){const im=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=g.bgUrl;});
       x.save();x.translate(g.pad+g.off-g.minX,g.pad-g.minY);const m=p.bg.m;x.transform(m[0],m[1],m[2],m[3],m[4],m[5]);x.globalAlpha=.95;x.drawImage(im,0,0,p.bg.w,p.bg.h);x.restore();}
-    p.holes.forEach(h=>{const cx=g.X(h.x),cy=g.Y(h.y);x.beginPath();x.arc(cx,cy,r,0,7);x.fillStyle=corFuro(h);x.globalAlpha=g.useBg?.88:1;x.fill();x.globalAlpha=1;
+    p.holes.forEach(h=>{const cx=g.X(h.x),cy=g.Y(h.y);x.beginPath();x.arc(cx,cy,r,0,7);x.fillStyle=corFuro(h);x.globalAlpha=g.useBg?.88:1;x.fill();
+      {const cs=camsDoFuro(h);if(corPor==='caminhao'&&cs.length>1&&h.status!=='perdido'&&h.status!=='nao'){x.beginPath();x.moveTo(cx,cy-r);x.arc(cx,cy,r*.92,-Math.PI/2,Math.PI/2);x.closePath();x.fillStyle=camCor(cs[1]);x.fill();}}x.globalAlpha=1;
       const ag=h.agua!=='seca';x.lineWidth=ag?r*.32:r*.12;x.strokeStyle=ag?'#1971c2':'#fff';x.stroke();
       x.fillStyle='#fff';x.font=`bold ${r*.8}px system-ui,sans-serif`;x.textAlign='center';x.fillText(String(h.n!=null?h.n:h.id).slice(-4),cx,cy+r*.3);
-      if(rotulos)(corPor==='tempo'?(temTempo(h)?[(h.tempos&&h.tempos.length>1?h.tempos.map(v=>fmt(v)).join('/'):fmt(h.tempo))+' ms']:[]):rotuloFuro(h)).forEach((t,k)=>{const yy=cy+r*(1.5+k*.56);x.font=`bold ${r*.5}px system-ui,sans-serif`;x.lineWidth=r*.15;x.strokeStyle='#fff';x.strokeText(t,cx,yy);x.fillStyle=corPor!=='tempo'&&k===0&&h.caminhao?camCor(h.caminhao):'#14202b';x.fillText(t,cx,yy);});});
+      if(rotulos)(corPor==='tempo'?(temTempo(h)?[(h.tempos&&h.tempos.length>1?h.tempos.map(v=>fmt(v)).join('/'):fmt(h.tempo))+' ms']:[]):rotuloFuro(h)).forEach((t,k)=>{const yy=cy+r*(1.5+k*.56);x.font=`bold ${r*.5}px system-ui,sans-serif`;x.lineWidth=r*.15;x.strokeStyle='#fff';x.strokeText(t,cx,yy);x.fillStyle=corPor!=='tempo'&&k===0&&camsDoFuro(h).length===1?camCor(camsDoFuro(h)[0]):'#14202b';x.fillText(t,cx,yy);});});
     x.restore();x.textAlign='left';
     let y=top+Math.round(g.H*K)+30;x.fillStyle='#102a43';x.font='bold 28px system-ui,sans-serif';x.fillText('Legenda',30,y);y+=40;x.font='24px system-ui,sans-serif';
     const item=(cor,txt)=>{x.fillStyle=cor;x.beginPath();x.arc(46,y-8,13,0,7);x.fill();x.fillStyle='#14202b';x.fillText(txt,72,y);y+=44;};
     if(corPor==='caminhao'){
       if(!cams.length)item(camCor(''),'Nenhum caminhão marcado');
-      cams.forEach(cm=>{const n=p.holes.filter(h=>h.caminhao===cm).length;const kg=Object.entries(res.cam[cm]||{}).filter(([pr])=>pr!=='Sem produto').map(([pr,k])=>`${pr} ${fmt(k)} kg`).join(' / ');item(camCor(cm),`${cm} – ${nf(n)}${kg?' – '+kg:''}${(p.nfs||{})[cm]?' – NF '+p.nfs[cm]:''}`);});
-      const sem=p.holes.filter(h=>!h.caminhao&&h.status!=='perdido'&&h.status!=='nao').length;item(camCor(''),`Sem caminhão – ${nf(sem)}`);
+      cams.forEach(cm=>{const n=p.holes.filter(h=>camsDoFuro(h).includes(cm)).length;const kg=Object.entries(res.cam[cm]||{}).filter(([pr])=>pr!=='Sem produto').map(([pr,k])=>`${pr} ${fmt(k)} kg`).join(' / ');item(camCor(cm),`${cm} – ${nf(n)}${kg?' – '+kg:''}${(p.nfs||{})[cm]?' – NF '+p.nfs[cm]:''}`);});
+      const sem=p.holes.filter(h=>!camsDoFuro(h).length&&h.status!=='perdido'&&h.status!=='nao').length;item(camCor(''),`Sem caminhão – ${nf(sem)}`);if(p.holes.some(h=>camsDoFuro(h).length>1))item('#868e96','Furo com 2 cores: cada metade é um caminhão (um por deck)');
       item(ST.perdido.c,`Perdido / não carregar – ${nf(res.st.perdido+res.st.nao)}`);
       item('#102a43',`Total lançado: ${Object.entries(res.prod).map(([pr,k])=>`${pr} ${fmt(k)} kg`).join(' / ')||'0 kg'} · Booster ${fmt(res.booster)} un`);
     }else if(corPor==='tempo'){const a=analiseTempo(p);
@@ -885,13 +903,13 @@ function desfazer(p){
   if(tz)markP(p.id);save();renderPoly();toast('Desfeito: '+u.txt);
 }
 function histAdd(h,t){h.hist=(h.hist||[]).slice(-19);h.hist.push({ts:Date.now(),por:meuNome()||'',t});}
-function resumoFuro(h){const kg=holeKg(h);return[ST[h.status].n,kg?fmt(kg)+' kg':'',h.caminhao||'',h.profMed!=null?'prof. '+fmt(h.profMed,1)+' m':'',(h.cond||[]).join('/')].filter(Boolean).join(' · ');}
+function resumoFuro(h){const kg=holeKg(h);return[ST[h.status].n,kg?fmt(kg)+' kg':'',camsDoFuro(h).join(' + '),h.profMed!=null?'prof. '+fmt(h.profMed,1)+' m':'',(h.cond||[]).join('/')].filter(Boolean).join(' · ');}
 function carimbaLotes(p,h){if(h.status==='carregado'&&!h.lotes&&p.lotes&&Object.values(p.lotes).some(Boolean))h.lotes=Object.assign({},p.lotes);}
 
 /* ===== Lançamento em lote (vários furos selecionados no mapa) ===== */
 function loteSheet(p,idx){
   const hs=idx.map(i=>p.holes[i]).filter(Boolean);
-  const camOpts=[...new Set([...CAMS,...p.holes.map(h=>h.caminhao).filter(Boolean)])];
+  const camOpts=[...new Set([...CAMS,...camsPoly(p)])];
   openSheet(`<h3>Lançar em ${nf(hs.length)}<button class="btn sm" id="lsClose">Fechar</button></h3>
   <p class="mut" style="margin:0">Só os campos preenchidos são aplicados. O resto continua como está em cada furo.</p>
   <label>Status</label><select id="lsSt"><option value="">— não mudar —</option>${Object.entries(ST).map(([k,v])=>`<option value="${k}">${v.n}</option>`).join('')}</select>
@@ -911,7 +929,7 @@ function loteSheet(p,idx){
     hs.forEach(h=>{
       if(usePj){const kp=kgProj(p,h);if(kp==null)semPj++;else{const n=pr.decks||1;h.decks=Array.from({length:n},()=>({prod:pr.prod,kg:Math.round(kp/n*10)/10}));if(pr.booster!=null)h.booster=pr.booster;if(pr.tampao!=null)h.tampao=pr.tampao;if(pr.detTipo)h.detTipo=pr.detTipo;if(pr.detQtd!=null)h.detQtd=pr.detQtd;}}
       if(kg!=null||prod){const d0=(h.decks&&h.decks[0])||{};h.decks=[{prod:prod||d0.prod||pr.prod||'',kg:kg!=null?kg:num(d0.kg)}];}
-      if(bo!=null)h.booster=bo;if(br!=null)h.brinel=br;if(dt)h.detTipo=dt;if(dq!=null)h.detQtd=dq;if(ta!=null)h.tampao=ta;if(ca)h.caminhao=ca;if(ag)h.agua=ag;
+      if(bo!=null)h.booster=bo;if(br!=null)h.brinel=br;if(dt)h.detTipo=dt;if(dq!=null)h.detQtd=dq;if(ta!=null)h.tampao=ta;if(ca){h.caminhao=ca;(h.decks||[]).forEach(d=>delete d.cam);}if(ag)h.agua=ag;
       if(ob)h.obs=h.obs?h.obs+' · '+ob:ob;
       if(st)h.status=st;else if(h.status==='pendente'&&(holeKg(h)>0||ca))h.status='carregado';
       carimbaLotes(p,h);histAdd(h,'Lote: '+resumoFuro(h));h.ts=agora;h.por=meuNome();markF(p.id,h.id);});
@@ -1027,7 +1045,7 @@ async function imprimir(p){
     try{const fot=[];for(const x of [...p.holes,{id:'_pos'}]){const a=await fotoGet(p.id+'|'+x.id);a.forEach(f=>fot.push([x.id,f.url,f.ts]));}
       (await listarFotos(p.id)).forEach(r=>{if(!fot.some(f=>f[0]===r.furo_id&&f[2]===r.ts))fot.push([r.furo_id,r.url,r.ts]);});
       if(fot.length)h+=`<h2 class="pb">Fotos</h2><div style="display:flex;flex-wrap:wrap;gap:8px">${fot.map(([id,u])=>`<div style="width:31%"><img src="${esc(u)}" style="width:100%"><div>${id==='_pos'?'Pós-fogo':'Furo '+esc(id)}</div></div>`).join('')}</div>`;}catch(e){}
-    h+=`<h2 class="pb">Furo a furo</h2>${T(p.holes.map(x=>[`<b>${esc(x.id)}</b>`,ST[x.status].n,fmt(x.profProj,1),fmt(x.profMed,1),AGUA_N[x.agua]||'',(x.decks||[]).map(d=>`${esc(d.prod||'')} ${fmt(num(d.kg))}`).join(' + '),holeKg(x)?fmt(holeKg(x)):'',x.booster??'',[x.detQtd,x.detTipo].filter(Boolean).join(' '),fmt(x.tampao,1),esc(camCurto(x.caminhao)),temTempo(x)?(x.tempos&&x.tempos.length>1?x.tempos.join('/'):fmt(x.tempo)):'',esc((x.cond||[]).join(', ')),esc(x.obs||''),esc(x.por||'')]),['Furo','Status','Proj.','Med.','Água','Decks (kg)','Total','Bst','Detonador','Tamp.','Cam.','ms','Condição','Obs.','Por'])}`;
+    h+=`<h2 class="pb">Furo a furo</h2>${T(p.holes.map(x=>[`<b>${esc(x.id)}</b>`,ST[x.status].n,fmt(x.profProj,1),fmt(x.profMed,1),AGUA_N[x.agua]||'',(x.decks||[]).map(d=>`${esc(d.prod||'')} ${fmt(num(d.kg))}${camsDoFuro(x).length>1&&deckCam(x,d)?' ('+esc(camCurto(deckCam(x,d)))+')':''}`).join(' + '),holeKg(x)?fmt(holeKg(x)):'',x.booster??'',[x.detQtd,x.detTipo].filter(Boolean).join(' '),fmt(x.tampao,1),esc(camsTxt(x)),temTempo(x)?(x.tempos&&x.tempos.length>1?x.tempos.join('/'):fmt(x.tempo)):'',esc((x.cond||[]).join(', ')),esc(x.obs||''),esc(x.por||'')]),['Furo','Status','Proj.','Med.','Água','Decks (kg)','Total','Bst','Detonador','Tamp.','Cam.','ms','Condição','Obs.','Por'])}`;
     h+=`<div class="sig"><div>Responsável pelo carregamento</div><div>Blaster</div><div>Supervisão</div></div>`;
     let pr=$('#print');if(!pr){pr=document.createElement('div');pr.id='print';document.body.appendChild(pr);}pr.innerHTML=h;busy();
     const fim=()=>{window.removeEventListener('afterprint',fim);};window.addEventListener('afterprint',fim);
@@ -1048,8 +1066,8 @@ function painel(){
   const ps=S.polys.filter(p=>!painelMina||p.mina===painelMina);
   const R={furos:0,kg:0,prod:{},cam:{},booster:0,brinel:0,det:{},polys:new Set(),linhas:[]};
   ps.forEach(p=>p.holes.forEach(h=>{if(!h.ts||(ini&&dayOf(h.ts)<ini))return;if(!(h.status==='carregado'||holeKg(h)>0))return;
-    R.furos++;R.polys.add(p.id);const c=h.caminhao||'Sem caminhão';
-    (h.decks||[]).forEach(d=>{const kg=num(d.kg)||0;if(!kg)return;const pr=d.prod||'Sem produto';R.kg+=kg;R.prod[pr]=(R.prod[pr]||0)+kg;R.cam[c]=(R.cam[c]||0)+kg;R.linhas.push([dayOf(h.ts),p.mina,p.pol,c,pr,kg]);});
+    R.furos++;R.polys.add(p.id);
+    (h.decks||[]).forEach(d=>{const kg=num(d.kg)||0;if(!kg)return;const c=deckCam(h,d)||'Sem caminhão';const pr=d.prod||'Sem produto';R.kg+=kg;R.prod[pr]=(R.prod[pr]||0)+kg;R.cam[c]=(R.cam[c]||0)+kg;R.linhas.push([dayOf(h.ts),p.mina,p.pol,c,pr,kg]);});
     R.booster+=num(h.booster)||0;R.brinel+=num(h.brinel)||0;if(h.detTipo&&h.detQtd)R.det[h.detTipo]=(R.det[h.detTipo]||0)+h.detQtd;}));
   return R;
 }
@@ -1169,7 +1187,7 @@ function alertasFuro(p,h){
   if(pr.detQtd!=null&&h.detQtd!=null&&num(h.detQtd)!==pr.detQtd)a.push(`detonadores ${h.detQtd} (projeto ${pr.detQtd})`);
   return a;
 }
-function camFora(p,c){if(!c)return null;const kl=p.holes.filter(h=>h.caminhao===c).reduce((s,h)=>s+holeKg(h),0);const d=camDif(p,c,kl);return d&&!d.ok?d:null;}
+function camFora(p,c){if(!c)return null;const kl=p.holes.reduce((s,h)=>s+kgDoCam(h,c),0);const d=camDif(p,c,kl);return d&&!d.ok?d:null;}
 function aviso(txt,grave=true){
   let b=$('#aviso');if(!b){b=document.createElement('div');b.id='aviso';b.style.cssText='position:fixed;left:8px;right:8px;top:62px;z-index:44;border-radius:12px;padding:12px 14px;color:#fff;font-size:15px;box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer';b.onclick=()=>b.remove();document.body.appendChild(b);}
   b.style.background=grave?'#c92a2a':'#e67700';b.innerHTML=txt+'<div style="font-size:12px;opacity:.85;margin-top:4px">toque para fechar</div>';
@@ -1181,9 +1199,9 @@ function notificar(titulo,txt){
   aviso(`<b>${esc(titulo)}</b><br>${esc(txt)}`);
 }
 function checarAlertas(p,h,camAntes){
-  const a=alertasFuro(p,h);const c=camFora(p,h.caminhao);
+  const a=alertasFuro(p,h);
   const L=[];if(a.length)L.push(`<b>Furo ${esc(h.id)} fora do projeto</b><br>${a.map(esc).join('<br>')}`);
-  if(c&&!camAntes)L.push(`<b>${esc(h.caminhao)}</b>: lançado x NF fora da tolerância (${esc(c.txt)})`);
+  camsDoFuro(h).forEach(cm=>{const c=camFora(p,cm);if(c&&!(camAntes||[]).includes(cm))L.push(`<b>${esc(cm)}</b>: lançado x NF fora da tolerância (${esc(c.txt)})`);});
   if(L.length)aviso(L.join('<hr style="border:0;border-top:1px solid rgba(255,255,255,.4)">'));
 }
 
@@ -1380,12 +1398,16 @@ async function bindVozCard(){
       catch(e){b.disabled=false;b.textContent='⬇️ Tentar de novo';toast(navigator.onLine===false?'Precisa de internet para baixar':e.message||'Falhou o download');}};}
 }
 function aplicaVoz(p,f,r){
-  if(r.kg!=null){const pr=projDe(p);const prod=r.prod||(f.decks[0]&&f.decks[0].prod)||pr.prod||'';f.decks=[{prod,kg:r.kg}];}
+  if(r.kg!=null){const pr=projDe(p);const prod=r.prod||(f.decks[0]&&f.decks[0].prod)||pr.prod||'';
+    // "caminhão 1050, 80 quilos" num furo que outro caminhão já carregou: entra como mais um deck
+    if(r.caminhao&&(f.decks||[]).some(d=>deckTemCarga(d)&&deckCam(f,d)!==r.caminhao))lancarCarga(f,r.caminhao,prod,r.kg);
+    else{f.decks=[{prod,kg:r.kg}];if(r.caminhao)f.caminhao=r.caminhao;}}
   else if(r.prod&&f.decks[0])f.decks[0].prod=r.prod;
-  ['tampao','booster','brinel','detQtd','profMed','caminhao','agua','aguaM','status'].forEach(k=>{if(r[k]!=null)f[k]=r[k];});
+  ['tampao','booster','brinel','detQtd','profMed','agua','aguaM','status'].forEach(k=>{if(r[k]!=null)f[k]=r[k];});
+  if(r.caminhao&&r.kg==null){f.caminhao=r.caminhao;(f.decks||[]).forEach(d=>delete d.cam);}
   if(f.status==='pendente'&&(r.kg!=null))f.status='carregado';
 }
-function vozNoMapa(p){vozOuvir(t=>{const camList=[...new Set([...CAMS,...p.holes.map(h=>h.caminhao).filter(Boolean)])];const r=parseVoz(t,camList);
+function vozNoMapa(p){vozOuvir(t=>{const camList=[...new Set([...CAMS,...camsPoly(p)])];const r=parseVoz(t,camList);
   if(!r.furo){toast(`Ouvi "${t}" — diga o número do furo primeiro`);return;}
   const i=p.holes.findIndex(h=>String(h.id).toUpperCase()===r.furo||String(h.n??'')===r.furo);if(i<0){toast(`Furo ${r.furo} não encontrado (ouvi "${t}")`);return;}
   editHole(i,r,t);});}
@@ -1511,13 +1533,13 @@ function renderCam(){
   const abertos=S.polys.filter(p=>situDe(p)==='aberto').sort((a,b)=>(b.data||'').localeCompare(a.data||''));
   if(!camPoly||!S.polys.find(p=>p.id===camPoly))camPoly=(abertos[0]||{}).id||null;
   const p=S.polys.find(x=>x.id===camPoly);
-  let h=`<div class="card"><div class="row"><div><label style="margin-top:0">Meu caminhão</label><select id="cmC">${opts([...new Set([...CAMS,...S.polys.flatMap(p=>p.holes.map(h=>h.caminhao)).filter(Boolean)])],meu,'Escolha')}</select></div><div><label style="margin-top:0">Polígono</label><select id="cmP">${abertos.map(x=>`<option value="${x.id}" ${x.id===camPoly?'selected':''}>POL ${esc(x.pol)} · ${esc(x.mina)}</option>`).join('')||'<option value="">Nenhum em carregamento</option>'}</select></div></div></div>`;
+  let h=`<div class="card"><div class="row"><div><label style="margin-top:0">Meu caminhão</label><select id="cmC">${opts([...new Set([...CAMS,...S.polys.flatMap(camsPoly)])],meu,'Escolha')}</select></div><div><label style="margin-top:0">Polígono</label><select id="cmP">${abertos.map(x=>`<option value="${x.id}" ${x.id===camPoly?'selected':''}>POL ${esc(x.pol)} · ${esc(x.mina)}</option>`).join('')||'<option value="">Nenhum em carregamento</option>'}</select></div></div></div>`;
   if(!meu||!p){$('#app').innerHTML=h+`<div class="card empty">${!meu?'Escolha o seu caminhão.':'Nenhum polígono em carregamento.'}</div>`;bindCam();return;}
-  const meus=p.holes.filter(x=>x.caminhao===meu);const kg=meus.reduce((s,x)=>s+holeKg(x),0);const pend=p.holes.filter(x=>x.status==='pendente');const cd=camDif(p,meu,kg);
+  const meus=p.holes.filter(x=>camsDoFuro(x).includes(meu));const kg=meus.reduce((s,x)=>s+kgDoCam(x,meu),0);const pend=p.holes.filter(x=>x.status==='pendente');const cd=camDif(p,meu,kg);
   h+=`<div class="kpis"><div class="kpi"><b>${meus.length}</b><span>furos que carreguei</span></div><div class="kpi"><b>${fmt(kg)}</b><span>kg lançados</span></div><div class="kpi"><b>${pend.length}</b><span>pendentes no POL</span></div>${cd?`<div class="kpi"><b style="color:${cd.ok?'var(--ok)':'var(--bad)'}">${esc(cd.txt)}</b><span>lançado x NF</span></div>`:''}</div>
   <div class="btns"><button class="btn pri" id="cmV" style="font-size:17px">🎤 Falar lançamento</button></div>
   <div class="seg" id="cmF" style="margin:10px 0">${[['pend','Pendentes'],['meus','Meus'],['todos','Todos']].map(([k,t])=>`<button data-f="${k}" class="${camFiltro===k?'on':''}">${t}</button>`).join('')}</div>
-  <div class="card" style="padding:4px 8px">${(camFiltro==='pend'?pend:camFiltro==='meus'?meus:p.holes).map(x=>{const i=p.holes.indexOf(x);return`<div class="poly" data-i="${i}" style="padding:12px 4px;border-bottom:1px solid var(--line)"><div><b style="font-size:18px">Furo ${esc(x.id)}</b>${x.agua!=='seca'?' 💧':''}<div class="mut">${ST[x.status].n}${holeKg(x)?' · '+fmt(holeKg(x))+' kg':''}${x.caminhao?' · '+esc(camCurto(x.caminhao)):''}${x.profMed!=null?' · prof. '+fmt(x.profMed,1)+' m':''}</div></div><span style="font-size:22px;color:var(--mut)">›</span></div>`;}).join('')||'<p class="mut" style="padding:10px">Nada aqui.</p>'}</div>`;
+  <div class="card" style="padding:4px 8px">${(camFiltro==='pend'?pend:camFiltro==='meus'?meus:p.holes).map(x=>{const i=p.holes.indexOf(x);return`<div class="poly" data-i="${i}" style="padding:12px 4px;border-bottom:1px solid var(--line)"><div><b style="font-size:18px">Furo ${esc(x.id)}</b>${x.agua!=='seca'?' 💧':''}<div class="mut">${ST[x.status].n}${holeKg(x)?' · '+fmt(holeKg(x))+' kg':''}${camsDoFuro(x).length?' · '+esc(camsTxt(x)):''}${x.profMed!=null?' · prof. '+fmt(x.profMed,1)+' m':''}</div></div><span style="font-size:22px;color:var(--mut)">›</span></div>`;}).join('')||'<p class="mut" style="padding:10px">Nada aqui.</p>'}</div>`;
   $('#app').innerHTML=h;bindCam(p,meu);
 }
 function bindCam(p,meu){
@@ -1530,17 +1552,19 @@ function bindCam(p,meu){
 }
 function camFuro(p,i,meu,voz){
   const h=p.holes[i],pr=projDe(p);const kp=kgProj(p,h);
-  const d0=(h.decks||[])[0]||{};let kg=voz&&voz.kg!=null?voz.kg:(holeKg(h)||kp);const prod=(voz&&voz.prod)||d0.prod||pr.prod||'';
+  const meuD=(h.decks||[]).filter(d=>deckCam(h,d)===meu&&deckTemCarga(d));const outrosKg=holeKg(h)-kgDoCam(h,meu);const outrosC=camsDoFuro(h).filter(c=>c!==meu);
+  const d0=meuD[0]||(h.decks||[])[0]||{};let kg=voz&&voz.kg!=null?voz.kg:(kgDoCam(h,meu)||(outrosKg>0?(kp!=null&&kp>outrosKg?Math.round((kp-outrosKg)*10)/10:null):(holeKg(h)||kp)));const prod=(voz&&voz.prod)||d0.prod||pr.prod||'';
   openSheet(`<h3>Furo ${esc(h.id)}<button class="btn sm" id="cfX">Fechar</button></h3>
   <p class="mut" style="margin:0">${kp!=null?'Projeto: '+fmt(kp)+' kg':'Sem carga de projeto'}${h.profMed!=null?' · prof. medida '+fmt(h.profMed,1)+' m':''}${h.agua!=='seca'?' · 💧 '+AGUA_N[h.agua]:''}${h.obsCroqui?' · croqui: '+esc(h.obsCroqui):''}</p>
+  ${outrosC.length&&outrosKg>0?`<div class="hint" style="margin:8px 0 0">Este furo já tem ${fmt(outrosKg)} kg do ${esc(outrosC.map(camCurto).join(' + '))}. O que você lançar aqui entra como outro deck, do ${esc(camCurto(meu))}.</div>`:''}
   <div class="row"><div><label>Produto</label><select id="cfP">${opts(PRODUTOS,prod,'—')}</select></div><div><label>kg colocados</label><input id="cfK" inputmode="decimal" value="${kg??''}" style="font-size:22px;font-weight:700"></div></div>
   <div class="row"><div><label>Tampão (m)</label><input id="cfT" inputmode="decimal" value="${(voz&&voz.tampao)??h.tampao??pr.tampao??''}"></div><div><label>Água</label><select id="cfA">${Object.entries(AGUA_N).map(([k,v])=>`<option value="${k}" ${((voz&&voz.agua)||h.agua)===k?'selected':''}>${v}</option>`).join('')}</select></div></div>
   <label>Observação</label><input id="cfO" value="${esc(h.obs||'')}">
   <div class="btns"><button class="btn ok" id="cfOk" style="font-size:18px;min-height:56px">✔ Carregado pelo ${esc(camCurto(meu))}</button></div>
   <div class="btns"><button class="btn" id="cfRe">Não deu para carregar (repasse)</button></div>`);
   $('#cfX').onclick=closeSheet;
-  const salva=st=>{const antes=camFora(p,meu);pushUndo(p,[h],'furo '+h.id);const k=num($('#cfK').value);
-    if(st==='carregado'){h.decks=k!=null?[{prod:$('#cfP').value,kg:k}]:h.decks;h.caminhao=meu;}
+  const salva=st=>{const antes=camFora(p,meu)?[meu]:[];pushUndo(p,[h],'furo '+h.id);const k=num($('#cfK').value);
+    if(st==='carregado')lancarCarga(h,meu,$('#cfP').value,k);
     h.status=st;h.tampao=num($('#cfT').value);h.agua=$('#cfA').value;h.obs=$('#cfO').value.trim();carimbaLotes(p,h);histAdd(h,'Modo caminhão: '+resumoFuro(h));h.ts=Date.now();h.por=meuNome()||meu;markF(p.id,h.id);save();closeSheet();renderCam();toast('Furo '+h.id+' salvo');checarAlertas(p,h,antes);};
   $('#cfOk').onclick=()=>salva('carregado');$('#cfRe').onclick=()=>salva('repasse');
 }
@@ -1564,7 +1588,7 @@ async function listarFotos(pid,forca){
 function tabLista(p){
   const f=listFilter,q=listQ.trim().toUpperCase();const rows=p.holes.map((h,i)=>[h,i]).filter(([h])=>(f==='todos'||(f==='agua'?h.agua!=='seca':f==='cond'?(h.cond||[]).length:h.status===f))&&(!q||String(h.id).toUpperCase().includes(q)));
   $('#tabBox').innerHTML=`<select id="lf" style="margin-bottom:10px"><option value="todos">Todos os furos (${p.holes.length})</option>${Object.entries(ST).map(([k,v])=>`<option value="${k}" ${f===k?'selected':''}>${v.n} (${p.holes.filter(h=>h.status===k).length})</option>`).join('')}<option value="agua" ${f==='agua'?'selected':''}>Com água (${p.holes.filter(h=>h.agua!=='seca').length})</option><option value="cond" ${f==='cond'?'selected':''}>Com ocorrência (${p.holes.filter(h=>(h.cond||[]).length).length})</option></select><input id="lq" placeholder="Buscar furo" value="${esc(listQ)}" style="margin-bottom:10px">
-  <div class="card" style="padding:4px 8px;overflow:auto"><table><thead><tr><th>Furo</th><th>Status</th><th class="n">Proj.</th><th class="n">Med.</th><th class="n">kg</th><th>Cam.</th></tr></thead><tbody>${rows.map(([h,i])=>`<tr class="click" data-i="${i}"><td><b>${esc(h.id)}</b>${h.agua!=='seca'?' 💧':''}${(h.cond||[]).length?' ⚠️':''}</td><td><span class="chip" style="background:${ST[h.status].c}">${ST[h.status].n}</span></td><td class="n">${fmt(h.profProj,1)}</td><td class="n">${fmt(h.profMed,1)}</td><td class="n">${holeKg(h)?fmt(holeKg(h)):'–'}</td><td>${esc((h.caminhao||'').replace('UMT ','').replace('UMB ',''))}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nenhum furo neste filtro</td></tr>'}</tbody></table></div>`;
+  <div class="card" style="padding:4px 8px;overflow:auto"><table><thead><tr><th>Furo</th><th>Status</th><th class="n">Proj.</th><th class="n">Med.</th><th class="n">kg</th><th>Cam.</th></tr></thead><tbody>${rows.map(([h,i])=>`<tr class="click" data-i="${i}"><td><b>${esc(h.id)}</b>${h.agua!=='seca'?' 💧':''}${(h.cond||[]).length?' ⚠️':''}</td><td><span class="chip" style="background:${ST[h.status].c}">${ST[h.status].n}</span></td><td class="n">${fmt(h.profProj,1)}</td><td class="n">${fmt(h.profMed,1)}</td><td class="n">${holeKg(h)?fmt(holeKg(h)):'–'}</td><td>${esc(camsTxt(h))}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nenhum furo neste filtro</td></tr>'}</tbody></table></div>`;
   $('#lf').onchange=e=>{listFilter=e.target.value;tabLista(p);};
   $('#lq').oninput=e=>{listQ=e.target.value;tabLista(p);const n=$('#lq');n.focus();n.setSelectionRange(n.value.length,n.value.length);};
   document.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>editHole(+tr.dataset.i));
@@ -1584,10 +1608,10 @@ function editHole(i,voz,vozTxt){
     ${f.agua==='agua'?`<label>Coluna de água (m)</label><input id="hAM" inputmode="decimal" value="${f.aguaM??''}">`:''}
     <div class="hint" id="hPj" style="background:#eef4fb;border-color:#c9dcf2"></div>
     <label>Carga lançada (o que foi colocado no furo)</label><div class="seg" id="hND">${[1,2,3].map(n=>`<button data-n="${n}" class="${f.decks.length===n?'on':''}">${n} deck${n>1?'s':''}</button>`).join('')}</div>
-    ${f.decks.map((d,k)=>`<div class="deck"><b>Deck ${k+1}</b><select data-dp="${k}">${opts(PRODUTOS,d.prod,'Produto')}</select><input data-dk="${k}" inputmode="decimal" placeholder="kg" value="${d.kg??''}"></div>`).join('')}
+    ${f.decks.map((d,k)=>`<div class="deck"><b>Deck ${k+1}</b><select data-dp="${k}">${opts(PRODUTOS,d.prod,'Produto')}</select><input data-dk="${k}" inputmode="decimal" placeholder="kg" value="${d.kg??''}">${f.decks.length>1?`<select data-dc="${k}" style="grid-column:2/4"><option value="">🚛 Caminhão: o mesmo do furo</option>${[...new Set([...CAMS,...camsPoly(p),d.cam].filter(Boolean))].map(c=>`<option value="${esc(c)}" ${d.cam===c?'selected':''}>🚛 ${esc(c)}</option>`).join('')}</select>`:''}</div>`).join('')}${f.decks.length>1?'<p class="mut" style="margin:4px 0 0">Se outro caminhão carregou um dos decks, escolha o caminhão daquele deck.</p>':''}
     <div class="row"><div><label>Booster (un)</label><input id="hBo" inputmode="numeric" value="${f.booster??''}"></div><div><label>Brinel (un)</label><input id="hBr" inputmode="numeric" value="${f.brinel??''}"></div></div>
     <div class="row"><div><label>Detonador</label><select id="hDT">${opts(DETS,f.detTipo,'—')}</select></div><div><label>Qtd. detonadores</label><input id="hDQ" inputmode="numeric" value="${f.detQtd??''}"></div></div>
-    <div class="row"><div><label>Tampão (m)</label><input id="hTa" inputmode="decimal" value="${f.tampao??''}"></div><div><label>Caminhão</label><select id="hCa">${opts(CAMS,f.caminhao,'—')}</select></div></div>
+    <div class="row"><div><label>Tampão (m)</label><input id="hTa" inputmode="decimal" value="${f.tampao??''}"></div><div><label>Caminhão${f.decks.length>1?' do furo':''}</label><select id="hCa">${opts([...new Set([...CAMS,f.caminhao].filter(Boolean))],f.caminhao,'—')}</select></div></div>
  <div class="row"><div><label>Tempo de detonação (ms)</label><input id="hTz" inputmode="decimal" value="${f.tempos&&f.tempos.length>1?f.tempos.join(';'):(f.tempo??'')}" placeholder="do plano"></div><div></div></div>
  <label>Carga de projeto deste furo (kg) — só se for diferente do padrão</label><input id="hCP" inputmode="decimal" value="${f.cargaProj??''}" placeholder="padrão do polígono: ${projDe(p).kg!=null?fmt(projDe(p).kg)+' kg':'não definido'}">
     <label>Condição do furo</label><div class="conds" id="hCo">${CONDS.map(c=>`<button data-c="${esc(c)}" class="${(f.cond||[]).includes(c)?'on':''}">${esc(c)}</button>`).join('')}</div>
@@ -1603,7 +1627,7 @@ function editHole(i,voz,vozTxt){
   const grab=()=>{
     f.profProj=num($('#hPP').value);f.profMed=num($('#hPM').value);
     if($('#hAM'))f.aguaM=num($('#hAM').value);
-    f.decks.forEach((d,k)=>{d.prod=document.querySelector(`[data-dp="${k}"]`).value;d.kg=num(document.querySelector(`[data-dk="${k}"]`).value);});
+    f.decks.forEach((d,k)=>{d.prod=document.querySelector(`[data-dp="${k}"]`).value;d.kg=num(document.querySelector(`[data-dk="${k}"]`).value);const c=document.querySelector(`[data-dc="${k}"]`);if(c){if(c.value)d.cam=c.value;else delete d.cam;}});
     f.booster=num($('#hBo').value);f.brinel=num($('#hBr').value);f.detTipo=$('#hDT').value;f.detQtd=num($('#hDQ').value);
     f.tampao=num($('#hTa').value);f.caminhao=$('#hCa').value;f.obs=$('#hOb').value.trim();f.cargaProj=num($('#hCP').value);{const l={prod:$('#hLp').value.trim(),booster:$('#hLb').value.trim(),det:$('#hLd').value.trim()};f.lotes=Object.values(l).some(Boolean)?l:null;}{const ts=$('#hTz').value.split(/[;\/]/).map(num).filter(v=>v!=null);f.tempo=ts.length?ts[0]:null;f.tempos=ts.length>1?ts:null;}
   };
@@ -1614,7 +1638,7 @@ function editHole(i,voz,vozTxt){
   const showDif=()=>{const pp=num($('#hPP').value),pm=num($('#hPM').value);const el=$('#hDif');if(pp!=null&&pm!=null){const d=pm-pp;el.innerHTML=`Diferença: <b style="color:${d<-0.5?'var(--bad)':d>0.5?'var(--warn)':'var(--ok)'}">${d>0?'+':''}${fmt(d,1)} m</b>${d<-0.5?' — abaixo do projeto (avaliar repasse)':''}`;}else el.textContent='';};
   const bind=()=>{
     $('#hClose').onclick=()=>{closeSheet();sel=null;};
-    $('#hVoz').onclick=()=>{grab();vozOuvir(t=>{const r=parseVoz(t,[...new Set([...CAMS,...p.holes.map(x=>x.caminhao).filter(Boolean)])]);delete r.furo;aplicaVoz(p,f,r);draw();toast(`Ouvi: "${t}"`);});};
+    $('#hVoz').onclick=()=>{grab();vozOuvir(t=>{const r=parseVoz(t,[...new Set([...CAMS,...camsPoly(p)])]);delete r.furo;aplicaVoz(p,f,r);draw();toast(`Ouvi: "${t}"`);});};
     document.querySelectorAll('.stbtns button').forEach(b=>b.onclick=()=>{grab();f.status=b.dataset.s;draw();});
     document.querySelectorAll('#hAg button').forEach(b=>b.onclick=()=>{grab();f.agua=b.dataset.a;draw();});
     document.querySelectorAll('#hCo button').forEach(b=>b.onclick=()=>{grab();const c=b.dataset.c;f.cond=(f.cond||[]).includes(c)?f.cond.filter(x=>x!==c):[...(f.cond||[]),c];draw();});
@@ -1634,7 +1658,7 @@ function editHole(i,voz,vozTxt){
   const commit=next=>{
     if(f.status==='pendente'&&f.decks.some(d=>num(d.kg)>0))f.status='carregado';
     f.decks=f.decks.filter(d=>d.prod||num(d.kg));
-    f.ts=Date.now();f.por=meuNome();const tzMudou=h.tempo!==f.tempo||JSON.stringify(h.tempos||null)!==JSON.stringify(f.tempos||null)||h.cargaProj!==f.cargaProj;pushUndo(p,[h],'furo '+h.id);delete f.hist;const camAntes=camFora(p,f.caminhao);Object.assign(h,f);carimbaLotes(p,h);histAdd(h,resumoFuro(h));markF(p.id,h.id);if(tzMudou)markP(p.id);
+    f.ts=Date.now();f.por=meuNome();const tzMudou=h.tempo!==f.tempo||JSON.stringify(h.tempos||null)!==JSON.stringify(f.tempos||null)||h.cargaProj!==f.cargaProj;pushUndo(p,[h],'furo '+h.id);delete f.hist;normCams(f);const camAntes=camsPoly(p).filter(c=>camFora(p,c));Object.assign(h,f);carimbaLotes(p,h);histAdd(h,resumoFuro(h));markF(p.id,h.id);if(tzMudou)markP(p.id);
     if(f.status==='carregado')S.last=Object.assign(S.last||{},{furo:{decks:f.decks,booster:f.booster,brinel:f.brinel,detTipo:f.detTipo,detQtd:f.detQtd,tampao:f.tampao,caminhao:f.caminhao}});
     save();toast(`Furo ${f.id} salvo`);setTimeout(()=>checarAlertas(p,h,camAntes),60);
     if(next){let j=-1;for(let k=1;k<=p.holes.length;k++){const q=(i+k)%p.holes.length;if(p.holes[q].status==='pendente'){j=q;break;}}
@@ -1646,7 +1670,7 @@ function editHole(i,voz,vozTxt){
 
 /* ----- Planilha de carregamento (Excel) — ida e volta ----- */
 const PL_COLS=[['Furo','id',8],['Status','status',14],['Prof. projeto (m)','profProj',11],['Prof. medida (m)','profMed',11],['Água','agua',10],['Coluna água (m)','aguaM',10],
-  ['Produto deck 1','p1',14],['kg deck 1','k1',9],['Produto deck 2','p2',14],['kg deck 2','k2',9],['Produto deck 3','p3',14],['kg deck 3','k3',9],['Total kg','tot',10],
+  ['Produto deck 1','p1',14],['kg deck 1','k1',9],['Caminhão deck 1','c1',12],['Produto deck 2','p2',14],['kg deck 2','k2',9],['Caminhão deck 2','c2',12],['Produto deck 3','p3',14],['kg deck 3','k3',9],['Caminhão deck 3','c3',12],['Total kg','tot',10],
   ['Booster (un)','booster',9],['Brinel (un)','brinel',9],['Detonador','detTipo',13],['Qtd det.','detQtd',8],['Tampão (m)','tampao',9],['Caminhão','caminhao',12],['Tempo (ms)','tempo',10],['Observação','obs',28],['Condição','cond',20],['Lote produto','lp',12],['Lote booster','lb',12],['Lote detonador','ld',12],['Lançado por','por',14],['Data/hora','ts',17]];
 const AGUA_N={seca:'Seca',umida:'Úmida',agua:'Com água'};
 const stDeNome=t=>{t=String(t||'').trim().toLowerCase();return Object.keys(ST).find(k=>ST[k].n.toLowerCase()===t)||(t.startsWith('carreg')?'carregado':t.startsWith('pend')?'pendente':t.startsWith('rep')?'repasse':t.startsWith('perd')?'perdido':t.startsWith('não')||t.startsWith('nao')?'nao':null);};
@@ -1655,7 +1679,7 @@ async function exportarPlanilha(p){
   busy('Montando planilha…');
   try{
     const EX=await loadExcel();const wb=new EX.Workbook();wb.creator='Carregamento de Campo';
-    const camList=[...new Set([...CAMS,...p.holes.map(h=>h.caminhao).filter(Boolean)])];
+    const camList=[...new Set([...CAMS,...camsPoly(p)])];
     // Listas (para as caixas de seleção)
     const rng=(c,n)=>`Listas!$${String.fromCharCode(65+c)}$2:$${String.fromCharCode(65+c)}$${n+1}`;
     // Carregamento
@@ -1666,11 +1690,11 @@ async function exportarPlanilha(p){
     ws.getRow(H).height=32;
     const col=k=>PL_COLS.findIndex(c=>c[1]===k)+1;const L=c=>ws.getColumn(c).letter;
     p.holes.forEach((h,i)=>{const r=H+1+i;const d=[0,1,2].map(k=>h.decks[k]||{});
-      const v={id:h.id,status:ST[h.status].n,profProj:h.profProj,profMed:h.profMed,agua:AGUA_N[h.agua]||'Seca',aguaM:h.aguaM,p1:d[0].prod||null,k1:num(d[0].kg),p2:d[1].prod||null,k2:num(d[1].kg),p3:d[2].prod||null,k3:num(d[2].kg),
+      const v={id:h.id,status:ST[h.status].n,profProj:h.profProj,profMed:h.profMed,agua:AGUA_N[h.agua]||'Seca',aguaM:h.aguaM,p1:d[0].prod||null,k1:num(d[0].kg),c1:deckTemCarga(d[0])&&deckCam(h,d[0])||null,p2:d[1].prod||null,k2:num(d[1].kg),c2:deckTemCarga(d[1])&&deckCam(h,d[1])||null,p3:d[2].prod||null,k3:num(d[2].kg),c3:deckTemCarga(d[2])&&deckCam(h,d[2])||null,
         booster:num(h.booster),brinel:num(h.brinel),detTipo:h.detTipo||null,detQtd:num(h.detQtd),tampao:num(h.tampao),caminhao:h.caminhao||null,tempo:h.tempos&&h.tempos.length>1?h.tempos.join('/'):(h.tempo??null),obs:h.obs||null,cond:(h.cond||[]).join(', ')||null,lp:h.lotes?.prod||null,lb:h.lotes?.booster||null,ld:h.lotes?.det||null,por:h.por||null,ts:h.ts?new Date(h.ts):null};
       PL_COLS.forEach(([,k],c)=>{const cell=ws.getCell(r,c+1);if(k==='tot')cell.value={formula:`IF(SUM(${L(col('k1'))}${r},${L(col('k2'))}${r},${L(col('k3'))}${r})=0,"",SUM(${L(col('k1'))}${r},${L(col('k2'))}${r},${L(col('k3'))}${r}))`};else if(v[k]!=null&&v[k]!=='')cell.value=v[k];});
       ws.getCell(r,col('ts')).numFmt='dd/mm/yyyy hh:mm';ws.getCell(r,col('id')).font={bold:true};
-      [['status',0,5],['agua',1,3],['p1',2,PRODUTOS.length],['p2',2,PRODUTOS.length],['p3',2,PRODUTOS.length],['detTipo',3,DETS.length],['caminhao',4,camList.length]].forEach(([k,c,n])=>{ws.getCell(r,col(k)).dataValidation={type:'list',allowBlank:true,formulae:[rng(c,n)],showErrorMessage:true,errorTitle:'Valor inválido',error:'Escolha um item da lista'};});
+      [['status',0,5],['agua',1,3],['p1',2,PRODUTOS.length],['p2',2,PRODUTOS.length],['p3',2,PRODUTOS.length],['detTipo',3,DETS.length],['caminhao',4,camList.length],['c1',4,camList.length],['c2',4,camList.length],['c3',4,camList.length]].forEach(([k,c,n])=>{ws.getCell(r,col(k)).dataValidation={type:'list',allowBlank:true,formulae:[rng(c,n)],showErrorMessage:true,errorTitle:'Valor inválido',error:'Escolha um item da lista'};});
       ['profProj','profMed','aguaM','tampao'].forEach(k=>ws.getCell(r,col(k)).numFmt='0.0');
       if(i%2)PL_COLS.forEach((_,c)=>ws.getCell(r,c+1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF3F6F9'}});});
     const last=H+p.holes.length;
@@ -1683,8 +1707,8 @@ async function exportarPlanilha(p){
     const R0=3;const hdr=['Caminhão','Furos',...PRODUTOS.map(x=>x+' (kg)'),'Total (kg)','Booster (un)','NF'];
     hdr.forEach((t,c)=>{const cell=rs.getCell(R0,c+1);cell.value=t;cell.font={bold:true,color:{argb:'FFFFFFFF'}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF102A43'}};rs.getColumn(c+1).width=c?13:14;});
     const rC=`Carregamento!$${L(col('caminhao'))}$${H+1}:$${L(col('caminhao'))}$${last}`;const rr=k=>`Carregamento!$${L(col(k))}$${H+1}:$${L(col(k))}$${last}`;
-    camList.forEach((cm,i)=>{const r=R0+1+i;rs.getCell(r,1).value=cm;rs.getCell(r,2).value={formula:`COUNTIF(${rC},A${r})`};
-      PRODUTOS.forEach((pr,j)=>{rs.getCell(r,3+j).value={formula:`SUMIFS(${rr('k1')},${rC},$A${r},${rr('p1')},"${pr}")+SUMIFS(${rr('k2')},${rC},$A${r},${rr('p2')},"${pr}")+SUMIFS(${rr('k3')},${rC},$A${r},${rr('p3')},"${pr}")`};rs.getCell(r,3+j).numFmt='#,##0';});
+    camList.forEach((cm,i)=>{const r=R0+1+i;rs.getCell(r,1).value=cm;rs.getCell(r,2).value={formula:`SUMPRODUCT(--(((${rr('c1')}=$A${r})+(${rr('c2')}=$A${r})+(${rr('c3')}=$A${r})+((${rr('c1')}="")*(${rr('c2')}="")*(${rr('c3')}="")*(${rC}=$A${r})))>0))`};
+      PRODUTOS.forEach((pr,j)=>{rs.getCell(r,3+j).value={formula:`SUMIFS(${rr('k1')},${rr('c1')},$A${r},${rr('p1')},"${pr}")+SUMIFS(${rr('k2')},${rr('c2')},$A${r},${rr('p2')},"${pr}")+SUMIFS(${rr('k3')},${rr('c3')},$A${r},${rr('p3')},"${pr}")`};rs.getCell(r,3+j).numFmt='#,##0';});
       const tc=3+PRODUTOS.length;rs.getCell(r,tc).value={formula:`SUM(${rs.getColumn(3).letter}${r}:${rs.getColumn(tc-1).letter}${r})`};rs.getCell(r,tc).numFmt='#,##0';rs.getCell(r,tc).font={bold:true};
       rs.getCell(r,tc+1).value={formula:`SUMIFS(${rr('booster')},${rC},$A${r})`};rs.getCell(r,tc+2).value=(p.nfs||{})[cm]||null;});
     const rt=R0+1+camList.length;rs.getCell(rt,1).value='TOTAL';rs.getCell(rt,1).font={bold:true};
@@ -1718,11 +1742,12 @@ async function importarPlanilha(p){
       if(g('detTipo')!==undefined)nv.detTipo=tx(g('detTipo'));if(g('caminhao')!==undefined)nv.caminhao=tx(g('caminhao'));if(g('obs')!==undefined)nv.obs=tx(g('obs'));
       if(g('cond')!==undefined)nv.cond=tx(g('cond')).split(/[,;\/]/).map(v=>v.trim()).filter(Boolean);
       if(ci.lp!=null||ci.lb!=null||ci.ld!=null){const l={prod:tx(g('lp')),booster:tx(g('lb')),det:tx(g('ld'))};nv.lotes=Object.values(l).some(Boolean)?l:null;}
-      if(ci.k1!=null||ci.p1!=null){nv.decks=[1,2,3].map(n=>({prod:tx(g('p'+n)),kg:num(g('k'+n))})).filter(d=>d.prod||d.kg);}
+      if(ci.k1!=null||ci.p1!=null){const temC=ci.c1!=null;nv.decks=[1,2,3].map(n=>{const d={prod:tx(g('p'+n)),kg:num(g('k'+n))};const c=temC?tx(g('c'+n)):((h.decks||[])[n-1]||{}).cam;if(c)d.cam=c;return d;}).filter(d=>d.prod||d.kg);
+        const hc=nv.caminhao!==undefined?nv.caminhao:h.caminhao;const tmp=normCams({caminhao:hc,decks:nv.decks});nv.decks=tmp.decks;if(tmp.caminhao!==hc)nv.caminhao=tmp.caminhao;}
       if(g('tempo')!==undefined){const ts=String(g('tempo')??'').split(/[\/;]/).map(num).filter(v=>v!=null);nv.tempo=ts.length?ts[0]:null;nv.tempos=ts.length>1?ts:null;}
       // o que mudou?
       const dif=[];const eq=(a,b)=>(a??'')===(b??'')||(a==null&&b==='')||(a===''&&b==null);
-      Object.keys(nv).forEach(k=>{const J=['tempos','cond','lotes'];const a=k==='decks'?JSON.stringify((h.decks||[]).map(d=>({prod:d.prod||'',kg:num(d.kg)}))):k==='cond'?JSON.stringify(h.cond||[]):J.includes(k)?JSON.stringify(h[k]||null):h[k];const b=k==='decks'?JSON.stringify(nv.decks):k==='cond'?JSON.stringify(nv.cond||[]):J.includes(k)?JSON.stringify(nv[k]||null):nv[k];if(!eq(a,b))dif.push(k);});
+      Object.keys(nv).forEach(k=>{const J=['tempos','cond','lotes'];const a=k==='decks'?JSON.stringify((h.decks||[]).map(d=>({prod:d.prod||'',kg:num(d.kg),cam:d.cam||''}))):k==='cond'?JSON.stringify(h.cond||[]):J.includes(k)?JSON.stringify(h[k]||null):h[k];const b=k==='decks'?JSON.stringify(nv.decks.map(d=>({prod:d.prod||'',kg:num(d.kg),cam:d.cam||''}))):k==='cond'?JSON.stringify(nv.cond||[]):J.includes(k)?JSON.stringify(nv[k]||null):nv[k];if(!eq(a,b))dif.push(k);});
       if(!dif.length)return;
       // furo pendente que ganhou carga/caminhão na planilha vira carregado
       if((nv.status||h.status)==='pendente'&&((nv.decks&&nv.decks.some(d=>d.kg))||(nv.caminhao&&!h.caminhao)))nv.status='carregado';
@@ -1751,7 +1776,7 @@ function tabConf(p){
   <div class="card" style="margin-top:12px"><h2>Carga total</h2><table><tbody><tr><td>Projeto (furos a carregar)</td><td class="n">${fmt(r.kgProj)} kg</td></tr><tr><td>Executado (lançado)</td><td class="n"><b>${fmt(r.kgExec)} kg</b></td></tr><tr><td>Diferença</td><td class="n">${dif==null?'–':(dif>=0?'+':'')+fmt(dif,1)+'%'}</td></tr></tbody></table>
   <p class="mut">A diferença total só fecha quando todos os furos estiverem lançados.</p></div>
   <div class="card"><h2>Outros pontos</h2><table><tbody><tr><td>Profundidade abaixo do projeto (> ${fmt(pr.tolProf,1)} m)</td><td class="n">${r.profBaixa}</td></tr>${pr.tampao!=null?`<tr><td>Tampão diferente do projeto (> 0,5 m)</td><td class="n">${r.tampDif}</td></tr>`:''}${pr.booster!=null?`<tr><td>Booster diferente do projeto</td><td class="n">${r.boosterDif}</td></tr>`:''}<tr><td>Perdidos / não carregar</td><td class="n">${r.n.fora}</td></tr></tbody></table></div>`;
-  if(r.lista.length)h+=`<div class="card" style="padding:4px 8px;overflow:auto"><h2 style="margin:10px 6px">Furos fora da tolerância</h2><table><thead><tr><th>Furo</th><th class="n">Projeto</th><th class="n">Exec.</th><th class="n">Desvio</th><th>Cam.</th></tr></thead><tbody>${r.lista.sort((a,b)=>Math.abs(b[1].d)-Math.abs(a[1].d)).map(([x,dv])=>`<tr class="click" data-i="${p.holes.indexOf(x)}"><td><b>${esc(x.id)}</b></td><td class="n">${fmt(kgProj(p,x))}</td><td class="n">${fmt(holeKg(x))}</td><td class="n" style="color:${DV[dv.c].c};font-weight:700">${dv.d>0?'+':''}${fmt(dv.d,0)}%</td><td>${esc(camCurto(x.caminhao))}</td></tr>`).join('')}</tbody></table></div>`;
+  if(r.lista.length)h+=`<div class="card" style="padding:4px 8px;overflow:auto"><h2 style="margin:10px 6px">Furos fora da tolerância</h2><table><thead><tr><th>Furo</th><th class="n">Projeto</th><th class="n">Exec.</th><th class="n">Desvio</th><th>Cam.</th></tr></thead><tbody>${r.lista.sort((a,b)=>Math.abs(b[1].d)-Math.abs(a[1].d)).map(([x,dv])=>`<tr class="click" data-i="${p.holes.indexOf(x)}"><td><b>${esc(x.id)}</b></td><td class="n">${fmt(kgProj(p,x))}</td><td class="n">${fmt(holeKg(x))}</td><td class="n" style="color:${DV[dv.c].c};font-weight:700">${dv.d>0?'+':''}${fmt(dv.d,0)}%</td><td>${esc(camsTxt(x))}</td></tr>`).join('')}</tbody></table></div>`;
   h+=`<div class="btns"><button class="btn" id="cfEd">Editar projeto</button><button class="btn" id="cfMap">Ver no mapa</button></div>`;
   $('#tabBox').innerHTML=h;
   $('#cfEd').onclick=()=>editProjeto(p);$('#cfMap').onclick=()=>{corPor='desvio';tab='mapa';renderPoly();};
@@ -1767,7 +1792,7 @@ function resumo(p,dia){
     if(h.profMed!=null){r.pm.push(h.profMed);r.metros+=h.profMed;if(h.profProj!=null&&h.profMed<h.profProj-0.5)r.abaixo++;}
     if(h.profProj!=null)r.pp.push(h.profProj);
     if(h.status==='carregado'||holeKg(h)>0){
-      h.decks.forEach(d=>{const kg=num(d.kg)||0;if(!kg)return;const pr=d.prod||'Sem produto';r.prod[pr]=(r.prod[pr]||0)+kg;const c=h.caminhao||'Sem caminhão';r.cam[c]=r.cam[c]||{};r.cam[c][pr]=(r.cam[c][pr]||0)+kg;});
+      h.decks.forEach(d=>{const kg=num(d.kg)||0;if(!kg)return;const pr=d.prod||'Sem produto';r.prod[pr]=(r.prod[pr]||0)+kg;const c=deckCam(h,d)||'Sem caminhão';r.cam[c]=r.cam[c]||{};r.cam[c][pr]=(r.cam[c][pr]||0)+kg;});
       r.booster+=num(h.booster)||0;r.brinel+=num(h.brinel)||0;if(h.detTipo&&h.detQtd)r.det[h.detTipo]=(r.det[h.detTipo]||0)+h.detQtd;}
   });
   r.lancados=hs.length;r.kg=Object.values(r.prod).reduce((a,b)=>a+b,0);
@@ -1853,8 +1878,8 @@ function tabRelatorio(p){
 /* ----- CSV ----- */
 function csv(p){
   const n=v=>v==null?'':String(v).replace('.',',');
-  const head=['POL','Mina','Furo','Status','ProfProjeto','ProfMedida','Agua','ColunaAgua','Deck1Produto','Deck1Kg','Deck2Produto','Deck2Kg','Deck3Produto','Deck3Kg','TempoMs','TotalKg','CargaProjetoKg','DesvioCarga','Booster','Brinel','Detonador','QtdDetonador','Tampao','Caminhao','NF','Obs','Condicao','LoteProduto','LoteBooster','LoteDetonador','LancadoPor','DataHora'];
-  const rows=p.holes.map(h=>{const d=[0,1,2].map(k=>h.decks[k]||{});return[p.pol,p.mina,h.id,ST[h.status].n,n(h.profProj),n(h.profMed),h.agua,n(h.aguaM),d[0].prod||'',n(d[0].kg),d[1].prod||'',n(d[1].kg),d[2].prod||'',n(d[2].kg),(h.tempos&&h.tempos.length>1?h.tempos.join('/'):(h.tempo??'')),n(holeKg(h)||null),n(kgProj(p,h)),desvio(p,h).t,n(h.booster),n(h.brinel),h.detTipo,n(h.detQtd),n(h.tampao),h.caminhao,(p.nfs||{})[h.caminhao]||'',(h.obs||'').replace(/;/g,','),(h.cond||[]).join(', '),(h.lotes?.prod||''),(h.lotes?.booster||''),(h.lotes?.det||''),h.por||'',h.ts?new Date(h.ts).toLocaleString('pt-BR'):''].join(';');});
+  const head=['POL','Mina','Furo','Status','ProfProjeto','ProfMedida','Agua','ColunaAgua','Deck1Produto','Deck1Kg','Deck1Caminhao','Deck2Produto','Deck2Kg','Deck2Caminhao','Deck3Produto','Deck3Kg','Deck3Caminhao','TempoMs','TotalKg','CargaProjetoKg','DesvioCarga','Booster','Brinel','Detonador','QtdDetonador','Tampao','Caminhao','NF','Obs','Condicao','LoteProduto','LoteBooster','LoteDetonador','LancadoPor','DataHora'];
+  const rows=p.holes.map(h=>{const d=[0,1,2].map(k=>h.decks[k]||{});return[p.pol,p.mina,h.id,ST[h.status].n,n(h.profProj),n(h.profMed),h.agua,n(h.aguaM),d[0].prod||'',n(d[0].kg),deckTemCarga(d[0])?deckCam(h,d[0]):'',d[1].prod||'',n(d[1].kg),deckTemCarga(d[1])?deckCam(h,d[1]):'',d[2].prod||'',n(d[2].kg),deckTemCarga(d[2])?deckCam(h,d[2]):'',(h.tempos&&h.tempos.length>1?h.tempos.join('/'):(h.tempo??'')),n(holeKg(h)||null),n(kgProj(p,h)),desvio(p,h).t,n(h.booster),n(h.brinel),h.detTipo,n(h.detQtd),n(h.tampao),camsDoFuro(h).join(' + '),camsDoFuro(h).map(c=>(p.nfs||{})[c]).filter(Boolean).join(' + '),(h.obs||'').replace(/;/g,','),(h.cond||[]).join(', '),(h.lotes?.prod||''),(h.lotes?.booster||''),(h.lotes?.det||''),h.por||'',h.ts?new Date(h.ts).toLocaleString('pt-BR'):''].join(';');});
   return [head.join(';'),...rows].join('\n');
 }
 
