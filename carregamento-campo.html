@@ -1188,46 +1188,106 @@ function checarAlertas(p,h,camAntes){
 
 /* ===== Lançamento por voz ===== */
 const NUMP={zero:0,um:1,uma:1,dois:2,duas:2,'três':3,tres:3,quatro:4,cinco:5,seis:6,sete:7,oito:8,nove:9,dez:10,onze:11,doze:12,treze:13,quatorze:14,catorze:14,quinze:15,dezesseis:16,dezessete:17,dezoito:18,dezenove:19,vinte:20,meio:0.5,meia:0.5};
-function vozNum(tk,i){ // lê número a partir do token i: "2,5" "2 vírgula 5" "dois e meio"
-  let t=tk[i];if(t==null)return null;let v=num(t);if(v==null&&t in NUMP)v=NUMP[t];if(v==null)return null;let used=1;
-  if((tk[i+1]==='vírgula'||tk[i+1]==='virgula'||tk[i+1]==='ponto')&&tk[i+2]!=null&&/^\d+$/.test(tk[i+2])){v=num(t+'.'+tk[i+2]);used=3;}
+const VOZ_FILL=new Set(['de','do','da','dos','das','com','igual','a','o','e','em','no','na','numero','n','nº','foi','ficou','deu','tem','teve','esta','ta','=','pra','para','ai','entao','mais']);
+const VOZ_UN_M=new Set(['metro','metros','m','mt','mts']);
+const VOZ_UN_KG=new Set(['kg','quilo','quilos','kilo','kilos','quilograma','quilogramas','k']);
+const VOZ_UN_UN=new Set(['unidade','unidades','un','pecas','peca']);
+const VOZ_KW=[ // campo, palavras (exatas) e começos de palavra
+  ['tampao',['tampao','tampoes','tampa','tampo'],['tampa']],
+  ['booster',['booster','boosters','buster','busters','boster','bosters','bus'],['booste','buste']],
+  ['brinel',['brinel','brinell','brineis','brinels'],['brinel']],
+  ['detQtd',['detonador','detonadores','espoleta','espoletas','det'],['detonad','espolet']],
+  ['profMed',['profundidade','prof','medida','medido','fundo','profundo','profundura'],['profund']],
+  ['aguaM',['agua','aguas','lamina','coluna'],[]],
+  ['kg',['carga','carreguei','carregou','coloquei','botei','emulsao','explosivo','total'],[]],
+];
+const vozNorm=s=>String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+function vozKw(w){for(const [k,ex,pre] of VOZ_KW){if(ex.includes(w)||pre.some(p=>w.startsWith(p)))return k;}return null;}
+function vozNum(tk,i){ // lê número a partir do token i: "2,5" "2 vírgula 5" "dois e meio" "2 metros e meio"
+  let t=tk[i];if(t==null)return null;let v=/^\d/.test(t)?num(t):null;if(v==null&&t in NUMP)v=NUMP[t];if(v==null)return null;let used=1;
+  if((tk[i+1]==='virgula'||tk[i+1]==='ponto')&&tk[i+2]!=null&&/^\d+$/.test(tk[i+2])){v=num(t+'.'+tk[i+2]);used=3;}
   else if(tk[i+1]==='e'&&(tk[i+2]==='meio'||tk[i+2]==='meia')){v+=0.5;used=3;}
+  else if(VOZ_UN_M.has(tk[i+1])&&tk[i+2]==='e'&&(tk[i+3]==='meio'||tk[i+3]==='meia')){v+=0.5;used=4;}
   return{v,used};
 }
 function parseVoz(txt,camList){
-  const s=' '+txt.toLowerCase().replace(/(\d)\s*kg\b/g,'$1 kg').replace(/(\d)\s*m\b/g,'$1 m').replace(/[.;:!?]/g,' ')+' ';
-  const tk=s.trim().split(/\s+/);const r={};
-  const kw=(w,arr)=>arr.some(a=>w===a||w.startsWith(a));
-  for(let i=0;i<tk.length;i++){const w=tk[i];
-    if(kw(w,['furo','buraco'])&&tk[i+1]){let id=tk[i+1];if(/^(número|numero|n)$/.test(id))id=tk[i+2];if(id!=null){const n=vozNum(tk,tk[i+1]===id?i+1:i+2);r.furo=n&&/^\d/.test(id)?String(n.v):id.toUpperCase();}continue;}
-    if(kw(w,['tampão','tampao','tampa'])){const n=vozNum(tk,i+1);if(n){r.tampao=n.v;i+=n.used;}continue;}
-    if(kw(w,['booster','buster','bus'])){const n=vozNum(tk,i+1);if(n){r.booster=n.v;i+=n.used;}else{const b=vozNum(tk,i-1);if(b)r.booster=b.v;}continue;}
-    if(kw(w,['brinel','brinell'])){const n=vozNum(tk,i+1);if(n){r.brinel=n.v;i+=n.used;}continue;}
-    if(kw(w,['detonador','espoleta'])){const n=vozNum(tk,i+1);if(n){r.detQtd=n.v;i+=n.used;}else{const b=vozNum(tk,i-1);if(b)r.detQtd=b.v;}continue;}
-    if(kw(w,['profundidade','prof','medida','medido','fundo'])){const n=vozNum(tk,i+1);if(n){r.profMed=n.v;i+=n.used;}continue;}
-    if(kw(w,['caminhão','caminhao','umt','umb'])){const id=tk[i+1];if(id){const c=camList.find(c=>c.toLowerCase().replace(/\s/g,'').endsWith(id.replace(/\D/g,''))&&id.replace(/\D/g,''));if(c)r.caminhao=c;i++;}continue;}
-    if(kw(w,['kg','quilo','kilo'])){const b=vozNum(tk,i-1);if(b&&r.kg==null)r.kg=b.v;continue;}
-    if(kw(w,['carga','carreguei','carregado','carregou'])&&w!=='carregado'){const n=vozNum(tk,i+1);if(n&&!['kg','quilo','quilos'].includes(tk[i+1+n.used])){r.kg=n.v;i+=n.used;}else if(n&&r.kg==null){r.kg=n.v;i+=n.used;}continue;}
-    if(w==='seco'||w==='seca')r.agua='seca';
-    if(w==='úmido'||w==='umido'||w==='úmida'||w==='umida'||w==='molhado')r.agua='umida';
-    if(w==='água'||w==='agua'){r.agua='agua';const n=vozNum(tk,i+1);if(n){r.aguaM=n.v;i+=n.used;}}
-    if(w==='perdido')r.status='perdido';if(w==='repasse')r.status='repasse';
-    if(w==='carregado'&&!r.status)r.status='carregado';
-    if(w==='não'&&(tk[i+1]||'').startsWith('carreg'))r.status='nao';
-    const pr=PRODUTOS.find(x=>x.toLowerCase()===w);if(pr)r.prod=pr;
+  let s=vozNorm(txt).replace(/(\d)\s*(kg|m)\b/g,'$1 $2').replace(/(\d)[.,](?=\d)/g,'$1\u0001').replace(/[.,;:!?()]/g,' ').replace(/\u0001/g,',');
+  const tk=s.trim().split(/\s+/).filter(Boolean);const r={};const usado=new Set();
+  const kwAt=tk.map(vozKw);const camN=tk.map(w=>/^(caminhao|caminhoes|umt|umb|cam)$/.test(w));
+  // furo e caminhão primeiro (os números deles não são carga)
+  for(let i=0;i<tk.length;i++){
+    if(/^(furo|buraco)$/.test(tk[i])&&r.furo==null){let j=i+1;while(j<tk.length&&/^(numero|n|no|nº|de|do)$/.test(tk[j]))j++;const id=tk[j];if(id==null)continue;
+      const n=vozNum(tk,j);if(n&&/^[\d]/.test(id)||n&&id in NUMP){r.furo=String(n.v);for(let k=i;k<j+n.used;k++)usado.add(k);}else if(!vozKw(id)){r.furo=id.toUpperCase();for(let k=i;k<=j;k++)usado.add(k);}}
+    if(camN[i]&&r.caminhao==null){let j=i+1;while(j<tk.length&&VOZ_FILL.has(tk[j]))j++;const id=(tk[j]||'').replace(/\D/g,'');if(id){const c=camList.find(c=>c.toLowerCase().replace(/\s/g,'').endsWith(id));if(c){r.caminhao=c;for(let k=i;k<=j;k++)usado.add(k);}}}
   }
-  // "furo 32 180" sem unidade: número solto depois do furo vira kg
-  if(r.kg==null&&r.furo){const i=tk.findIndex(w=>w.startsWith('furo'));const n=vozNum(tk,i+2);if(n&&!/^(tampão|tampao|booster|prof)/.test(tk[i+2+n.used]||'')&&tk[i+1+n.used+1]===undefined)r.kg=n.v;}
+  // palavras de estado
+  for(let i=0;i<tk.length;i++){const w=tk[i];
+    if(w==='seco'||w==='seca')r.agua='seca';
+    if(/^(umido|umida|molhado|molhada)$/.test(w))r.agua='umida';
+    if((w==='agua'||w==='aguas')&&r.agua!=='seca')r.agua=tk[i-1]==='sem'?'seca':'agua';
+    if(w==='perdido')r.status='perdido';if(w==='repasse')r.status='repasse';
+    if(w==='nao'&&(tk[i+1]||'').startsWith('carreg')){r.status='nao';usado.add(i+1);}
+    if((w==='carregado'||w==='carregada')&&!usado.has(i)&&!r.status)r.status='carregado';
+    const pr=PRODUTOS.find(x=>vozNorm(x)===w);if(pr)r.prod=pr;
+  }
+  // cada número vai para o campo certo, em qualquer ordem:
+  // 1) "180 quilos" → carga; 2) campo logo antes ("tampão 2,5", "tampão de 3 metros"); 3) campo logo depois ("1 booster", "3 metros de tampão")
+  const soltos=[];
+  for(let i=0;i<tk.length;i++){if(usado.has(i))continue;const n=vozNum(tk,i);if(!n)continue;
+    const fim=i+n.used;let j=fim;while(j<tk.length&&(VOZ_UN_M.has(tk[j])||VOZ_UN_UN.has(tk[j])||/^(de|do|da|no|na)$/.test(tk[j])))j++;
+    let campo=null;
+    if(VOZ_UN_KG.has(tk[fim])&&r.kg==null){campo='kg';j=fim+1;}
+    if(!campo){let b=i-1;while(b>=0&&VOZ_FILL.has(tk[b])&&!usado.has(b))b--;const k=b>=0&&!usado.has(b)?kwAt[b]:null;if(k&&r[k]==null)campo=k;}
+    if(!campo){const k=kwAt[j];if(k&&r[k]==null){campo=k;usado.add(j);}}
+    if(campo){r[campo]=n.v;if(campo==='aguaM')r.agua='agua';}else soltos.push(n.v);
+    for(let k=i;k<fim;k++)usado.add(k);i=fim-1;
+  }
+  // "furo 32 180" sem unidade: número solto vira carga
+  if(r.kg==null&&soltos.length===1&&r.furo)r.kg=soltos[0];
   return r;
 }
+let vozAtiva=null;
 function vozOuvir(ok){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){toast('Este navegador não tem reconhecimento de voz. Use o Chrome no Android.');return;}
-  const rec=new SR();rec.lang='pt-BR';rec.interimResults=false;rec.maxAlternatives=1;
-  aviso('🎤 Pode falar… ex.: "furo 32, 180 quilos, tampão 2,5, booster 1"',false);
-  rec.onresult=e=>{const t=e.results[0][0].transcript;const x=$('#aviso');if(x)x.remove();ok(t);};
-  rec.onerror=e=>{const x=$('#aviso');if(x)x.remove();toast(e.error==='not-allowed'?'Libere o microfone para este site':e.error==='network'?'A voz precisa de internet neste celular':'Não entendi, tente de novo');};
-  try{rec.start();}catch(e){toast('Não consegui ligar o microfone');}
+  if(vozAtiva){vozAtiva.parar(true);}
+  if(navigator.onLine===false){toast('Sem internet: a voz do celular precisa de sinal. Lance pela ficha do furo.');return;}
+  const pn=document.createElement('div');pn.id='vozPn';
+  pn.style.cssText='position:fixed;left:8px;right:8px;bottom:12px;z-index:60;background:#14202b;color:#fff;border-radius:14px;padding:14px;box-shadow:0 8px 28px rgba(0,0,0,.35);font-size:15px';
+  pn.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span id="vozDot" style="width:12px;height:12px;border-radius:50%;background:#e03131;flex:0 0 auto"></span><b style="flex:1">Ouvindo… fale com calma, na ordem que quiser</b></div>
+  <div id="vozTx" style="min-height:44px;background:rgba(255,255,255,.08);border-radius:8px;padding:8px;line-height:1.35"><span style="opacity:.6">ex.: "furo 32, tampão 2,5, booster 1, 180 quilos"</span></div>
+  <div id="vozSt" style="font-size:12px;opacity:.75;margin:6px 0 8px"></div>
+  <div style="display:flex;gap:8px"><button class="btn" id="vozCan" style="flex:1">Cancelar</button><button class="btn ok" id="vozOk" style="flex:2">✓ Pronto</button></div>`;
+  document.body.appendChild(pn);
+  const st={finais:[],sessao:[],interim:'',parado:false,cancel:false,rec:null,reinicios:0,t0:Date.now(),erroRede:false};
+  const texto=()=>[...st.finais,...st.sessao,st.interim].join(' ').replace(/\s+/g,' ').trim();
+  const mostra=()=>{const t=texto();const tx=$('#vozTx');if(tx&&t)tx.textContent=t;};
+  const fecha=()=>{clearTimeout(st.tmax);pn.remove();if(vozAtiva===api)vozAtiva=null;};
+  const entrega=()=>{if(st.feito)return;st.feito=true;fecha();if(st.cancel)return;const t=texto();if(!t){toast(st.erroRede?'A voz precisa de internet neste celular':'Não ouvi nada. Toque em 🎤 e fale de novo.');return;}ok(t);};
+  const novo=()=>{const rec=new SR();rec.lang='pt-BR';rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=1;
+    rec.onresult=e=>{const fin=[];let it='';for(let i=0;i<e.results.length;i++){const x=e.results[i];const t=(x[0]&&x[0].transcript||'').trim();if(!t)continue;
+        if(x.isFinal===false){it+=' '+t;continue;}
+        // Chrome no Android às vezes repete o texto anterior crescendo: fica só a versão mais longa
+        const ult=fin[fin.length-1];if(ult&&vozNorm(t).startsWith(vozNorm(ult)))fin[fin.length-1]=t;else if(!ult||!vozNorm(ult).startsWith(vozNorm(t)))fin.push(t);}
+      st.sessao=fin;st.interim=it.trim();mostra();};
+    rec.onerror=e=>{const er=e.error;
+      if(er==='not-allowed'||er==='service-not-allowed'){st.parado=true;st.cancel=true;fecha();toast('Libere o microfone para este site (cadeado ao lado do endereço)');return;}
+      if(er==='network'){st.erroRede=true;st.parado=true;const s=$('#vozSt');if(s)s.textContent='Sem conexão com o serviço de voz.';return;}
+      if(er==='audio-capture'){st.parado=true;st.cancel=true;fecha();toast('Microfone ocupado por outro app');return;}
+      // no-speech / aborted: só segue ouvindo
+    };
+    rec.onend=()=>{st.finais.push(...st.sessao);st.sessao=[];if(st.interim){st.finais.push(st.interim);st.interim='';}
+      if(st.parado){entrega();return;}
+      // o Android encerra sozinho depois de uma pausa: liga de novo até tocar em Pronto
+      st.reinicios++;if(st.reinicios>40){entrega();return;}
+      setTimeout(()=>{if(st.parado){entrega();return;}try{st.rec=novo();st.rec.start();}catch(e){entrega();}},150);};
+    return rec;};
+  const api={parar(cancel){st.parado=true;if(cancel)st.cancel=true;try{st.rec&&st.rec.stop();}catch(e){}clearTimeout(st.tfim);st.tfim=setTimeout(()=>{if(document.body.contains(pn))entrega();},2500);}};
+  vozAtiva=api;
+  $('#vozOk').onclick=()=>{$('#vozSt').textContent='Terminando…';api.parar(false);};
+  $('#vozCan').onclick=()=>{api.parar(true);fecha();};
+  st.tmax=setTimeout(()=>api.parar(false),90000);
+  try{st.rec=novo();st.rec.start();try{navigator.vibrate&&navigator.vibrate(40);}catch(_){}}catch(e){fecha();toast('Não consegui ligar o microfone');}
 }
 function aplicaVoz(p,f,r){
   if(r.kg!=null){const pr=projDe(p);const prod=r.prod||(f.decks[0]&&f.decks[0].prod)||pr.prod||'';f.decks=[{prod,kg:r.kg}];}
