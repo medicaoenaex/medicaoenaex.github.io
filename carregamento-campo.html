@@ -41,7 +41,7 @@ button{font:inherit;cursor:pointer}
 .legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:13px;margin-bottom:8px}
 .dot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin-right:4px}
 .mapwrap{overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:#fbfcfd;max-height:70vh;touch-action:pan-x pan-y}
-.mapwrap svg{display:block}
+.mapwrap svg{display:block;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .mapwrap circle{cursor:pointer}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
 .kpi{background:var(--pri2);border-radius:10px;padding:10px}
@@ -628,10 +628,13 @@ function polyMenu(){
   $('#mCsv').onclick=()=>exportBox('Furos (CSV)',`POL${p.pol}-${p.data}.csv`,csv(p),'text/csv');
   $('#mDel').onclick=()=>confirmBox(`Excluir POL ${p.pol} e todos os lançamentos? Isso não pode ser desfeito.`,()=>{markDel(p);S.polys=S.polys.filter(x=>x.id!==p.id);S.cur=null;save();go('home');},'Excluir');
 }
-function addExtra(p,near){
-  const base=near||p.holes[p.holes.length-1]||{x:0,y:0};
+const ehExtra=h=>/^EX\d+$/i.test(String(h.id));
+function maisPerto(p,x,y){let b=null,d=Infinity;p.holes.forEach(h=>{const q=Math.hypot(h.x-x,h.y-y);if(q<d){d=q;b=h;}});return b;}
+function addExtra(p,near,ponto){
+  const base=near||(ponto&&maisPerto(p,ponto.x,ponto.y))||p.holes[p.holes.length-1]||{x:0,y:0};
   const ids=new Set(p.holes.map(h=>h.id));let k=1;while(ids.has('EX'+k))k++;
-  const h=novoFuro('EX'+k,(base.x||0)+(p.esp||4)/2,(base.y||0)+1.5,base.profProj);
+  const h=ponto?novoFuro('EX'+k,Math.round(ponto.x*100)/100,Math.round(ponto.y*100)/100,base.profProj):novoFuro('EX'+k,(base.x||0)+(p.esp||4)/2,(base.y||0)+1.5,base.profProj);
+  histAdd(h,ponto?'Criado no croqui (tocar e segurar)':'Criado como furo extra');
   p.holes.push(h);markP(p.id);markF(p.id,h.id);save();renderPoly();editHole(p.holes.length-1);
 }
 
@@ -734,9 +737,11 @@ function tabMapa(p){
   ${gpsOn?`<div class="hint" id="gpsInfo" style="margin:0 0 8px">Procurando sinal do GPS…</div>`:''}
   <div class="mapwrap" id="mw"><svg id="map" viewBox="0 0 ${g.W} ${g.H}" width="${g.W*pxPerM*zoom}" height="${g.H*pxPerM*zoom}">${s}</svg></div>
   ${selMode?`<div class="selbar"><b style="flex:1 1 100%">${nf(selSet.size)} selecionado(s)</b><button class="btn" id="sPend">+ Pendentes</button>${Object.keys(lnMap(p)).length?`<select id="sLin" style="flex:1 1 110px;min-height:38px;padding:6px"><option value="">+ Linha…</option>${Object.keys(lnMap(p)).map(l=>`<option>${esc(l)}</option>`).join('')}</select>`:''}<button class="btn" id="sAll">Todos</button><button class="btn" id="sClr">Limpar</button><button class="btn ok" id="sGo" ${selSet.size?'':'disabled style="opacity:.5"'}>Lançar nos selecionados</button></div>`:''}
-  <p class="mut">${selMode?'Toque nos furos para marcar ou desmarcar.':pincel&&corPor==='caminhao'?'Modo marcação de caminhão ligado.':'Toque num furo para lançar. A borda azul indica furo com água; o ponto marrom, furo com ocorrência.'}</p>`;
+  <p class="mut">${moverFuro?'<b>Toque no ponto novo do furo '+esc(moverFuro)+' no croqui.</b> <button class="btn sm" id="movX">Cancelar</button>':selMode?'Toque nos furos para marcar ou desmarcar.':pincel&&corPor==='caminhao'?'Modo marcação de caminhão ligado.':'Toque num furo para lançar. Toque e segure num ponto vazio para criar um furo extra ali; toque e segure num furo extra para arrastá-lo. A borda azul indica furo com água; o ponto marrom, furo com ocorrência.'}</p>`;
   const mw=$('#mw'),sx=mapScroll.x,sy=mapScroll.y;mw.scrollLeft=sx;mw.scrollTop=sy;mw.onscroll=()=>{mapScroll.x=mw.scrollLeft;mapScroll.y=mw.scrollTop;};
-  $('#map').onclick=e=>{const a=e.target.getAttribute('data-i');if(a==null)return;const i=+a;
+  $('#map').onclick=e=>{if(Date.now()-mapIgnora<600)return;
+    if(moverFuro){const h=p.holes.find(q=>q.id===moverFuro);moverFuro=null;const q=mapPonto(e,g);if(h&&q){h.x=q.x;h.y=q.y;histAdd(h,'Posição ajustada no croqui');markP(p.id);markF(p.id,h.id);save();toast('Furo '+h.id+' movido');}tabMapa(p);return;}
+    const a=e.target.getAttribute('data-i');if(a==null)return;const i=+a;
     if(corPor==='caminhao'&&pincel){const h=p.holes[i];pushUndo(p,[h],'caminhão no furo '+h.id);if(h.caminhao===pincel){h.caminhao='';}else{h.caminhao=pincel;if(h.status==='pendente')h.status='carregado';}carimbaLotes(p,h);histAdd(h,'Caminhão pelo mapa: '+(h.caminhao||'(sem)'));h.ts=Date.now();h.por=meuNome();markF(p.id,h.id);save();tabMapa(p);return;}
     if(selMode){selSet.has(i)?selSet.delete(i):selSet.add(i);tabMapa(p);return;}
     editHole(i);};
@@ -752,6 +757,8 @@ function tabMapa(p){
   $('#vozM').onclick=()=>vozNoMapa(p);
   $('#selT').onclick=()=>{selMode=!selMode;selSet.clear();pincel=null;tabMapa(p);};
   if($('#undo'))$('#undo').onclick=()=>desfazer(p);
+  if($('#movX'))$('#movX').onclick=()=>{moverFuro=null;tabMapa(p);};
+  ligaToqueLongo(p,g);
   if($('#gpsT'))$('#gpsT').onclick=()=>{gpsOn?gpsStop():gpsStart();tabMapa(p);};
   const abrir=()=>{const q=$('#busca').value.trim().toUpperCase();if(!q)return;const i=p.holes.findIndex(h=>String(h.id).toUpperCase()===q||String(h.n??'')===q);const j=i>=0?i:p.holes.findIndex(h=>String(h.id).toUpperCase().endsWith(q));if(j<0)toast('Furo '+q+' não encontrado');else editHole(j);};
   $('#buscaGo').onclick=abrir;$('#busca').onkeydown=e=>{if(e.key==='Enter')abrir();};
@@ -766,6 +773,38 @@ function tabMapa(p){
 }
 const lnMap=p=>{const m={};p.holes.forEach((h,i)=>{if(h.line!=null){(m['L'+h.line]=m['L'+h.line]||[]).push(i);}});return m;};
 let selMode=false;const selSet=new Set();let lastGeom=null;
+let mapIgnora=0,moverFuro=null;
+function mapPonto(e,g){const svg=$('#map');const m=svg&&svg.getScreenCTM();if(!m)return null;const q=new DOMPoint(e.clientX,e.clientY).matrixTransform(m.inverse());
+  return{x:Math.round((q.x-g.pad-g.off+g.minX)*100)/100,y:Math.round((q.y-g.pad+g.minY)*100)/100};}
+/* Tocar e segurar: em ponto vazio cria furo extra; num furo extra, arrasta. Pan/zoom, seleção e toque normal seguem iguais. */
+function ligaToqueLongo(p,g){
+  const svg=$('#map');if(!svg)return;let lp=null;const ativos=new Set();
+  const cancela=()=>{if(lp){clearTimeout(lp.t);if(lp.drag&&lp.el)lp.el.removeAttribute('transform');}lp=null;};
+  svg.addEventListener('contextmenu',e=>e.preventDefault());
+  svg.addEventListener('touchmove',e=>{if(lp&&lp.drag&&e.cancelable)e.preventDefault();},{passive:false});
+  svg.addEventListener('pointerdown',e=>{ativos.add(e.pointerId);
+    if(ativos.size>1){cancela();return;}
+    if((e.button||0)>0||selMode||moverFuro||(corPor==='caminhao'&&pincel))return;
+    const a=e.target.getAttribute('data-i');const i=a==null?-1:+a;
+    lp={id:e.pointerId,x0:e.clientX,y0:e.clientY,cx:e.clientX,cy:e.clientY,i,drag:false};
+    lp.t=setTimeout(()=>{if(!lp)return;mapIgnora=Date.now()+1e6;try{navigator.vibrate&&navigator.vibrate(35);}catch(_){}
+      if(lp.i<0){const q=mapPonto({clientX:lp.cx,clientY:lp.cy},g);lp=null;if(!q)return;toast('Furo extra criado aqui');addExtra(p,null,q);mapIgnora=Date.now();return;}
+      const h=p.holes[lp.i];
+      if(!ehExtra(h)){toast('Só furos extras podem ser movidos. Os do projeto seguem a medição.');lp=null;mapIgnora=Date.now();return;}
+      lp.drag=true;lp.el=svg.querySelector('g[data-i="'+lp.i+'"]');lp.q0=mapPonto({clientX:lp.cx,clientY:lp.cy},g);
+      try{svg.setPointerCapture(lp.id);}catch(_){}
+      toast('Arraste o furo '+h.id+' até o ponto certo');},550);
+  });
+  svg.addEventListener('pointermove',e=>{if(!lp||e.pointerId!==lp.id)return;lp.cx=e.clientX;lp.cy=e.clientY;
+    if(!lp.drag){if(Math.hypot(e.clientX-lp.x0,e.clientY-lp.y0)>10)cancela();return;}
+    const q=mapPonto(e,g);if(q&&lp.el)lp.el.setAttribute('transform','translate('+(q.x-lp.q0.x)+' '+(q.y-lp.q0.y)+')');});
+  const fim=e=>{ativos.delete(e.pointerId);if(!lp||e.pointerId!==lp.id)return;clearTimeout(lp.t);
+    if(lp.drag){const h=p.holes[lp.i],q=mapPonto(e,g),q0=lp.q0;lp=null;mapIgnora=Date.now();
+      if(e.type==='pointercancel'||!q||!q0){moverFuro=h.id;tabMapa(p);toast('Toque no ponto novo do furo '+h.id);return;}
+      h.x=Math.round((h.x+q.x-q0.x)*100)/100;h.y=Math.round((h.y+q.y-q0.y)*100)/100;histAdd(h,'Posição ajustada no croqui');markP(p.id);markF(p.id,h.id);save();tabMapa(p);toast('Furo '+h.id+' movido');return;}
+    if(mapIgnora>Date.now())mapIgnora=Date.now();lp=null;};
+  svg.addEventListener('pointerup',fim);svg.addEventListener('pointercancel',fim);
+}
 const mapScroll={x:0,y:0};
 let simK=null,simTimer=null;
 function pintaSim(p){const [t0,t1]=faixaTempo(p);const tc=simK==null?Infinity:t0+simK*(t1-t0);
@@ -1406,7 +1445,7 @@ function editHole(i,voz,vozTxt){
     <div class="row"><div><label>Lote produto</label><input id="hLp" value="${esc(f.lotes?.prod||'')}" placeholder="${esc(p.lotes?.prod||'')}"></div><div><label>Lote booster</label><input id="hLb" value="${esc(f.lotes?.booster||'')}" placeholder="${esc(p.lotes?.booster||'')}"></div><div><label>Lote detonador</label><input id="hLd" value="${esc(f.lotes?.det||'')}" placeholder="${esc(p.lotes?.det||'')}"></div></div>
     <label>Fotos (ficam só neste celular)</label><div class="thumbs" id="hFt"></div><button class="btn sm" id="hFoto" style="margin-top:6px">📷 Adicionar foto</button>
     ${p.situ==='detonado'?'<div class="hint">⚠️ Este polígono está marcado como detonado.</div>':''}
-    <div class="btns"><button class="btn" id="hUsePj">Usar carga do projeto</button><button class="btn" id="hRep">Repetir último</button><button class="btn" id="hNear">+ Furo ao lado</button></div>
+    <div class="btns"><button class="btn" id="hUsePj">Usar carga do projeto</button><button class="btn" id="hRep">Repetir último</button><button class="btn" id="hNear">+ Furo ao lado</button>${ehExtra(h)?'<button class="btn" id="hMov">Mover no croqui</button><button class="btn bad" id="hDelX">Excluir furo extra</button>':''}</div>
     <div class="btns"><button class="btn pri" id="hSave">Salvar</button><button class="btn ok" id="hNext">Salvar e próximo ›</button></div>
     ${(h.hist||[]).length?`<details style="margin-top:10px"><summary class="mut">Histórico do furo (${h.hist.length})</summary><div class="hist">${h.hist.slice().reverse().map(x=>`<div>${new Date(x.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${x.por?' · <b>'+esc(x.por)+'</b>':''} — ${esc(x.t)}</div>`).join('')}</div></details>`:''}`);
     bind();showDif();showPj();fotosFuro(p,h);
@@ -1437,6 +1476,8 @@ function editHole(i,voz,vozTxt){
     $('#hRep').onclick=()=>{const L=S.last&&S.last.furo;if(!L){toast('Nenhum lançamento anterior');return;}grab();
       f.decks=JSON.parse(JSON.stringify(L.decks));['booster','brinel','detTipo','detQtd','tampao','caminhao'].forEach(k=>f[k]=L[k]);if(f.status==='pendente')f.status='carregado';draw();toast('Carga do último furo copiada');};
     $('#hNear').onclick=()=>{grab();commit(false);closeSheet();addExtra(p,h);};
+    if($('#hMov'))$('#hMov').onclick=()=>{closeSheet();moverFuro=h.id;tab='mapa';renderPoly();toast('Toque no ponto novo do furo '+h.id);};
+    if($('#hDelX'))$('#hDelX').onclick=()=>confirmBox('Excluir o furo extra '+h.id+'?',()=>{const j=p.holes.indexOf(h);if(j>=0)p.holes.splice(j,1);delete SY().df[FK(p.id,h.id)];markP(p.id);save();closeSheet();renderPoly();toast('Furo '+h.id+' excluído');},'Excluir');
     $('#hSave').onclick=()=>{grab();commit(false);};
     $('#hNext').onclick=()=>{grab();commit(true);};
   };
