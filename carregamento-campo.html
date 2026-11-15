@@ -334,6 +334,7 @@ function renderHome(){
   h+=`<div class="card" id="syncBox">${syncBoxHTML()}</div>`;
   h+=`<div class="card" id="vozCard">${vozCardHTML()}</div>`;
   h+=`<div class="card"><h2>Backup</h2><p class="mut" style="margin:0">Os dados ficam só neste aparelho. Faça backup no fim do turno e restaure em outro celular se precisar.</p><div class="btns"><button class="btn" id="bkp">Gerar backup</button><button class="btn" id="rst">Restaurar backup</button></div></div>`;
+  h+=`<p class="mut" style="text-align:center;margin:4px 0 12px">Versão ${APP_VER}</p>`;
   $('#app').innerHTML=h;
   $('#novo').onclick=()=>go('novo');$('#goCam').onclick=()=>go('cam');$('#goInd').onclick=()=>go('indic');
   document.querySelectorAll('.poly').forEach(el=>el.onclick=()=>{mapScroll.x=mapScroll.y=0;pincel=null;selMode=false;selSet.clear();gpsStop();S.cur=el.dataset.id;save();tab='mapa';go('poly');});
@@ -408,6 +409,29 @@ function lerLista(){
   if(semXY)hs.forEach((h,i)=>{h.x=(i%10)*4;h.y=Math.floor(i/10)*3.5;});
   else{const mx=Math.min(...hs.map(h=>h.x)),my=Math.min(...hs.map(h=>h.y));hs.forEach(h=>{h.x-=mx;h.y-=my;});hs.geo={mx,my};}
   return hs;
+}
+/* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
+const APP_VER='2026-11-15.7';
+const ARQ_VER='carregamento-versao.json';
+async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
+async function checarAtualizacao(){
+  if(navigator.onLine===false||!('caches' in window))return;
+  try{await apagarDosCaches(ARQ_VER);const r=await fetch(ARQ_VER+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const j=await r.json();
+    if(!j.v||j.v===APP_VER)return;
+    let b=$('#novaVer');if(b)return;b=document.createElement('div');b.id='novaVer';
+    b.style.cssText='position:fixed;left:8px;right:8px;bottom:12px;z-index:70;background:#1864ab;color:#fff;border-radius:14px;padding:14px;box-shadow:0 8px 28px rgba(0,0,0,.3);font-size:16px;display:flex;gap:10px;align-items:center';
+    b.innerHTML='<div style="flex:1"><b>Nova versão do app</b><div style="font-size:13px;opacity:.85">Toque para atualizar. Seus lançamentos ficam guardados.</div></div><button class="btn" id="novaVerOk" style="flex:0 0 auto;background:#fff;color:#1864ab;font-weight:700">Atualizar</button>';
+    document.body.appendChild(b);$('#novaVerOk').onclick=atualizarApp;}catch(e){}
+}
+async function atualizarApp(){
+  const bt=$('#novaVerOk');if(bt){bt.disabled=true;bt.textContent='Baixando…';}
+  const nome=location.pathname.split('/').pop()||'carregamento-campo.html';
+  try{save();}catch(e){}
+  // guarda a versão antiga para devolver ao cache se a internet cair no meio
+  const velhos=[];try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome))velhos.push([k,q,await c.match(q)]);}}catch(e){}
+  await apagarDosCaches(nome);
+  try{const r=await fetch(nome,{cache:'reload'});const t=r.ok?await r.text():'';if(!/APP_VER/.test(t))throw new Error('falhou');location.reload();}
+  catch(e){for(const [k,q,res] of velhos){try{await (await caches.open(k)).put(q,res);}catch(_){}}if(bt){bt.disabled=false;bt.textContent='Tentar de novo';}toast('Sem internet para atualizar agora');}
 }
 /* caminhão por deck: d.cam vale para o deck; sem d.cam o deck é do caminhão do furo (h.caminhao) */
 const deckCam=(h,d)=>(d&&d.cam)||h.caminhao||'';
@@ -1283,7 +1307,13 @@ function vozExtenso(tk){const out=[];
 /* ----- voz sem internet: Vosk (roda no próprio celular) ----- */
 const VOZ_CACHE='carregamento-voz-v1',VOZ_LIB='lib/vosk/vosk.js',VOZ_MODELO='lib/vosk/vosk-model-small-pt-0.3.tar.gz';
 const vozModo=()=>{try{return localStorage.getItem('carregamento.vozModo')||'auto';}catch(e){return'auto';}};
-async function vozCache(){try{return await caches.open(VOZ_CACHE);}catch(e){return null;}}
+// guarda a voz no IndexedDB: o service worker do site apaga os outros caches quando o Medição atualiza
+function vozIdb(){return new Promise((ok,no)=>{const r=indexedDB.open('carregamentoVoz',1);r.onupgradeneeded=()=>r.result.createObjectStore('arq');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});}
+async function vozCache(){try{const db=await vozIdb();const tx=(m,f)=>new Promise((ok,no)=>{const t=db.transaction('arq',m);const q=f(t.objectStore('arq'));t.oncomplete=()=>ok(q&&q.result);t.onerror=()=>no(t.error);});
+  const w={match:async u=>{const b=await tx('readonly',st=>st.get(u));return b?{blob:async()=>b}:undefined;},put:async(u,resp)=>{const b=await resp.blob();await tx('readwrite',st=>st.put(b,u));}};
+  // traz o que a versão anterior tinha guardado no Cache Storage
+  try{if(!(await w.match(VOZ_MODELO))&&(await caches.has(VOZ_CACHE))){const c=await caches.open(VOZ_CACHE);for(const u of [VOZ_LIB,VOZ_MODELO]){const r=await c.match(u);if(r)await w.put(u,r);}await caches.delete(VOZ_CACHE);}}catch(e){}
+  return w;}catch(e){return null;}}
 async function vozOfflinePronta(){const c=await vozCache();if(!c)return false;return !!(await c.match(VOZ_LIB))&&!!(await c.match(VOZ_MODELO));}
 async function baixarVozOffline(prog){
   const c=await vozCache();if(!c)throw new Error('Este navegador não deixa guardar a voz');
@@ -1293,8 +1323,10 @@ async function baixarVozOffline(prog){
     const parts=[];let n=0;for(;;){const {done,value}=await rd.read();if(done)break;parts.push(value);n+=value.length;if(tot)prog(base+peso*n/tot);}
     await c.put(url,new Response(new Blob(parts),{headers:{'content-type':url.endsWith('.js')?'text/javascript':'application/gzip'}}));};
   await pega(VOZ_LIB,0.15,0);await pega(VOZ_MODELO,0.85,0.15);prog(1);
+  // o service worker do site também guardou uma cópia: apaga para não ocupar 32 MB a mais
+  try{for(const k of await caches.keys()){const c=await caches.open(k);for(const u of [VOZ_LIB,VOZ_MODELO])await c.delete(u,{ignoreSearch:true});}}catch(e){}
 }
-async function apagarVozOffline(){try{await caches.delete(VOZ_CACHE);}catch(e){}vozModel=null;}
+async function apagarVozOffline(){try{await caches.delete(VOZ_CACHE);}catch(e){}try{await new Promise(ok=>{const r=indexedDB.deleteDatabase('carregamentoVoz');r.onsuccess=r.onerror=r.onblocked=()=>ok();});}catch(e){}vozModel=null;}
 let vozModel=null,vozModelP=null;
 async function vozCarregarModelo(){
   if(vozModel)return vozModel;if(vozModelP)return vozModelP;
@@ -1885,6 +1917,9 @@ function csv(p){
 
 render();
 if(SY().token)setTimeout(syncNow,800);
+setTimeout(checarAtualizacao,1500);
+// usa o mesmo service worker do site (Medição) para abrir sem sinal mesmo se o Medição nunca foi aberto neste celular
+try{if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.getRegistration().then(r=>{if(!r)navigator.serviceWorker.register('sw.js').catch(()=>{});}).catch(()=>{});}catch(e){}
 </script>
 </body>
 </html>
