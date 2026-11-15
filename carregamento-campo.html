@@ -411,7 +411,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-15.7';
+const APP_VER='2026-11-15.8';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -423,6 +423,11 @@ async function checarAtualizacao(){
     b.innerHTML='<div style="flex:1"><b>Nova versão do app</b><div style="font-size:13px;opacity:.85">Toque para atualizar. Seus lançamentos ficam guardados.</div></div><button class="btn" id="novaVerOk" style="flex:0 0 auto;background:#fff;color:#1864ab;font-weight:700">Atualizar</button>';
     document.body.appendChild(b);$('#novaVerOk').onclick=atualizarApp;}catch(e){}
 }
+// guarda esta página no cache do site para abrir sem sinal, mesmo na primeira visita
+async function guardarParaOffline(){try{if(navigator.onLine===false||!('caches' in window)||!navigator.serviceWorker||!/^https?:$/.test(location.protocol))return;
+  await navigator.serviceWorker.ready;await new Promise(ok=>setTimeout(ok,1500));const ks=(await caches.keys()).filter(k=>/^croqui-real/.test(k));if(!ks.length)return;
+  const url=location.origin+location.pathname;const r=await fetch(url,{cache:'no-cache'});if(!r.ok)return;const t=await r.clone().text();if(!/const APP_VER=/.test(t))return;
+  for(const k of ks){const c=await caches.open(k);if(!(await c.match(url)))await c.put(url,new Response(t,{headers:{'content-type':'text/html; charset=utf-8'}}));}}catch(e){}}
 async function atualizarApp(){
   const bt=$('#novaVerOk');if(bt){bt.disabled=true;bt.textContent='Baixando…';}
   const nome=location.pathname.split('/').pop()||'carregamento-campo.html';
@@ -1917,7 +1922,7 @@ function csv(p){
 
 render();
 if(SY().token)setTimeout(syncNow,800);
-setTimeout(checarAtualizacao,1500);
+setTimeout(checarAtualizacao,1500);setTimeout(guardarParaOffline,2500);
 // usa o mesmo service worker do site (Medição) para abrir sem sinal mesmo se o Medição nunca foi aberto neste celular
 try{if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.getRegistration().then(r=>{if(!r)navigator.serviceWorker.register('sw.js').catch(()=>{});}).catch(()=>{});}catch(e){}
 </script>
