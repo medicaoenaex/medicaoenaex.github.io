@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Carregamento de Campo</title>
+<style>
+:root{--bg:#f3f5f7;--card:#fff;--ink:#14202b;--mut:#5d6b78;--line:#d6dde3;--pri:#0b5cad;--pri2:#e6f0fa;--ok:#1f9d55;--warn:#f08c00;--bad:#d64545;--r:12px}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:#102a43;color:#fff;display:flex;align-items:center;gap:8px;padding:10px 12px;min-height:54px}
+header h1{font-size:17px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header button{background:rgba(255,255,255,.14);color:#fff;border:0;border-radius:10px;padding:8px 12px;font-size:15px}
+main{padding:12px;max-width:900px;margin:0 auto;padding-bottom:90px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.card h2{font-size:16px;margin:0 0 10px}
+.mut{color:var(--mut);font-size:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1 1 140px}
+label{display:block;font-size:13px;color:var(--mut);margin:8px 0 4px}
+input,select,textarea{width:100%;font-size:16px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+textarea{min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:14px}
+button{font:inherit;cursor:pointer}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:10px;padding:11px 14px;font-size:15px;min-height:46px}
+.btn.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.bad{color:var(--bad);border-color:#f0c4c4}
+.btn.sm{min-height:36px;padding:6px 10px;font-size:14px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btns .btn{flex:1 1 auto}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.seg button{flex:1;border:0;background:transparent;padding:10px 6px;font-size:14px;min-height:42px;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--pri);color:#fff}
+.tabs{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto}
+.tabs button{flex:1;border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 12px;font-size:14px;white-space:nowrap}
+.tabs button.on{background:#102a43;color:#fff;border-color:#102a43}
+.poly{display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer}
+.bar{height:8px;background:#e5e9ed;border-radius:6px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--ok)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:13px;margin-bottom:8px}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin-right:4px}
+.mapwrap{overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:#fbfcfd;max-height:70vh;touch-action:pan-x pan-y}
+.mapwrap svg{display:block}
+.mapwrap circle{cursor:pointer}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.kpi{background:var(--pri2);border-radius:10px;padding:10px}
+.kpi b{display:block;font-size:20px}
+.kpi span{font-size:12px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+th{font-size:12px;color:var(--mut);font-weight:600}
+td.n,th.n{text-align:right}
+tr.click{cursor:pointer}
+.chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;color:#fff}
+.sheet{position:fixed;inset:0;z-index:20;background:rgba(10,20,30,.45);display:flex;align-items:flex-end;justify-content:center}
+.sheet.hidden{display:none}
+.panel{background:#fff;width:100%;max-width:640px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:14px 14px 20px}
+.panel h3{margin:0 0 6px;font-size:18px;display:flex;justify-content:space-between;align-items:center}
+.stbtns{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.stbtns button{border:2px solid var(--line);background:#fff;border-radius:10px;padding:9px 4px;font-size:13px;min-height:44px}
+.stbtns button.on{color:#fff}
+.deck{display:grid;grid-template-columns:auto 1fr 110px;gap:6px;align-items:center;margin-top:6px}
+.deck b{font-size:13px;color:var(--mut);width:52px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#102a43;color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:40}
+#toast.show{opacity:1}
+.empty{text-align:center;padding:30px 10px;color:var(--mut)}
+.hint{background:#fff8e6;border:1px solid #f3dca4;border-radius:10px;padding:10px;font-size:13px;margin-top:8px}
+.chk{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);font-size:15px}
+.chk input{width:24px;height:24px;flex:0 0 auto}
+.conds{display:flex;flex-wrap:wrap;gap:6px}
+.conds button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 10px;font-size:13px}
+.conds button.on{background:#7a4b00;border-color:#7a4b00;color:#fff}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.thumbs img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer}
+.hist{font-size:13px;color:var(--mut);border-left:3px solid var(--line);padding-left:8px;margin-top:4px}
+.hist div{padding:2px 0}
+.selbar{position:sticky;bottom:8px;z-index:4;background:#102a43;color:#fff;border-radius:12px;padding:10px;margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.selbar .btn{min-height:38px;padding:6px 10px;font-size:14px}
+#print{display:none}
+@media print{
+  body>*:not(#print){display:none!important}
+  #print{display:block;font-size:11px;color:#000}
+  #print h1{font-size:18px;margin:0 0 4px}#print h2{font-size:14px;margin:14px 0 6px;border-bottom:2px solid #102a43}
+  #print table{font-size:10px;width:100%}html,body{background:#fff!important}#print th,#print td{padding:3px 4px;border:1px solid #bbb}
+  #print .pb{page-break-before:always}#print img{max-width:100%}
+  #print .sig{display:flex;gap:30px;margin-top:40px}#print .sig div{flex:1;border-top:1px solid #000;padding-top:4px;text-align:center}
+}
+</style>
+</head>
+<body>
+<header><button id="back" style="display:none">‹ Voltar</button><h1 id="ttl">Carregamento de Campo</h1><button id="hdrBtn" style="display:none"></button></header>
+<main id="app"></main>
+<div id="sheet" class="sheet hidden"></div>
+<div id="toast"></div>
+<input type="file" id="fileIn" accept=".json,application/json" style="display:none">
+<script>
+"use strict";
+/* ===== Configuração ===== */
+const KEY='carregamentoCampo.v1';
+const MINAS=['Pico','HZT','TAM','ABO'];
+const PRODUTOS=['Ibemux','Ibenite','Blendado','Encartuchado'];
+const DETS=['DT5 15m','DT STD 15m','DT STD 10m'];
+const CAMS=['UMT 1038','UMT 1039','UMT 1044','UMT 1045','UMB 1148','UMB 1113'];
+const ST={pendente:{n:'Pendente',c:'#9aa3ad'},carregado:{n:'Carregado',c:'#1f9d55'},repasse:{n:'Repasse',c:'#f08c00'},perdido:{n:'Perdido',c:'#d64545'},nao:{n:'Não carregar',c:'#5b6b7a'}};
+const CONDS=['Obstruído','Desmoronado','Fraturado','Quente','Reativo','Água corrente','Boca danificada','Furo desviado'];
+const SITU={aberto:{n:'Em carregamento',c:'#0b5cad'},carregado:{n:'Carregamento concluído',c:'#1f9d55'},detonado:{n:'Detonado',c:'#5b6b7a'}};
+const CHK_PRE=['Área isolada e sinalizada','Acessos bloqueados e vigias posicionados','Furos inspecionados (profundidade e água)','Caminhões inspecionados e aterrados','Explosivos e acessórios conferidos com a NF','Rádio e EPIs conferidos','Condições do tempo verificadas (raios)'];
+const CHK_FIM=['Todos os furos lançados','Tampão conferido','Sobras de explosivo devolvidas','Acessórios conferidos (saldo zero)','Área limpa e embalagens recolhidas','Ligação conferida conforme o plano','Área entregue ao blaster'];
+
+/* ===== Estado ===== */
+let S={polys:[],cur:null,last:null};
+let view='home', tab='mapa', zoom=1, listFilter='todos', listQ='', sel=null;
+try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&Array.isArray(d.polys))S=Object.assign(S,d);}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){toast('Não deu para salvar no aparelho — faça um backup');}}
+
+/* ===== Utilidades ===== */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=v=>{if(v==null||v==='')return null;if(typeof v==='number')return isNaN(v)?null:v;let t=String(v).replace(/\s/g,'');if(t.includes(',')&&t.includes('.'))t=t.lastIndexOf(',')>t.lastIndexOf('.')?t.replace(/\./g,'').replace(',','.'):t.replace(/,/g,'');else t=t.replace(',','.');const n=parseFloat(t);return isNaN(n)?null:n;};
+const fmt=(n,d=0)=>n==null||isNaN(n)?'–':Number(n).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+const fmtC=n=>String(Math.round(n*1000)/1000).replace('.',',');
+const brDate=s=>s?s.split('-').reverse().join('/'):'';
+const dayOf=ts=>{if(!ts)return '';const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),2200);}
+const cur=()=>S.polys.find(p=>p.id===S.cur);
+const opts=(arr,v,blank)=>(blank?`<option value="">${blank}</option>`:'')+arr.map(a=>`<option ${a===v?'selected':''}>${esc(a)}</option>`).join('');
+const holeKg=h=>(h.decks||[]).reduce((s,d)=>s+(num(d.kg)||0),0);
+
+function closeSheet(){$('#sheet').classList.add('hidden');$('#sheet').innerHTML='';}
+function openSheet(html){const s=$('#sheet');s.innerHTML=`<div class="panel">${html}</div>`;s.classList.remove('hidden');s.onclick=e=>{if(e.target===s)closeSheet();};}
+function confirmBox(msg,ok,label='Confirmar'){openSheet(`<h3>Confirmar</h3><p>${esc(msg)}</p><div class="btns"><button class="btn" id="cNo">Cancelar</button><button class="btn pri" id="cOk">${esc(label)}</button></div>`);$('#cNo').onclick=closeSheet;$('#cOk').onclick=()=>{closeSheet();ok();};}
+async function copyText(t){try{await navigator.clipboard.writeText(t);toast('Copiado');}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy');}catch(_){}ta.remove();toast(ok?'Copiado':'Selecione o texto e copie manualmente');}}
+function exportBox(title,name,text,mime){
+  openSheet(`<h3>${esc(title)}<button class="btn sm" id="xClose">Fechar</button></h3><textarea id="xTxt" readonly style="min-height:220px">${esc(text)}</textarea><div class="btns"><button class="btn pri" id="xCopy">Copiar</button><button class="btn" id="xDown">Baixar arquivo</button></div><p class="mut">Se o botão Baixar não funcionar aqui, use Copiar e cole num bloco de notas ou no WhatsApp.</p>`);
+  $('#xClose').onclick=closeSheet;$('#xCopy').onclick=()=>copyText(text);
+  $('#xDown').onclick=()=>{try{const b=new Blob([text],{type:mime});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();a.remove();}catch(e){toast('Download bloqueado — use Copiar');}};
+}
+
+/* ===== Bibliotecas (usa lib/ do site; se não tiver, baixa do cdnjs) ===== */
+function loadScript(srcs){return new Promise((res,rej)=>{const tryI=i=>{if(i>=srcs.length)return rej(new Error('Sem internet para carregar o leitor de arquivos'));const sc=document.createElement('script');sc.src=srcs[i];sc.onload=()=>res();sc.onerror=()=>{sc.remove();tryI(i+1);};document.head.appendChild(sc);};tryI(0);});}
+let pdfP=null,xlsxP=null;
+function loadPdf(){return pdfP||(pdfP=(async()=>{if(!window.pdfjsLib)await loadScript(['lib/pdf.min.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js']);if(!window.pdfjsWorker)await loadScript(['lib/pdf.worker.min.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js']);return window.pdfjsLib;})().catch(e=>{pdfP=null;throw e;}));}
+function loadXlsx(){return xlsxP||(xlsxP=(async()=>{if(!window.XLSX)await loadScript(['lib/xlsx.full.min.js','https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js']);return window.XLSX;})().catch(e=>{xlsxP=null;throw e;}));}
+function busy(m){let b=$('#busy');if(!m){if(b)b.remove();return;}if(!b){b=document.createElement('div');b.id='busy';b.style.cssText='position:fixed;inset:0;z-index:50;background:rgba(10,20,30,.55);color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;padding:20px;text-align:center';document.body.appendChild(b);}b.textContent=m;}
+
+let excelP=null;
+function loadExcel(){return excelP||(excelP=(async()=>{if(!window.ExcelJS)await loadScript(['lib/exceljs.min.js','https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js']);return window.ExcelJS;})().catch(e=>{excelP=null;throw e;}));}
+async function entregarArquivo(blob,nome,tipo){
+  try{const file=new File([blob],nome,{type:tipo});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:nome});return true;}}catch(e){if(e&&e.name==='AbortError')return true;}
+  try{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();a.remove();toast('Arquivo gerado: '+nome);return true;}catch(e){toast('Este navegador bloqueou o download. Abra o app pelo link do GitHub.');return false;}
+}
+
+/* ===== Croqui de fundo (fica no IndexedDB do aparelho) ===== */
+const bgCache={};let dbP=null;
+function db(){return dbP||(dbP=new Promise(res=>{try{const r=indexedDB.open('carregamentoCampo',2);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('bg'))d.createObjectStore('bg');if(!d.objectStoreNames.contains('foto'))d.createObjectStore('foto');};r.onsuccess=()=>res(r.result);r.onerror=()=>res(null);}catch(e){res(null);}}));}
+async function bgGet(id){if(id in bgCache)return bgCache[id];const d=await db();if(!d)return bgCache[id]=null;return new Promise(res=>{try{const q=d.transaction('bg').objectStore('bg').get(id);q.onsuccess=()=>res(bgCache[id]=q.result||null);q.onerror=()=>res(null);}catch(e){res(null);}});}
+async function bgPut(id,url){bgCache[id]=url;const d=await db();if(!d)return false;return new Promise(res=>{try{const t=d.transaction('bg','readwrite');t.objectStore('bg').put(url,id);t.oncomplete=()=>res(true);t.onerror=()=>res(false);}catch(e){res(false);}});}
+async function bgDel(id){bgCache[id]=null;const d=await db();if(!d)return;try{d.transaction('bg','readwrite').objectStore('bg').delete(id);}catch(e){}}
+// fotos dos furos (ficam só neste aparelho)
+async function fotoGet(k){const d=await db();if(!d)return[];return new Promise(res=>{try{const q=d.transaction('foto').objectStore('foto').get(k);q.onsuccess=()=>res(q.result||[]);q.onerror=()=>res([]);}catch(e){res([]);}});}
+async function fotoPut(k,arr){const d=await db();if(!d)return false;return new Promise(res=>{try{const t=d.transaction('foto','readwrite');if(arr.length)t.objectStore('foto').put(arr,k);else t.objectStore('foto').delete(k);t.oncomplete=()=>res(true);t.onerror=()=>res(false);}catch(e){res(false);}});}
+async function pdfPageToImage(buf,maxW=2400){busy('Abrindo PDF…');const lib=await loadPdf();const doc=await lib.getDocument({data:new Uint8Array(buf),isEvalSupported:false}).promise;const page=await doc.getPage(1);const v1=page.getViewport({scale:1});const Z=Math.min(3,maxW/v1.width);const vp=page.getViewport({scale:Z});const c=document.createElement('canvas');c.width=Math.round(vp.width);c.height=Math.round(vp.height);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);await page.render({canvasContext:x,viewport:vp}).promise;busy();return{url:c.toDataURL('image/jpeg',.8),w:c.width,h:c.height};}
+function imageFileToImage(file,maxW=2400){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,maxW/im.naturalWidth);const c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*k);c.height=Math.round(im.naturalHeight*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);res({url:c.toDataURL('image/jpeg',.82),w:c.width,h:c.height});};im.onerror=()=>rej(new Error('Imagem inválida'));im.src=r.result;};r.readAsDataURL(file);});}
+function pickFile(accept){return new Promise(res=>{const fi=$('#fileIn');fi.accept=accept;fi.value='';fi.onchange=()=>res(fi.files[0]||null);fi.click();});}
+const readBuf=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsArrayBuffer(f);});
+const readTxt=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result));r.onerror=rej;r.readAsText(f);});
+
+/* ===== Ler arquivo de coordenadas (Excel, CSV, TXT ou PDF) ===== */
+async function fileToRows(file){
+  const nm=file.name.toLowerCase();
+  if(/\.xlsx?$/.test(nm)){busy('Lendo planilha…');const X=await loadXlsx();const wb=X.read(await readBuf(file),{type:'array'});busy();return X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false}).map(r=>r.map(v=>String(v??'').trim()));}
+  if(/\.pdf$/.test(nm)){busy('Lendo PDF…');const lib=await loadPdf();const doc=await lib.getDocument({data:new Uint8Array(await readBuf(file)),isEvalSupported:false}).promise;const rows=[];
+    for(let p=1;p<=doc.numPages;p++){const tc=await (await doc.getPage(p)).getTextContent();const lines=[];
+      tc.items.filter(i=>i.str.trim()).forEach(i=>{const y=i.transform[5],x=i.transform[4];let L=lines.find(l=>Math.abs(l.y-y)<2.5);if(!L){L={y,it:[]};lines.push(L);}L.it.push({x,s:i.str.trim()});});
+      lines.sort((a,b)=>b.y-a.y).forEach(l=>rows.push(l.it.sort((a,b)=>a.x-b.x).flatMap(i=>i.s.split(/\s+/))));}
+    busy();return rows;}
+  const t=(await readTxt(file)).replace(/^﻿/,'');const L=t.split(/\r?\n/).filter(l=>l.trim());
+  const sep=[';','\t',','].find(c=>L.slice(0,5).every(l=>l.includes(c)));
+  return L.map(l=>sep?l.split(sep).map(v=>v.trim().replace(/^"|"$/g,'')):l.trim().split(/\s+/));
+}
+function rowsToHoles(rows){
+  const norm=s=>String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
+  const find=(h,keys)=>h.findIndex(c=>keys.some(k=>norm(c)===k||norm(c).startsWith(k)));
+  let hi=-1,ci=null;
+  for(let i=0;i<Math.min(rows.length,40);i++){const h=rows[i];const cx=find(h,['x','este','east','easting','coordx','coordenadax']),cy=find(h,['y','norte','north','northing','coordy','coordenaday']);
+    if(cx>=0&&cy>=0){hi=i;ci={id:find(h,['furo','id','hole','holeid','nome','name','ponto','numero','n']),x:cx,y:cy,p:find(h,['prof','profundidade','depth','comprimento','length','compr'])};break;}}
+  const out=[];
+  rows.slice(hi+1).forEach((r,k)=>{
+    if(ci){const x=num(r[ci.x]),y=num(r[ci.y]);if(x==null||y==null)return;out.push({id:ci.id>=0&&r[ci.id]?r[ci.id]:String(out.length+1),x,y,p:ci.p>=0?num(r[ci.p]):null});return;}
+    // sem cabeçalho: ID + dois números grandes (X,Y) + profundidade
+    const nums=r.map(num);const big=nums.map((n,i)=>n!=null&&Math.abs(n)>=1000?i:-1).filter(i=>i>=0);
+    if(big.length<2)return;const ix=big[0],iy=big[1];
+    const id=ix>0?r[0]:String(out.length+1);
+    const after=nums.slice(iy+1).filter(n=>n!=null&&n>0.5&&n<=80);
+    out.push({id,x:nums[ix],y:nums[iy],p:after.length?after[0]:null});
+  });
+  if(!out.length)throw new Error('Não achei coordenadas nesse arquivo. Me mande um exemplo para ajustar o leitor.');
+  return out;
+}
+
+
+/* ===== Base da equipe (sincroniza pelo Supabase) ===== */
+const API_PADRAO='https://attfereqzkhqsunbbpha.supabase.co/functions/v1/carregamento';
+const apiURL=()=>{try{return localStorage.getItem('carregamento.api')||API_PADRAO;}catch(e){return API_PADRAO;}};
+function SY(){S.sync=S.sync||{};const y=S.sync;y.dp=y.dp||{};y.df=y.df||{};return y;}
+const meuNome=()=>(S.sync&&S.sync.nome)||'';
+const FK=(pid,fid)=>pid+'\u0001'+fid;
+function markP(id){SY().dp[id]=Date.now();syncLogo();}
+function markF(pid,fid){SY().df[FK(pid,fid)]=Date.now();syncLogo();}
+function markAll(p){markP(p.id);p.holes.forEach(h=>markF(p.id,h.id));}
+function markDel(p){const y=SY();y.del=y.del||{};y.del[p.id]=polyDoc(p);y.dp[p.id]=Date.now();Object.keys(y.df).forEach(k=>{if(k.startsWith(p.id+'\u0001'))delete y.df[k];});syncLogo();}
+const GEO=['id','x','y','line','n','profProj','obsCroqui','cargaProj','tempo','tempos'];
+const DYN=['status','profMed','agua','aguaM','decks','booster','brinel','detTipo','detQtd','tampao','caminhao','obs','cond','lotes','hist','ts','por'];
+const PK=['lotes','cams','acess','check','situ','geo','pos','detAt'];
+function polyDoc(p){const ex={};PK.forEach(k=>{if(p[k]!=null)ex[k]=p[k];});return{...ex,dvtProg:p.dvtProg??null,proj:p.proj||null,mina:p.mina,cava:p.cava,pol:p.pol,banco:p.banco,data:p.data,resp:p.resp,nfs:p.nfs||{},esp:p.esp||null,criado:p.criado||null,holes:p.holes.map(h=>{const o={};GEO.forEach(k=>{if(h[k]!=null)o[k]=h[k];});return o;})};}
+function furoDoc(h){const o={};DYN.forEach(k=>o[k]=h[k]??null);return o;}
+let syncT=null,syncing=false,syncMsg='';
+function syncLogo(){clearTimeout(syncT);if(SY().token)syncT=setTimeout(syncNow,2500);}
+function pendentes(){const y=SY();return Object.keys(y.dp).length+Object.keys(y.df).length;}
+async function api(body){
+  const r=await fetch(apiURL(),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+  let d={};try{d=await r.json();}catch(e){}
+  if(!r.ok){const er=new Error(d.erro||('Erro '+r.status));er.sair=!!d.sair;throw er;}
+  return d;
+}
+async function syncNow(){
+  const y=SY();if(!y.token||syncing)return;
+  syncing=true;const t0=Date.now();
+  try{
+    const polys=Object.keys(y.dp).map(id=>{const p=S.polys.find(x=>x.id===id);if(p)return{id,doc:polyDoc(p)};if(y.del&&y.del[id])return{id,doc:y.del[id],excluido:true};return null;}).filter(Boolean);
+    const furos=[];Object.keys(y.df).forEach(k=>{const [pid,fid]=k.split('\u0001');const p=S.polys.find(x=>x.id===pid);const h=p&&p.holes.find(q=>q.id===fid);if(h){const doc=furoDoc(h);if(h.ts&&!doc.por)doc.por=h.por=meuNome();furos.push({poly_id:pid,furo_id:fid,doc,ts:h.ts||1});}});
+    const d=await api({acao:'sync',token:y.token,desde:y.desde||null,polys,furos});
+    // limpa só o que foi enviado e não mudou de novo durante o envio
+    Object.keys(y.dp).forEach(k=>{if(y.dp[k]<=t0){delete y.dp[k];if(y.del)delete y.del[k];}});
+    Object.keys(y.df).forEach(k=>{if(y.df[k]<=t0)delete y.df[k];});
+    aplicarRemoto(d);setTimeout(enviarFotos,300);
+    y.desde=d.agora;y.ultima=Date.now();if(d.usuario)y.nome=d.usuario.nome;syncMsg='';
+    save();
+  }catch(e){
+    if(e.sair){y.token=null;syncMsg='Sessão expirada. Entre de novo.';save();}
+    else syncMsg=e instanceof TypeError?'Sem conexão com a base — os lançamentos ficam guardados no celular e sobem quando tiver sinal.':e.message;
+  }finally{syncing=false;atualizaTelaSync();}
+}
+const avisosRem=[];
+function aplicarRemoto(d){
+  const y=SY();let mudou=false;
+  (d.polys||[]).forEach(rp=>{
+    if(y.dp[rp.id])return; // tenho alteração local ainda não enviada
+    const i=S.polys.findIndex(x=>x.id===rp.id);
+    if(rp.excluido){if(i>=0){S.polys.splice(i,1);if(S.cur===rp.id&&view==='poly'){S.cur=null;view='home';}mudou=true;}return;}
+    const doc=rp.doc||{};
+    if(i<0){const np={id:rp.id,...Object.fromEntries(PK.filter(k=>doc[k]!=null).map(k=>[k,doc[k]])),dvtProg:doc.dvtProg??null,proj:doc.proj||null,criado:doc.criado||Date.now(),mina:doc.mina,cava:doc.cava,pol:doc.pol,banco:doc.banco,data:doc.data,resp:doc.resp,nfs:doc.nfs||{},esp:doc.esp,
+        holes:(doc.holes||[]).map(g=>Object.assign(novoFuro(g.id,g.x,g.y,g.profProj,g.line,g.n),g.obsCroqui?{obsCroqui:g.obsCroqui}:{},g.cargaProj!=null?{cargaProj:g.cargaProj}:{},g.tempo!=null?{tempo:g.tempo,tempos:g.tempos||null}:{}))};S.polys.push(np);mudou=true;return;}
+    const p=S.polys[i];['mina','cava','pol','banco','data','resp','esp','proj','dvtProg',...PK].forEach(k=>p[k]=doc[k]);p.nfs=doc.nfs||{};
+    const byId=new Map(p.holes.map(h=>[h.id,h]));
+    (doc.holes||[]).forEach(g=>{const h=byId.get(g.id);if(h){GEO.forEach(k=>{if(g[k]!==undefined)h[k]=g[k];});}else p.holes.push(Object.assign(novoFuro(g.id,g.x,g.y,g.profProj,g.line,g.n),g.obsCroqui?{obsCroqui:g.obsCroqui}:{},g.tempo!=null?{tempo:g.tempo,tempos:g.tempos||null}:{}));});
+    mudou=true;
+  });
+  (d.furos||[]).forEach(rf=>{
+    const p=S.polys.find(x=>x.id===rf.poly_id);if(!p)return;const h=p.holes.find(q=>q.id===rf.furo_id);if(!h)return;
+    const k=FK(rf.poly_id,rf.furo_id);if(y.df[k]&&(h.ts||0)>rf.ts)return;
+    if((rf.ts||0)<(h.ts||0))return;
+    const antes=JSON.stringify(alertasFuro(p,h));
+    DYN.forEach(f=>{if(rf.doc&&f in rf.doc)h[f]=rf.doc[f];});if(!h.decks)h.decks=[];if(!h.status)h.status='pendente';
+    if(y.desde&&rf.doc&&rf.doc.por&&rf.doc.por!==meuNome()){const a=alertasFuro(p,h);if(a.length&&JSON.stringify(a)!==antes)avisosRem.push(`POL ${p.pol} furo ${h.id} (${rf.doc.por}): ${a[0]}`);}
+    mudou=true;
+  });
+  if(avisosRem.length){notificar(avisosRem.length===1?'Furo fora do projeto':avisosRem.length+' furos fora do projeto',avisosRem.slice(0,4).join('\n'));avisosRem.length=0;}
+  if(mudou){if(view==='home')renderHome();else if(view==='cam'&&$('#sheet').classList.contains('hidden'))renderCam();else if(view==='poly'&&$('#sheet').classList.contains('hidden'))renderPoly();}
+}
+function atualizaTelaSync(){const el=$('#syncBox');if(el)el.innerHTML=syncBoxHTML();bindSyncBox();}
+let syncAba='entrar';const syF={nome:'',login:'',senha:'',cod:''};
+function syncBoxHTML(){
+  const y=SY();
+  if(y.token){const n=pendentes();return`<h2>Equipe online</h2><p style="margin:0">Conectado como <b>${esc(y.nome||y.login)}</b></p><p class="mut" style="margin:4px 0 0">${y.ultima?'Última sincronização: '+new Date(y.ultima).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'Ainda não sincronizou'}${n?` · <b>${n}</b> alteração(ões) aguardando envio`:' · tudo enviado'}</p>${syncMsg?`<div class="hint">${esc(syncMsg)}</div>`:''}<div class="btns"><button class="btn" id="syGo">${syncing?'Sincronizando…':'Sincronizar agora'}</button><button class="btn" id="syAv">${S.ui&&S.ui.avisos?'🔔 Avisos ligados':'🔕 Ligar avisos da equipe'}</button><button class="btn" id="syOut">Sair</button></div>${y.fq&&Object.keys(y.fq).length?`<p class="mut" style="margin:6px 0 0">${Object.keys(y.fq).length} foto(s) aguardando envio</p>`:''}`;}
+  return`<h2>Equipe online</h2><p class="mut" style="margin:0 0 8px">Entre para lançar no mesmo polígono que o resto da equipe. Sem entrar, os dados ficam só neste celular.</p>
+  <div class="seg" id="syTab"><button data-a="entrar" class="${syncAba==='entrar'?'on':''}">Entrar</button><button data-a="cadastrar" class="${syncAba==='cadastrar'?'on':''}">Criar conta</button></div>
+  ${syncAba==='cadastrar'?`<label>Seu nome</label><input id="syNome" value="${esc(syF.nome)}" placeholder="como aparece no relatório">`:''}
+  <div class="row"><div><label>Login</label><input id="syLogin" value="${esc(syF.login)}" autocapitalize="none" autocomplete="username"></div><div><label>Senha</label> <input id="sySenha" type="password" value="${esc(syF.senha)}" autocomplete="${syncAba==='cadastrar'?'new-password':'current-password'}"></div></div>
+  ${syncAba==='cadastrar'?`<label>Código da equipe</label> <input id="syCod" value="${esc(syF.cod)}" autocapitalize="characters" placeholder="peça ao Rodrigo">`:''}
+  ${syncMsg?`<div class="hint">${esc(syncMsg)}</div>`:''}
+  <div class="btns"><button class="btn pri" id="syEnt">${syncAba==='cadastrar'?'Criar conta e entrar':'Entrar'}</button></div>`;
+}
+function bindSyncBox(){
+  const y=SY();
+  if($('#syGo'))$('#syGo').onclick=()=>syncNow();
+  if($('#syAv'))$('#syAv').onclick=async()=>{const on=!(S.ui&&S.ui.avisos);if(on&&'Notification' in window&&Notification.permission==='default'){try{await Notification.requestPermission();}catch(e){}}S.ui=Object.assign(S.ui||{},{avisos:on});save();atualizaTelaSync();toast(on?'Você vai ser avisado quando um furo da equipe sair do projeto':'Avisos desligados');};
+  if($('#syOut'))$('#syOut').onclick=()=>confirmBox(pendentes()?'Ainda há alterações não enviadas. Sair mesmo assim? Elas continuam no celular e sobem quando você entrar de novo.':'Sair da conta da equipe?',()=>{y.token=null;y.nome='';y.login='';save();atualizaTelaSync();},'Sair');
+  [['syNome','nome'],['syLogin','login'],['sySenha','senha'],['syCod','cod']].forEach(([id,k])=>{const e=$('#'+id);if(e)e.oninput=()=>syF[k]=e.value;});
+  document.querySelectorAll('#syTab button').forEach(b=>b.onclick=()=>{syncAba=b.dataset.a;syncMsg='';atualizaTelaSync();});
+  if($('#syEnt'))$('#syEnt').onclick=async()=>{
+    const body={acao:syncAba,login:$('#syLogin').value,senha:$('#sySenha').value};
+    if(syncAba==='cadastrar'){body.nome=$('#syNome').value;body.codigo=$('#syCod').value;}
+    $('#syEnt').textContent='Aguarde…';
+    try{const d=await api(body);syF.senha='';syF.cod='';y.token=d.token;y.nome=d.nome;y.login=d.login;
+      // primeira vez: manda tudo que já existe neste celular
+      S.polys.forEach(p=>markAll(p));syncMsg='';save();atualizaTelaSync();syncNow();toast('Conectado à equipe');}
+    catch(e){syncMsg=e instanceof TypeError?'Não consegui falar com a base. Confira a internet. (Dentro do app do Claude a base online não funciona — use o link do GitHub.)':e.message;atualizaTelaSync();}
+  };
+}
+setInterval(()=>{if(SY().token&&navigator.onLine!==false)syncNow();},20000);
+window.addEventListener('online',()=>syncNow());
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow();});
+
+/* ===== Navegação ===== */
+function go(v){view=v;sel=null;render();window.scrollTo(0,0);}
+$('#back').onclick=()=>{if(view==='poly'||view==='novo'||view==='cam'||view==='indic')go('home');else if(view==='editpoly')go('poly');};
+function render(){
+  const b=$('#back'),h=$('#hdrBtn');h.style.display='none';h.onclick=null;
+  b.style.display=view==='home'?'none':'';
+  if(view==='home')renderHome();
+  else if(view==='novo')renderNovo();
+  else if(view==='editpoly')renderNovo(cur());
+  else if(view==='poly')renderPoly();
+  else if(view==='cam')renderCam();
+  else if(view==='indic')renderIndic();
+}
+
+/* ===== Tela inicial ===== */
+function renderHome(){
+  $('#ttl').textContent='Carregamento de Campo';
+  const q=homeQ.trim().toLowerCase();
+  const ps=[...S.polys].filter(p=>(!homeSitu||situDe(p)===homeSitu)&&(!q||[p.pol,p.mina,p.cava,p.banco,p.resp,brDate(p.data)].join(' ').toLowerCase().includes(q))).sort((a,b)=>(b.data||'').localeCompare(a.data||'')||(b.criado||0)-(a.criado||0));
+  let h=`<div class="btns" style="margin:0 0 12px"><button class="btn pri" id="novo">+ Novo polígono</button><button class="btn" id="goCam">🚛 Modo caminhão</button><button class="btn" id="goInd">📊 Indicadores</button></div>`;
+  if(S.polys.length>1)h+=`<div class="row" style="margin-bottom:10px;gap:6px"><input id="hq" placeholder="Buscar POL, mina, banco…" value="${esc(homeQ)}"><select id="hs">${[['','Todas as situações'],...Object.entries(SITU).map(([k,v])=>[k,v.n])].map(([k,t])=>`<option value="${k}" ${homeSitu===k?'selected':''}>${t}</option>`).join('')}</select></div>`;
+  if(S.polys.length&&!ps.length)h+=`<div class="card empty">Nenhum polígono neste filtro.</div>`;
+  if(!S.polys.length)h+=`<div class="card empty">Nenhum polígono ainda.<br>Toque em <b>+ Novo polígono</b> para gerar a malha de furos ou colar a lista do croqui.</div>`;
+  ps.forEach(p=>{const t=p.holes.length,c=p.holes.filter(x=>x.status==='carregado').length;
+    h+=`<div class="card poly" data-id="${p.id}"><div style="flex:1"><b>POL ${esc(p.pol)}</b> · ${esc(p.mina)}${p.cava?' / '+esc(p.cava):''}${p.banco?' · Banco '+esc(p.banco):''}<div class="mut">${brDate(p.data)} · ${c}/${t} carregados${p.resp?' · '+esc(p.resp):''} <span class="chip" style="background:${SITU[situDe(p)].c}">${SITU[situDe(p)].n}</span></div><div class="bar"><i style="width:${t?c/t*100:0}%"></i></div></div><span style="font-size:22px;color:var(--mut)">›</span></div>`;});
+  if(S.polys.length)h+=`<div class="card" id="painel">${painelHTML()}</div>`;
+  h+=`<div class="card" id="syncBox">${syncBoxHTML()}</div>`;
+  h+=`<div class="card"><h2>Backup</h2><p class="mut" style="margin:0">Os dados ficam só neste aparelho. Faça backup no fim do turno e restaure em outro celular se precisar.</p><div class="btns"><button class="btn" id="bkp">Gerar backup</button><button class="btn" id="rst">Restaurar backup</button></div></div>`;
+  $('#app').innerHTML=h;
+  $('#novo').onclick=()=>go('novo');$('#goCam').onclick=()=>go('cam');$('#goInd').onclick=()=>go('indic');
+  document.querySelectorAll('.poly').forEach(el=>el.onclick=()=>{mapScroll.x=mapScroll.y=0;pincel=null;selMode=false;selSet.clear();gpsStop();S.cur=el.dataset.id;save();tab='mapa';go('poly');});
+  $('#bkp').onclick=()=>exportBox('Backup','backup-carregamento-'+today()+'.json',JSON.stringify(S),'application/json');
+  $('#rst').onclick=restoreBox;bindSyncBox();
+  if($('#painel'))bindPainel();
+  if($('#hq')){$('#hq').oninput=e=>{homeQ=e.target.value;const pos=e.target.selectionStart;renderHome();const n=$('#hq');n.focus();try{n.setSelectionRange(pos,pos);}catch(_){}};$('#hs').onchange=e=>{homeSitu=e.target.value;renderHome();};}
+}
+let homeQ='',homeSitu='';
+function restoreBox(){
+  openSheet(`<h3>Restaurar backup<button class="btn sm" id="rClose">Fechar</button></h3><p class="mut">Escolha o arquivo .json ou cole o texto do backup. Polígonos com o mesmo código serão substituídos; os outros continuam.</p><button class="btn" id="rFile" style="width:100%">Escolher arquivo</button><label>Ou cole aqui</label><textarea id="rTxt"></textarea><div class="btns"><button class="btn pri" id="rGo">Restaurar</button></div>`);
+  $('#rClose').onclick=closeSheet;
+  $('#rFile').onclick=()=>{const f=$('#fileIn');f.accept='.json,application/json';f.value='';f.onchange=()=>{const r=new FileReader();r.onload=()=>{$('#rTxt').value=r.result;};r.readAsText(f.files[0]);};f.click();};
+  $('#rGo').onclick=()=>{try{const d=JSON.parse($('#rTxt').value);if(!d||!Array.isArray(d.polys))throw 0;let n=0;d.polys.forEach(p=>{const i=S.polys.findIndex(x=>x.id===p.id);if(i>=0)S.polys[i]=p;else S.polys.push(p);n++;markAll(p);});save();closeSheet();toast(n+' polígono(s) restaurado(s)');render();}catch(e){toast('Backup inválido');}};
+}
+
+/* ===== Novo / editar polígono ===== */
+let novoModo='malha';
+function renderNovo(p){
+  const ed=!!p;p=p||{mina:'',cava:'',pol:'',banco:'',data:today(),resp:(S.last&&S.last.resp)||''};
+  $('#ttl').textContent=ed?'Dados do polígono':'Novo polígono';
+  let h=`<div class="card"><h2>Identificação</h2><div class="row"><div><label>Mina</label><select id="fMina">${opts(MINAS,p.mina,'Selecione')}</select></div><div><label>Cava</label><input id="fCava" value="${esc(p.cava)}" placeholder="ex.: QUARTZITO"></div></div>
+  <div class="row"><div><label>Polígono (POL)</label><input id="fPol" value="${esc(p.pol)}" placeholder="ex.: 08"></div><div><label>Banco</label><input id="fBanco" value="${esc(p.banco)}" placeholder="ex.: 1180"></div></div>
+  <div class="row"><div><label>Data do desmonte</label><input id="fData" type="date" value="${esc(p.data)}"></div><div><label>Responsável</label><input id="fResp" value="${esc(p.resp)}"></div></div></div>`;
+  if(!ed){
+    h+=`<div class="card"><h2>Furos</h2><div class="seg" id="modo"><button data-m="malha" class="${novoModo==='malha'?'on':''}">Gerar malha</button><button data-m="lista" class="${novoModo==='lista'?'on':''}">Colar lista</button><button data-m="medicao" class="${novoModo==='medicao'?'on':''}">Medição Enaex</button></div><div id="modoBox"></div></div>`;
+  }
+  h+=`<div class="btns"><button class="btn pri" id="fSave">${ed?'Salvar dados':'Criar polígono'}</button></div>`;
+  $('#app').innerHTML=h;
+  if(!ed){let draw=()=>{$('#modoBox').innerHTML=novoModo==='malha'?`<div class="row"><div><label>Nº de linhas</label><input id="gL" inputmode="numeric" value="5"></div><div><label>Furos por linha</label><input id="gF" inputmode="numeric" value="10"></div></div>
+      <div class="row"><div><label>Afastamento (m)</label><input id="gA" inputmode="decimal" value="3,5"></div><div><label>Espaçamento (m)</label><input id="gE" inputmode="decimal" value="4,0"></div></div>
+      <div class="row"><div><label>Profundidade de projeto (m)</label><input id="gP" inputmode="decimal" value="15"></div><div><label>Arranjo</label><select id="gS"><option value="0">Retangular</option><option value="1" selected>Estagiado (pé de galinha)</option></select></div></div>
+      <label>Numeração</label><select id="gN"><option value="lf">Linha-Furo (L1-F1, L1-F2…)</option><option value="seq">Sequencial (1, 2, 3…)</option></select>
+      <p class="mut">Afastamento e espaçamento servem só para desenhar o mapa.</p>`
+      :novoModo==='medicao'?`<p class="mut" style="margin:10px 0 6px">No app Medição Enaex, exporte o <b>Backup (.json)</b> do polígono (traz a posição dos furos igual ao croqui) ou o <b>CSV</b>. Depois escolha o arquivo aqui.</p><button class="btn pri" id="mLoc" style="width:100%">Buscar no Medição Enaex deste celular</button><button class="btn" id="mFile" style="width:100%;margin-top:8px">Escolher arquivo do Medição Enaex</button><button class="btn" id="mPdf" style="width:100%;margin-top:8px">Ler PDF da temporização (desenho com os tempos)</button><div id="mInfo" class="hint" style="display:none"></div>`
+      :`<label>Uma linha por furo: <b>ID;PROF</b> ou <b>ID;X;Y;PROF</b></label><textarea id="gList" placeholder="L1-F1;15&#10;L1-F2;15&#10;ou&#10;1;612345,2;7765432,8;15"></textarea><button class="btn" id="lFile" style="width:100%;margin-top:8px">Ler arquivo de coordenadas (Excel, CSV, TXT ou PDF)</button><div class="hint">Funciona com coordenadas do topógrafo (X = leste, Y = norte) ou só a lista de furos. Separador pode ser ponto e vírgula ou tab (direto do Excel).</div>`;};
+    const bindMed=()=>{const lf=$('#lFile');if(lf)lf.onclick=async()=>{const file=await pickFile('.xlsx,.xls,.csv,.txt,.pdf');if(!file)return;try{const hs=rowsToHoles(await fileToRows(file));$('#gList').value=hs.map(h=>[h.id,fmtC(h.x),fmtC(h.y),h.p!=null?fmtC(h.p):''].join(';').replace(/;$/,'')).join('\n');toast(hs.length+' furos lidos — confira a lista');}catch(e){busy();toast(e.message);}};
+    const mostra=(r,nome)=>{medImport=r;const i=$('#mInfo');i.style.display='';i.innerHTML=`✅ <b>${esc(nome)}</b><br>${r.holes.length} furos · ${r.resumo}`;if(r.nome&&!$('#fPol').value){const m=r.nome.match(/POL[\s_\-]*(\d+)/i)||r.nome.match(/(\d+)(?:[_\-\/]\d+)?[A-Za-z]?\s*$/)||r.nome.match(/(\d+[A-Za-z]?)/);if(m)$('#fPol').value=m[1];}};
+    if($('#mLoc'))$('#mLoc').onclick=()=>escolherMedicao(r=>mostra(r,r.nome||'Medição Enaex'));
+    if($('#mPdf'))$('#mPdf').onclick=async()=>{const r=await pdfTemposFluxo(null);if(r)mostra(r,r.nome);};
+    const b=$('#mFile');if(!b)return;b.onclick=()=>{const fi=$('#fileIn');fi.accept='.json,.csv,.txt';fi.value='';fi.onchange=()=>{const file=fi.files[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{medImport=lerMedicao(String(r.result),file.name);const i=$('#mInfo');i.style.display='';i.innerHTML=`✅ <b>${esc(file.name)}</b><br>${medImport.holes.length} furos · ${medImport.resumo}`;if(medImport.nome&&!$('#fPol').value){const m=medImport.nome.match(/(\d+[A-Za-z]?)\s*$/);if(m)$('#fPol').value=m[1];}}catch(e){medImport=null;toast(e.message);}};r.readAsText(file);};fi.click();};};
+    const draw0=draw;draw=()=>{draw0();bindMed();};
+    draw();document.querySelectorAll('#modo button').forEach(b=>b.onclick=()=>{novoModo=b.dataset.m;document.querySelectorAll('#modo button').forEach(x=>x.classList.toggle('on',x===b));draw();});}
+  $('#fSave').onclick=()=>{
+    const d={mina:$('#fMina').value,cava:$('#fCava').value.trim(),pol:$('#fPol').value.trim(),banco:$('#fBanco').value.trim(),data:$('#fData').value,resp:$('#fResp').value.trim()};
+    if(!d.mina||!d.pol){toast('Preencha mina e polígono');return;}
+    S.last=Object.assign(S.last||{},{resp:d.resp});
+    if(ed){Object.assign(cur(),d);markP(cur().id);save();go('poly');return;}
+    let holes;
+    try{if(novoModo==='medicao'){if(!medImport)throw new Error('Escolha o arquivo do Medição Enaex');holes=medImport.holes;}else holes=novoModo==='malha'?gerarMalha():lerLista();}catch(e){toast(e.message);return;}
+    const np=Object.assign({id:uid(),criado:Date.now(),nfs:{},holes},d,{esp:novoModo==='malha'?num($('#gE')?.value)||4:null});
+    const geo=novoModo==='medicao'?medImport.geo:holes.geo;if(geo&&geoUTM(geo))np.geo=geo;delete holes.geo;
+    if(novoModo==='medicao'&&medImport.bg){const g=medImport.bg;np.bg={w:g.w,h:g.h,m:[1,0,0,1,0,0],on:true};bgPut(np.id,g.url).then(ok=>{if(!ok)toast('Aparelho sem espaço para guardar o croqui de fundo');});}
+    S.polys.push(np);S.cur=np.id;markAll(np);save();tab='mapa';go('poly');toast(holes.length+' furos criados');
+  };
+}
+function gerarMalha(){
+  const L=parseInt($('#gL').value),F=parseInt($('#gF').value),A=num($('#gA').value)||3.5,E=num($('#gE').value)||4,P=num($('#gP').value),stg=$('#gS').value==='1',seq=$('#gN').value==='seq';
+  if(!(L>0&&F>0)||L*F>3000)throw new Error('Confira linhas e furos por linha');
+  const hs=[];let k=1;
+  for(let l=1;l<=L;l++)for(let f=1;f<=F;f++)hs.push(novoFuro(seq?String(k++):`L${l}-F${f}`,(f-1)*E+(stg&&l%2===0?E/2:0),(l-1)*A,P,l,f));
+  return hs;
+}
+function lerLista(){
+  const lines=$('#gList').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  if(!lines.length)throw new Error('Cole a lista de furos');
+  const hs=[];let semXY=false;
+  lines.forEach((ln,i)=>{const c=ln.split(/[;\t]/).map(s=>s.trim());if(i===0&&isNaN(num(c[c.length-1]))&&isNaN(num(c[1])))return;/*cabeçalho*/
+    if(c.length>=3)hs.push(novoFuro(c[0],num(c[1]),-num(c[2]),c.length>=4?num(c[3]):null));
+    else{semXY=true;hs.push(novoFuro(c[0],null,null,num(c[1])));}});
+  if(!hs.length)throw new Error('Nenhum furo reconhecido');
+  if(semXY)hs.forEach((h,i)=>{h.x=(i%10)*4;h.y=Math.floor(i/10)*3.5;});
+  else{const mx=Math.min(...hs.map(h=>h.x)),my=Math.min(...hs.map(h=>h.y));hs.forEach(h=>{h.x-=mx;h.y-=my;});hs.geo={mx,my};}
+  return hs;
+}
+function novoFuro(id,x,y,prof,line,n){return{id:String(id),x,y,line:line||null,n:n||null,profProj:prof,profMed:null,agua:'seca',aguaM:null,status:'pendente',decks:[],booster:null,brinel:null,detTipo:'',detQtd:null,tampao:null,caminhao:'',obs:'',cond:[],lotes:null,ts:null};}
+
+
+/* ===== Projeto de carregamento (valores do plano de fogo, informados pelo usuário) ===== */
+const PROJ_PADRAO={prod:'',kg:null,decks:1,tampao:null,booster:null,detTipo:'',detQtd:null,tolKg:10,tolProf:0.5,tolCam:3};
+const projDe=p=>Object.assign({},PROJ_PADRAO,p.proj||{});
+const kgProj=(p,h)=>h.cargaProj!=null?h.cargaProj:projDe(p).kg;
+// classifica o furo comparando executado x projeto
+function desvio(p,h){
+  const pr=projDe(p),kp=kgProj(p,h),ke=holeKg(h);
+  if(h.status==='perdido'||h.status==='nao')return{c:'fora',t:ST[h.status].n};
+  if(!ke)return{c:'sem',t:'Sem carga lançada'};
+  if(kp==null)return{c:'semproj',t:'Sem carga de projeto'};
+  const d=(ke-kp)/kp*100;
+  if(d<-pr.tolKg)return{c:'abaixo',d,t:`Abaixo do projeto (${fmt(d,0)}%)`};
+  if(d>pr.tolKg)return{c:'acima',d,t:`Acima do projeto (+${fmt(d,0)}%)`};
+  return{c:'ok',d,t:`Dentro do projeto (${d>=0?'+':''}${fmt(d,0)}%)`};
+}
+const DV={ok:{n:'Dentro do projeto',c:'#1f9d55'},abaixo:{n:'Abaixo do projeto',c:'#f08c00'},acima:{n:'Acima do projeto',c:'#7048e8'},sem:{n:'Sem carga lançada',c:'#b8c0c8'},semproj:{n:'Sem projeto',c:'#5b6b7a'},fora:{n:'Perdido / não carregar',c:'#d64545'}};
+function conferencia(p){
+  const pr=projDe(p),r={n:{},kgProj:0,kgExec:0,profBaixa:0,tampDif:0,boosterDif:0,lista:[]};Object.keys(DV).forEach(k=>r.n[k]=0);
+  p.holes.forEach(h=>{const dv=desvio(p,h);r.n[dv.c]++;
+    if(h.status!=='perdido'&&h.status!=='nao'){const kp=kgProj(p,h);if(kp!=null)r.kgProj+=kp;}
+    r.kgExec+=holeKg(h);
+    if(h.profMed!=null&&h.profProj!=null&&h.profMed<h.profProj-pr.tolProf)r.profBaixa++;
+    if(pr.tampao!=null&&h.tampao!=null&&Math.abs(h.tampao-pr.tampao)>0.5)r.tampDif++;
+    if(pr.booster!=null&&h.booster!=null&&num(h.booster)!==pr.booster)r.boosterDif++;
+    if(dv.c==='abaixo'||dv.c==='acima')r.lista.push([h,dv]);});
+  return r;
+}
+function editProjeto(p){
+  const pr=projDe(p);
+  openSheet(`<h3>Projeto de carregamento<button class="btn sm" id="pjClose">Fechar</button></h3>
+  <p class="mut" style="margin:0 0 6px">Copie aqui os valores do plano de fogo. O app não calcula carga: só compara o que foi lançado no campo com o projeto.</p>
+  <div class="row"><div><label>Produto</label><select id="pjProd">${opts(PRODUTOS,pr.prod,'—')}</select></div><div><label>Carga por furo (kg)</label><input id="pjKg" inputmode="decimal" value="${pr.kg??''}"></div></div>
+  <div class="row"><div><label>Decks</label><select id="pjDk">${[1,2,3].map(n=>`<option ${pr.decks==n?'selected':''}>${n}</option>`).join('')}</select></div><div><label>Tampão (m)</label><input id="pjTa" inputmode="decimal" value="${pr.tampao??''}"></div></div>
+  <div class="row"><div><label>Booster por furo</label><input id="pjBo" inputmode="numeric" value="${pr.booster??''}"></div><div><label>Detonador</label><select id="pjDt">${opts(DETS,pr.detTipo,'—')}</select></div></div>
+  <div class="row"><div><label>Detonadores por furo</label><input id="pjDq" inputmode="numeric" value="${pr.detQtd??''}"></div><div></div></div>
+  <div class="row"><div><label>Tolerância de carga (±%)</label><input id="pjTk" inputmode="decimal" value="${pr.tolKg}"></div><div><label>Tolerância de profundidade (m)</label><input id="pjTp" inputmode="decimal" value="${String(pr.tolProf).replace('.',',')}"></div></div>
+  <div class="row"><div><label>Tolerância caminhão: NF x lançado (±%)</label><input id="pjTc" inputmode="decimal" value="${String(pr.tolCam).replace('.',',')}"></div><div></div></div>
+  <p class="mut">Furo com carga diferente (ex.: borda, com água): abra o furo e preencha "Carga de projeto deste furo".</p>
+  <div class="btns"><button class="btn pri" id="pjSave">Salvar projeto</button></div>`);
+  $('#pjClose').onclick=closeSheet;
+  $('#pjSave').onclick=()=>{p.proj={prod:$('#pjProd').value,kg:num($('#pjKg').value),decks:+$('#pjDk').value,tampao:num($('#pjTa').value),booster:num($('#pjBo').value),detTipo:$('#pjDt').value,detQtd:num($('#pjDq').value),tolKg:num($('#pjTk').value)??10,tolProf:num($('#pjTp').value)??0.5,tolCam:num($('#pjTc').value)??3};
+    markP(p.id);save();closeSheet();renderPoly();toast('Projeto salvo');};
+}
+
+/* ===== Temporização (tempos já programados; o app não calcula sequência) ===== */
+function tzHolesDe(P){ // lê os furos do backup do app Temporização
+  return P.holes.filter(h=>!h.ghost).map(h=>{const st=h.st||[];const lbl=medLabel(h);const t=num(lbl);
+    const nd=st.includes('deck3')?3:st.includes('deck2')?2:1;const tempos=Array.isArray(h.dt)?h.dt.slice(0,nd).map(num).filter(v=>v!=null):null;
+    const an=st.includes('anomalia')?('anomalia'+(h.an?' '+h.an:'')):'';
+    return{id:String(lbl),x:h.x+5.5,y:h.y+4.2,tempo:t,tempos:tempos&&tempos.length>1?tempos:null,perdido:st.includes('perdido'),obs:[an,h.obs].filter(Boolean).join(' · ')};});
+}
+const temTempo=h=>h.tempo!=null&&!isNaN(h.tempo);
+function corTempo(t,t0,t1){const k=t1>t0?(t-t0)/(t1-t0):0;return`hsl(${Math.round(235-235*k)},78%,${k>.45&&k<.7?40:46}%)`;}
+function faixaTempo(p){const ts=p.holes.filter(temTempo).map(h=>h.tempo);return ts.length?[Math.min(...ts),Math.max(...ts)]:[0,0];}
+function analiseTempo(p){
+  const ativos=p.holes.filter(h=>h.status!=='perdido'&&h.status!=='nao');
+  const com=ativos.filter(temTempo),sem=ativos.filter(h=>!temTempo(h));
+  const por={};com.forEach(h=>{(por[h.tempo]=por[h.tempo]||[]).push(h);});
+  const rep=Object.entries(por).filter(([,v])=>v.length>1).map(([t,v])=>[+t,v]).sort((a,b)=>a[0]-b[0]);
+  const ord=[...new Set(com.map(h=>h.tempo))].sort((a,b)=>a-b);let gmin=null;for(let i=1;i<ord.length;i++){const g=ord[i]-ord[i-1];if(gmin==null||g<gmin)gmin=g;}
+  const dets=com.reduce((s,h)=>s+(h.tempos&&h.tempos.length?h.tempos.length:1),0);
+  const [t0,t1]=faixaTempo(p);
+  return{ativos:ativos.length,com,sem,rep,gmin,dets,t0,t1,unicos:ord.length};
+}
+function tabTempo(p){
+  const a=analiseTempo(p);
+  if(!a.com.length){$('#tabBox').innerHTML=`<div class="card empty">Este polígono ainda não tem tempos de detonação.<br><br><button class="btn pri" id="tzImp">Importar tempos</button></div><p class="mut">Pode importar o backup do app de Temporização, colar uma lista <b>furo;tempo</b> ou digitar o tempo em cada furo.</p>`;$('#tzImp').onclick=()=>tzMenu(p);return;}
+  const prog=num(p.dvtProg);
+  let h=`<div class="kpis"><div class="kpi"><b>${a.com.length}/${a.ativos}</b><span>furos com tempo</span></div><div class="kpi"><b style="color:${a.sem.length?'var(--bad)':'inherit'}">${a.sem.length}</b><span>furos sem tempo</span></div><div class="kpi"><b style="color:${a.rep.length?'var(--warn)':'inherit'}">${a.rep.length}</b><span>tempos repetidos</span></div><div class="kpi"><b>${fmt(a.t0)}–${fmt(a.t1)}</b><span>ms (primeiro – último)</span></div><div class="kpi"><b>${a.gmin==null?'–':fmt(a.gmin)+' ms'}</b><span>menor intervalo entre tempos</span></div><div class="kpi"><b>${a.dets}</b><span>detonadores com tempo</span></div></div>
+  <div class="card" style="margin-top:12px"><h2>Conferência com o DVT programado</h2><div class="row"><div><label>Nº DVT programado</label><input id="tzProg" inputmode="numeric" value="${p.dvtProg??''}" placeholder="do relatório"></div><div style="align-self:end;padding-bottom:10px">${prog==null?'<span class="mut">Informe para conferir</span>':prog===a.dets?'<b style="color:var(--ok)">✔ Fecha com os tempos</b>':`<b style="color:var(--bad)">Diferença de ${fmt(Math.abs(prog-a.dets))} (${prog>a.dets?'programado a mais':'programado a menos'})</b>`}</div></div></div>`;
+  if(a.sem.length)h+=`<div class="card"><h2>Furos sem tempo</h2><div class="row" style="gap:6px">${a.sem.map(x=>`<button class="btn sm" data-i="${p.holes.indexOf(x)}" style="flex:0 0 auto">${esc(x.id)}</button>`).join('')}</div></div>`;
+  if(a.rep.length)h+=`<div class="card"><h2>Tempos repetidos</h2><p class="mut" style="margin:0 0 6px">Furos com o mesmo tempo detonam juntos. Confira se está no plano.</p><table><tbody>${a.rep.map(([t,v])=>`<tr><td><b>${fmt(t)} ms</b></td><td>${v.map(x=>`<a href="#" data-i="${p.holes.indexOf(x)}">${esc(x.id)}</a>`).join(', ')}</td></tr>`).join('')}</tbody></table></div>`;
+  h+=`<div class="btns"><button class="btn pri" id="tzSim">Ver sequência no mapa</button><button class="btn" id="tzImp">Importar / trocar tempos</button></div><p class="mut">O app só mostra e confere os tempos que vieram do plano. Ele não monta nem altera a sequência.</p>`;
+  $('#tabBox').innerHTML=h;
+  $('#tzProg').onchange=e=>{p.dvtProg=num(e.target.value);markP(p.id);save();tabTempo(p);};
+  $('#tzSim').onclick=()=>{corPor='tempo';tab='mapa';renderPoly();};$('#tzImp').onclick=()=>tzMenu(p);
+  document.querySelectorAll('#tabBox [data-i]').forEach(b=>b.onclick=e=>{e.preventDefault();editHole(+b.dataset.i);});
+}
+function tzMenu(p){
+  openSheet(`<h3>Importar tempos<button class="btn sm" id="tzClose">Fechar</button></h3>
+  <div class="btns" style="flex-direction:column"><button class="btn pri" id="tzBk">Backup do app de Temporização (.json)</button><button class="btn" id="tzPdf">PDF da temporização (desenho com os tempos)</button><button class="btn" id="tzLs">Lista furo;tempo (colar ou arquivo)</button>${p.holes.some(temTempo)?'<button class="btn bad" id="tzClr">Apagar todos os tempos</button>':''}</div>
+  <p class="mut">Pela lista, o furo precisa ter o mesmo número do croqui. Pelo backup da Temporização, o app encaixa pela posição dos furos.</p>`);
+  $('#tzClose').onclick=closeSheet;
+  if($('#tzClr'))$('#tzClr').onclick=()=>confirmBox('Apagar os tempos de todos os furos deste polígono?',()=>{p.holes.forEach(h=>{delete h.tempo;delete h.tempos;});markP(p.id);save();renderPoly();},'Apagar');
+  $('#tzLs').onclick=()=>tzLista(p);
+  $('#tzPdf').onclick=()=>{closeSheet();pdfTemposFluxo(p);};
+  $('#tzBk').onclick=async()=>{const file=await pickFile('.json,application/json');if(!file)return;
+    try{const d=JSON.parse(await readTxt(file));const P=d.poly||d;if(!P||!Array.isArray(P.holes))throw new Error('Arquivo não é backup da Temporização');tzEncaixar(p,tzHolesDe(P).filter(t=>t.tempo!=null));}catch(e){toast(e.message||'Arquivo inválido');}};
+}
+function tzLista(p){
+  openSheet(`<h3>Lista de tempos<button class="btn sm" id="tlClose">Fechar</button></h3><label>Uma linha por furo: <b>FURO;TEMPO</b> (ms). Para decks: FURO;25;42</label><textarea id="tlTxt" placeholder="1;0&#10;2;25&#10;3;50"></textarea><button class="btn" id="tlFile" style="width:100%;margin-top:8px">Ler arquivo (Excel, CSV ou TXT)</button><div class="btns"><button class="btn pri" id="tlGo">Aplicar tempos</button></div>`);
+  $('#tlClose').onclick=closeSheet;
+  $('#tlFile').onclick=async()=>{const file=await pickFile('.xlsx,.xls,.csv,.txt');if(!file)return;try{const rows=await fileToRows(file);$('#tlTxt').value=rows.filter(r=>r.length>=2&&num(r[1])!=null).map(r=>r.filter(v=>v!=='').join(';')).join('\n');}catch(e){busy();toast(e.message);}};
+  $('#tlGo').onclick=()=>{const byId=new Map(p.holes.map(h=>[String(h.id).toUpperCase(),h]));let ok=0;const nao=[];
+    $('#tlTxt').value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).forEach(l=>{const c=l.split(/[;\t,]/).map(v=>v.trim());const h=byId.get(String(c[0]).toUpperCase());const ts=c.slice(1).map(num).filter(v=>v!=null);
+      if(!ts.length)return;if(!h){nao.push(c[0]);return;}h.tempo=ts[0];h.tempos=ts.length>1?ts:null;ok++;});
+    markP(p.id);save();closeSheet();tab='tempo';renderPoly();toast(`${ok} furos com tempo`+(nao.length?` · ${nao.length} não encontrados (${nao.slice(0,5).join(', ')}${nao.length>5?'…':''})`:''));};
+}
+function vizinhoMin(pts){let d=Infinity;const sm=pts.slice(0,250);for(let i=0;i<sm.length;i++)for(let j=i+1;j<sm.length;j++){const q=Math.hypot(sm[i][0]-sm[j][0],sm[i][1]-sm[j][1]);if(q>1e-6&&q<d)d=q;}return isFinite(d)?d:1;}
+function casar(p,T,m){ // aplica transformação m nos furos da temporização e liga ao furo mais próximo
+  const dm=vizinhoMin(p.holes.map(h=>[h.x,h.y]));const lim=dm*0.45;const usados=new Set();const pares=[];
+  T.forEach(t=>{const X=m[0]*t.x+m[2]*t.y+m[4],Y=m[1]*t.x+m[3]*t.y+m[5];let best=-1,bd=Infinity;p.holes.forEach((h,i)=>{const d=Math.hypot(h.x-X,h.y-Y);if(d<bd){bd=d;best=i;}});if(best>=0&&bd<=lim&&!usados.has(best)){usados.add(best);pares.push([best,t]);}});
+  return pares;
+}
+function semelhanca(p1,p2,q1,q2){const dpx=p2[0]-p1[0],dpy=p2[1]-p1[1],dqx=q2[0]-q1[0],dqy=q2[1]-q1[1],den=dpx*dpx+dpy*dpy;if(den<1e-9)return null;const sr=(dqx*dpx+dqy*dpy)/den,si=(dqy*dpx-dqx*dpy)/den;return[sr,si,-si,sr,q1[0]-(sr*p1[0]-si*p1[1]),q1[1]-(si*p1[0]+sr*p1[1])];}
+function tzEncaixar(p,T){
+  if(!T.length){toast('O backup não tem furos com tempo');return;}
+  // 1ª tentativa: mesmo desenho (mesmas coordenadas)
+  const auto=casar(p,T,[1,0,0,1,0,0]);
+  const aplicar=pares=>{p.holes.forEach(h=>{delete h.tempo;delete h.tempos;});pares.forEach(([i,t])=>{const h=p.holes[i];h.tempo=t.tempo;h.tempos=t.tempos||null;if(t.perdido&&h.status==='pendente')h.status='perdido';});markP(p.id);save();closeSheet();tab='tempo';renderPoly();toast(`${pares.length} furos receberam tempo · ${T.length-pares.length} tempos sem furo correspondente`);};
+  if(auto.length>=Math.min(T.length,p.holes.length)*0.8){aplicar(auto);return;}
+  let A=0,B=p.holes.length-1,a=0,b=T.length-1;
+  const draw=(res)=>{openSheet(`<h3>Encaixar temporização<button class="btn sm" id="teClose">Cancelar</button></h3>
+    <p class="mut">Os desenhos são diferentes. Indique 2 furos que você sabe qual tempo têm (de preferência longe um do outro):</p>
+    <div class="row"><div><label>1º furo do croqui</label><select id="teA">${p.holes.map((h,i)=>`<option value="${i}" ${i===A?'selected':''}>${esc(h.id)}</option>`).join('')}</select></div><div><label>tem o tempo</label><select id="tea">${T.map((t,i)=>`<option value="${i}" ${i===a?'selected':''}>${fmt(t.tempo)} ms</option>`).join('')}</select></div></div>
+    <div class="row"><div><label>2º furo do croqui</label><select id="teB">${p.holes.map((h,i)=>`<option value="${i}" ${i===B?'selected':''}>${esc(h.id)}</option>`).join('')}</select></div><div><label>tem o tempo</label><select id="teb">${T.map((t,i)=>`<option value="${i}" ${i===b?'selected':''}>${fmt(t.tempo)} ms</option>`).join('')}</select></div></div>
+    ${res?`<div class="hint">${res.length} de ${T.length} tempos encaixaram em furos do croqui.${res.length<T.length*0.8?' Poucos — confira os 2 pares escolhidos.':''}</div>`:''}
+    <div class="btns"><button class="btn" id="teTest">Testar encaixe</button><button class="btn pri" id="teOk" ${res&&res.length?'':'disabled style="opacity:.5"'}>Aplicar tempos</button></div>`);
+    $('#teClose').onclick=closeSheet;
+    ['teA','tea','teB','teb'].forEach(id=>$('#'+id).onchange=()=>{A=+$('#teA').value;a=+$('#tea').value;B=+$('#teB').value;b=+$('#teb').value;draw();});
+    $('#teTest').onclick=()=>{const m=semelhanca([T[a].x,T[a].y],[T[b].x,T[b].y],[p.holes[A].x,p.holes[A].y],[p.holes[B].x,p.holes[B].y]);if(!m||A===B||a===b){toast('Escolha 2 furos e 2 tempos diferentes');return;}draw(casar(p,T,m));};
+    if(res&&res.length)$('#teOk').onclick=()=>aplicar(res);};
+  draw();
+}
+
+/* ===== Importar do app Medição Enaex (croqui real) ===== */
+let medImport=null;
+function medStatus(st){st=st||[];
+  if(st.includes('perdido'))return'perdido';
+  if(st.includes('nao_furado'))return'nao';
+  if(st.includes('nao_carregado'))return'nao';
+  if(st.includes('repasse'))return'repasse';
+  return'pendente';}
+function medLabel(h){return h.tl!=null&&h.tl!==''?String(h.tl):h.n>=1e5?'A'+(h.n-1e5):h.pf?h.pf+String(h.n).padStart(3,'0'):String(h.n);}
+function lerMedicao(txt,nome){
+  txt=txt.replace(/^﻿/,'');
+  if(/^\s*\{/.test(txt)){
+    const d=JSON.parse(txt);const P=d.poly||d;
+    if(!P||!Array.isArray(P.holes))throw new Error('Arquivo não é um backup do Medição Enaex');
+    if(d.app==='temporizacao'){const hs=tzHolesDe(P).map(t=>{const f=novoFuro(t.id,t.x,t.y,num(P.proj));f.tempo=t.tempo;if(t.tempos)f.tempos=t.tempos;if(t.perdido)f.status='perdido';if(t.obs)f.obsCroqui=t.obs;return f;});
+      const bg=P.bg&&P.w?{url:P.bg,w:P.w,h:P.h}:null;return{holes:hs,nome:P.nome||'',bg,resumo:'plano de temporização (cada furo com seu tempo)'+(bg?' · com o desenho de fundo':'')};}
+    const projP=num(P.proj);
+    const hs=P.holes.filter(h=>!h.ghost).sort((a,b)=>(a.n||0)-(b.n||0)).map(h=>{
+      const st=h.st||[];let status=medStatus(st);
+      const pr=num(h.pr),pm=num(h.pm);
+      if(status==='repasse'&&pr!=null)status='pendente'; // repasse já feito: furo liberado para carregar
+      const f=novoFuro(medLabel(h),h.x+5.5,h.y+4.2,num(h.pp)??projP); // centro do furo no croqui
+      f.status=status;f.profMed=pr??pm;
+      if(st.includes('agua')||num(h.ag)){f.agua='agua';f.aguaM=num(h.ag);}
+      f.caminhao=h.cam||'';f.obs=h.obs||'';
+      if(st.length)f.obsCroqui=st.join(' + ');
+      return f;});
+    if(!hs.length)throw new Error('Backup sem furos');
+    const bg=P.bg&&P.w?{url:P.bg,w:P.w,h:P.h}:null;
+    return{holes:hs,nome:P.nome||'',bg,resumo:'posições iguais ao croqui'+(bg?' · com o desenho do croqui de fundo':'')};
+  }
+  // CSV (Medição Enaex, Temporização, planilha do app ou lista com coordenadas)
+  const L=txt.split(/\r?\n/).filter(l=>l.trim());if(!L.length)throw new Error('Arquivo vazio');
+  const norm=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9_]/g,'');
+  const sepDe=l=>[';','\t',','].map(c=>[c,l.split(c).length]).sort((a,b)=>b[1]-a[1])[0][0];
+  const mkSplit=sep=>l=>{const out=[];let cur='',q=false;for(let i=0;i<l.length;i++){const c=l[i];if(q){if(c==='"'&&l[i+1]==='"'){cur+='"';i++;}else if(c==='"')q=false;else cur+=c;}else if(c==='"')q=true;else if(c===sep){out.push(cur);cur='';}else cur+=c;}out.push(cur);return out.map(v=>v.trim());};
+  const IDK=['furo','n_furo','nfuro','numero_furo','furo_id','hole','holeid','hole_id','id','n','no','numero','ponto','nome','tempo_ms'];
+  let hi=-1,split=null,head=null;
+  for(let k=0;k<Math.min(L.length,15);k++){const sp=mkSplit(sepDe(L[k]));const h=sp(L[k]).map(norm);if(h.some(c=>IDK.includes(c)||c.startsWith('furo'))){hi=k;split=sp;head=h;break;}}
+  if(hi<0){ // sem cabeçalho reconhecido: tenta como lista de coordenadas
+    const sp=mkSplit(sepDe(L[0]));try{const hs=rowsToHoles(L.map(sp)).map(q=>novoFuro(q.id,q.x,-q.y,q.p));const mx=Math.min(...hs.map(h=>h.x)),my=Math.min(...hs.map(h=>h.y));hs.forEach(h=>{h.x-=mx;h.y-=my;});return{holes:hs,nome:'',geo:{mx,my},resumo:'lista de coordenadas'};}
+    catch(e){throw new Error('Não reconheci este CSV. 1ª linha: "'+L[0].slice(0,80)+'". Me mande o arquivo para eu ajustar o leitor.');}}
+  const col=(...ks)=>{for(const k of ks){const i=head.indexOf(k);if(i>=0)return i;}return head.findIndex(c=>ks.some(k=>c.startsWith(k)));};
+  const ci={id:col('furo','n_furo','nfuro','numero_furo','furo_id','hole','holeid','hole_id','id','n','no','numero','ponto','nome'),tempo:col('tempo_ms','tempo'),st:col('status','marcacao'),pp:col('prof_projeto_m','prof_projeto','profundidade_projeto','prof_proj','prof','profundidade','depth'),pm:col('prof_medida_m','prof_medida','profundidade_medida','prof_med'),pr:col('prof_apos_repasse_m','prof_apos_repasse'),ag:col('lamina_agua_m','lamina_agua','coluna_agua','agua_m'),cam:col('caminhao'),obs:col('observacao','obs'),x:col('x','este','east','coord_x'),y:col('y','norte','north','coord_y'),d1:col('tempo_deck1'),d2:col('tempo_deck2'),d3:col('tempo_deck3')};
+  const tz=ci.id<0&&ci.tempo>=0; // CSV do app Temporização: o furo é o próprio tempo
+  const rows=L.slice(hi+1).map(split);const temXY=ci.x>=0&&ci.y>=0&&rows.some(r=>num(r[ci.x])!=null);
+  const g=(r,k)=>ci[k]>=0?(r[ci[k]]??''):'';
+  const hs=rows.map((r,i)=>{const id=tz?g(r,'tempo'):g(r,'id');if(!id)return null;
+    const stTxt=(g(r,'st')+'').toLowerCase();
+    let status='pendente';if(stTxt.includes('perdido'))status='perdido';else if(stTxt.includes('não furado')||stTxt.includes('nao furado')||stTxt.includes('não carregado')||stTxt.includes('nao carregado'))status='nao';else if(stTxt.includes('repasse')&&num(g(r,'pr'))==null)status='repasse';
+    const f=novoFuro(id,temXY?num(g(r,'x')):(i%10)*4,temXY?-num(g(r,'y')):Math.floor(i/10)*3.5,num(g(r,'pp')));
+    f.status=status;f.profMed=num(g(r,'pr'))??num(g(r,'pm'));
+    if(stTxt.includes('água')||stTxt.includes('agua')||num(g(r,'ag'))){f.agua='agua';f.aguaM=num(g(r,'ag'));}
+    f.caminhao=g(r,'cam');f.obs=g(r,'obs');
+    if(tz){f.tempo=num(id);const ds=['d1','d2','d3'].map(k=>num(g(r,k))).filter(v=>v!=null);if(ds.length>1)f.tempos=ds;}
+    else if(ci.tempo>=0&&num(g(r,'tempo'))!=null)f.tempo=num(g(r,'tempo'));
+    return f;}).filter(Boolean);
+  if(!hs.length)throw new Error('CSV sem furos');
+  let geo=null;if(temXY){const mx=Math.min(...hs.map(h=>h.x)),my=Math.min(...hs.map(h=>h.y));hs.forEach(h=>{h.x-=mx;h.y-=my;});geo={mx,my};}
+  return{holes:hs,nome:'',geo,resumo:(tz?'CSV da Temporização (cada furo com seu tempo). ':'')+(temXY?'com coordenadas':'o CSV não traz a posição; o mapa fica em grade (use o backup .json para o desenho igual ao croqui)')};
+}
+
+/* ===== Polígono ===== */
+function renderPoly(){
+  const p=cur();if(!p){go('home');return;}
+  $('#ttl').textContent=`POL ${p.pol} · ${p.mina}`;if(tab!=='mapa'&&gpsOn)gpsStop();
+  const h=$('#hdrBtn');h.style.display='';h.textContent='⋯';h.onclick=polyMenu;
+  const tabs=[['mapa','Mapa'],['lista','Lista'],['conf','Projeto x Exec.'],['tempo','Temporização'],['resumo','Caminhões e consumo'],['liber','Liberação'],['pos','Pós-fogo'],['relatorio','Relatório']];
+  let html=`<div class="tabs">${tabs.map(t=>`<button data-t="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}</button>`).join('')}</div><div id="tabBox"></div>`;
+  $('#app').innerHTML=html;
+  document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;renderPoly();});
+  ({mapa:tabMapa,lista:tabLista,conf:tabConf,tempo:tabTempo,resumo:tabResumo,liber:tabLiber,pos:tabPos,relatorio:tabRelatorio})[tab](p);
+}
+const p0=()=>cur();
+function polyMenu(){
+  openSheet(`<h3>Polígono<button class="btn sm" id="mClose">Fechar</button></h3><div class="btns" style="flex-direction:column"><button class="btn" id="mPlE">Gerar planilha de carregamento (Excel)</button><button class="btn" id="mPlI">Importar planilha preenchida</button><button class="btn" id="mTz">Importar tempos de detonação</button><button class="btn" id="mMed">Atualizar com a medição (Medição Enaex)</button><button class="btn pri" id="mProj">Projeto de carregamento (carga, tampão, tolerância)</button><button class="btn" id="mPrint">Relatório completo (imprimir / PDF)</button><button class="btn" id="mLote">Lotes em uso (produto, booster, detonador)</button><button class="btn" id="mEdit">Editar dados (mina, POL, data…)</button><button class="btn" id="mAdd">Adicionar furo extra</button><button class="btn" id="mBg">${p0().bg?'Trocar / reposicionar croqui de fundo':'Colocar croqui de fundo (PDF ou foto)'}</button>${p0().bg?'<button class="btn" id="mBgDel">Remover croqui de fundo</button>':''}<button class="btn" id="mCsv">Exportar furos (CSV / Excel)</button><button class="btn bad" id="mDel">Excluir polígono</button></div>`);
+  const p=cur();
+  $('#mClose').onclick=closeSheet;
+  $('#mEdit').onclick=()=>{closeSheet();go('editpoly');};
+  $('#mProj').onclick=()=>editProjeto(p);
+  $('#mPrint').onclick=()=>{closeSheet();imprimir(p);};
+  $('#mLote').onclick=()=>editLotes(p);
+  $('#mTz').onclick=()=>tzMenu(p);
+  $('#mMed').onclick=()=>atualizarMedicao(p);
+  $('#mPlE').onclick=()=>{closeSheet();exportarPlanilha(p);};
+  $('#mPlI').onclick=()=>{closeSheet();importarPlanilha(p);};
+  $('#mAdd').onclick=()=>{closeSheet();addExtra(p);};
+  $('#mBg').onclick=()=>{closeSheet();bgMenu(p);};
+  if($('#mBgDel'))$('#mBgDel').onclick=()=>confirmBox('Remover o croqui de fundo deste polígono?',()=>{delete p.bg;bgDel(p.id);save();renderPoly();},'Remover');
+  $('#mCsv').onclick=()=>exportBox('Furos (CSV)',`POL${p.pol}-${p.data}.csv`,csv(p),'text/csv');
+  $('#mDel').onclick=()=>confirmBox(`Excluir POL ${p.pol} e todos os lançamentos? Isso não pode ser desfeito.`,()=>{markDel(p);S.polys=S.polys.filter(x=>x.id!==p.id);S.cur=null;save();go('home');},'Excluir');
+}
+function addExtra(p,near){
+  const base=near||p.holes[p.holes.length-1]||{x:0,y:0};
+  const ids=new Set(p.holes.map(h=>h.id));let k=1;while(ids.has('EX'+k))k++;
+  const h=novoFuro('EX'+k,(base.x||0)+(p.esp||4)/2,(base.y||0)+1.5,base.profProj);
+  p.holes.push(h);markP(p.id);markF(p.id,h.id);save();renderPoly();editHole(p.holes.length-1);
+}
+
+/* ----- Croqui de fundo: carregar e posicionar ----- */
+async function bgMenu(p){
+  const opts2=p.bg?`<button class="btn" id="bRe">Reposicionar o croqui atual</button>`:'';
+  openSheet(`<h3>Croqui de fundo<button class="btn sm" id="bClose">Fechar</button></h3><p class="mut">Escolha o PDF do croqui ou uma foto. Depois você toca em 2 furos no desenho para o app encaixar o croqui nos furos.</p><div class="btns" style="flex-direction:column"><button class="btn pri" id="bPick">Escolher PDF ou foto</button>${opts2}</div>`);
+  $('#bClose').onclick=closeSheet;
+  if($('#bRe'))$('#bRe').onclick=async()=>{const url=await bgGet(p.id);if(!url){toast('Croqui não encontrado neste aparelho');return;}calibrar(p,{url,w:p.bg.w,h:p.bg.h});};
+  $('#bPick').onclick=async()=>{const file=await pickFile('.pdf,image/*');if(!file)return;
+    try{const img=/\.pdf$/i.test(file.name)?await pdfPageToImage(await readBuf(file)):await imageFileToImage(file);calibrar(p,img);}catch(e){busy();toast(e.message||'Não consegui abrir o arquivo');}};
+}
+function calibrar(p,img){
+  if(p.holes.length<2){toast('O polígono precisa de pelo menos 2 furos');return;}
+  // sugere os dois furos mais distantes entre si (primeiro e último)
+  let A=0,B=p.holes.length-1,dm=0;for(let i=0;i<p.holes.length;i+=Math.max(1,Math.floor(p.holes.length/60)))for(let j=i+1;j<p.holes.length;j+=Math.max(1,Math.floor(p.holes.length/60))){const d=Math.hypot(p.holes[i].x-p.holes[j].x,p.holes[i].y-p.holes[j].y);if(d>dm){dm=d;A=i;B=j;}}
+  const pick=[null,null];let step=0,z=1;
+  const sel=(id,v)=>`<select id="${id}">${p.holes.map((h,i)=>`<option value="${i}" ${i===v?'selected':''}>${esc(h.id)}</option>`).join('')}</select>`;
+  const draw=()=>{
+    openSheet(`<h3>Encaixar o croqui<button class="btn sm" id="cClose">Cancelar</button></h3>
+    <div class="row"><div><label>1º furo</label>${sel('cA',A)}</div><div><label>2º furo</label>${sel('cB',B)}</div></div>
+    <div class="hint" id="cMsg">Toque no centro do furo <b>${esc(p.holes[step===0?A:B].id)}</b> no desenho abaixo (${step+1} de 2). Use o zoom para acertar.</div>
+    <div class="btns"><button class="btn sm" id="cZo">− Zoom</button><button class="btn sm" id="cZi">+ Zoom</button></div>
+    <div class="mapwrap" style="max-height:55vh;margin-top:8px"><div style="position:relative;width:${100*z}%"><img id="cImg" src="${img.url}" style="width:100%;display:block">${pick.map((q,k)=>q?`<div style="position:absolute;left:${q[0]/img.w*100}%;top:${q[1]/img.h*100}%;width:18px;height:18px;margin:-9px;border-radius:50%;border:3px solid ${k?'#d64545':'#0b5cad'};background:rgba(255,255,255,.4);pointer-events:none"></div>`:'').join('')}</div></div>
+    <div class="btns"><button class="btn" id="cRedo">Refazer toques</button><button class="btn pri" id="cOk" ${pick[1]?'':'disabled style="opacity:.5"'}>Salvar encaixe</button></div>`);
+    $('#cClose').onclick=closeSheet;
+    $('#cA').onchange=e=>{A=+e.target.value;pick[0]=pick[1]=null;step=0;draw();};
+    $('#cB').onchange=e=>{B=+e.target.value;pick[0]=pick[1]=null;step=0;draw();};
+    $('#cZi').onclick=()=>{z=Math.min(5,z*1.5);draw();};$('#cZo').onclick=()=>{z=Math.max(1,z/1.5);draw();};
+    $('#cRedo').onclick=()=>{pick[0]=pick[1]=null;step=0;draw();};
+    $('#cImg').onclick=e=>{const r=e.target.getBoundingClientRect();const u=(e.clientX-r.left)/r.width*img.w,v=(e.clientY-r.top)/r.height*img.h;if(!pick[0])pick[0]=[u,v];else pick[1]=[u,v];step=pick[0]?1:0;draw();};
+    $('#cOk').onclick=async()=>{if(!(pick[0]&&pick[1]))return;if(A===B){toast('Escolha dois furos diferentes');return;}
+      const p1=pick[0],p2=pick[1],q1=[p.holes[A].x,p.holes[A].y],q2=[p.holes[B].x,p.holes[B].y];
+      // transformação de semelhança (escala + giro + deslocamento) da imagem para o mapa
+      const dpx=p2[0]-p1[0],dpy=p2[1]-p1[1],dqx=q2[0]-q1[0],dqy=q2[1]-q1[1],den=dpx*dpx+dpy*dpy;
+      if(den<1){toast('Os dois toques estão no mesmo lugar');return;}
+      const sr=(dqx*dpx+dqy*dpy)/den,si=(dqy*dpx-dqx*dpy)/den;
+      const e1=q1[0]-(sr*p1[0]-si*p1[1]),f1=q1[1]-(si*p1[0]+sr*p1[1]);
+      p.bg={w:img.w,h:img.h,m:[sr,si,-si,sr,e1,f1],on:true};const ok=await bgPut(p.id,img.url);save();closeSheet();tab='mapa';renderPoly();toast(ok?'Croqui encaixado':'Encaixado, mas o aparelho não guardou a imagem');};
+  };
+  draw();
+}
+
+/* ----- Mapa ----- */
+const CAM_COR={'UMT 1038':'#e8590c','UMT 1039':'#1971c2','UMT 1044':'#2f9e44','UMT 1045':'#9c36b5','UMB 1148':'#c2255c','UMB 1113':'#0c8599'};
+const EXTRA_COR=['#5c940d','#862e9c','#d9480f','#364fc7','#a61e4d','#087f5b'];
+function camCor(c){if(!c)return'#b8c0c8';if(CAM_COR[c])return CAM_COR[c];let h=0;for(const ch of c)h=(h*31+ch.charCodeAt(0))>>>0;return EXTRA_COR[h%EXTRA_COR.length];}
+const camCurto=c=>(c||'').replace(/^UM[TB]\s*/,'');
+let corPor=(S.ui&&S.ui.corPor)||'caminhao',pincel=null,rotulos=true;
+function setCorPor(v){corPor=v;S.ui=Object.assign(S.ui||{},{corPor:v});save();}
+const nf=n=>n===1?'1 furo':n+' furos';
+function rotuloFuro(h){const kg=holeKg(h);return[h.caminhao?camCurto(h.caminhao):'',kg?fmt(kg)+' kg':''].filter(Boolean);} // pincel = caminhão sendo marcado no mapa
+function geom(p,crop){
+  const bgOn=!!(p.bg&&p.bg.on!==false);const bgUrl=p.bg?(bgCache[p.id]||null):null;const useBg=bgOn&&!!bgUrl;
+  const pts=p.holes.map(h=>[h.x,h.y]);
+  if(useBg&&!crop){const m=p.bg.m;[[0,0],[p.bg.w,0],[0,p.bg.h],[p.bg.w,p.bg.h]].forEach(([u,v])=>pts.push([m[0]*u+m[2]*v+m[4],m[1]*u+m[3]*v+m[5]]));}
+  const xs=pts.map(q=>q[0]),ys=pts.map(q=>q[1]);
+  const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+  let dmin=Infinity;const sm=p.holes.slice(0,250);
+  for(let a=0;a<sm.length;a++)for(let b=a+1;b<sm.length;b++){const d=Math.hypot(sm[a].x-sm[b].x,sm[a].y-sm[b].y);if(d>0.01&&d<dmin)dmin=d;}
+  if(!isFinite(dmin))dmin=4;const r=dmin*(useBg?0.3:0.36),pad=r*(crop?4:2.2),off=r*1.8;
+  return{bgOn,bgUrl,useBg,minX,minY,r,pad,off,W:maxX-minX+pad*2+off,H:maxY-minY+pad*2,X:x=>x-minX+pad+off,Y:y=>y-minY+pad};
+}
+function corFuro(h){
+  if(corPor==='caminhao'){if(h.status==='perdido'||h.status==='nao')return ST[h.status].c;return camCor(h.caminhao);}
+  if(corPor==='desvio')return DV[desvio(cur(),h).c].c;
+  if(corPor==='tempo'){if(h.status==='perdido'||h.status==='nao')return'#343a40';if(!temTempo(h))return'#b8c0c8';const [t0,t1]=faixaTempo(cur());return corTempo(h.tempo,t0,t1);}
+  return ST[h.status].c;
+}
+function legendaHTML(p){
+  if(corPor==='tempo'){const a=analiseTempo(p);if(!a.com.length)return'<span class="mut">Sem tempos — importe em Temporização</span>';return`<span style="display:inline-flex;align-items:center;gap:6px">${fmt(a.t0)} ms<i style="display:inline-block;width:110px;height:10px;border-radius:5px;background:linear-gradient(90deg,${[0,.25,.5,.75,1].map(k=>corTempo(a.t0+k*(a.t1-a.t0),a.t0,a.t1)).join(',')})"></i>${fmt(a.t1)} ms</span><span><i class="dot" style="background:#b8c0c8"></i>Sem tempo ${a.sem.length}</span><span><i class="dot" style="background:#343a40"></i>Perdido / não carregar</span>${a.rep.length?`<span>⚠️ ${a.rep.length} tempo(s) repetido(s)</span>`:''}`;}
+  if(corPor==='desvio'){const r=conferencia(p);return Object.entries(DV).map(([k,v])=>`<span><i class="dot" style="background:${v.c}"></i>${v.n} ${r.n[k]}</span>`).join('');}
+  if(corPor==='caminhao'){const cnt={};p.holes.forEach(h=>{const k=h.caminhao||'';cnt[k]=(cnt[k]||0)+1;});
+    return Object.keys(cnt).sort((a,b)=>(a===''?1:0)-(b===''?1:0)||a.localeCompare(b)).map(k=>`<span><i class="dot" style="background:${camCor(k)}"></i>${k?esc(k):'Sem caminhão'} ${cnt[k]}</span>`).join('')+`<span><i class="dot" style="background:${ST.perdido.c}"></i>Perdido / não carregar</span>`;}
+  const cnt={};Object.keys(ST).forEach(k=>cnt[k]=0);p.holes.forEach(h=>cnt[h.status]++);
+  return Object.entries(ST).map(([k,v])=>`<span><i class="dot" style="background:${v.c}"></i>${v.n} ${cnt[k]}</span>`).join('')+`<span><i class="dot" style="background:#fff;border:3px solid #1971c2"></i>Com água</span>`;
+}
+function tabMapa(p){
+  if(p.bg&&!(p.id in bgCache)){bgGet(p.id).then(()=>{if(view==='poly'&&tab==='mapa'&&S.cur===p.id)tabMapa(p);});}
+  const g=geom(p),r=g.r;
+  let s='';
+  if(g.useBg){const m=p.bg.m;s+=`<g transform="translate(${g.pad+g.off-g.minX} ${g.pad-g.minY})"><image href="${g.bgUrl}" width="${p.bg.w}" height="${p.bg.h}" transform="matrix(${m.join(' ')})" preserveAspectRatio="none" opacity="0.95"/></g>`;}
+  p.holes.forEach((h,i)=>{const cx=g.X(h.x),cy=g.Y(h.y),c=corFuro(h);
+    const lbl=h.n!=null?h.n:h.id;const agua=h.agua!=='seca';const sl=selMode&&selSet.has(i);
+    s+=`<g data-i="${i}">${sl?`<circle cx="${cx}" cy="${cy}" r="${r*1.45}" fill="none" stroke="#fab005" stroke-width="${r*0.35}" pointer-events="none"/>`:''}${(h.cond||[]).length?`<circle cx="${cx+r*0.8}" cy="${cy-r*0.8}" r="${r*0.32}" fill="#7a4b00" stroke="#fff" stroke-width="${r*0.08}" pointer-events="none"/>`:''}<circle data-i="${i}" cx="${cx}" cy="${cy}" r="${r}" fill="${c}" fill-opacity="${g.useBg?0.85:1}" stroke="${agua?'#1971c2':'#fff'}" stroke-width="${agua?r*0.32:r*0.12}"/>`+
+    `<text data-i="${i}" x="${cx}" y="${cy+r*0.3}" text-anchor="middle" font-size="${r*0.8}" fill="#fff" font-weight="700" pointer-events="none">${esc(String(lbl).slice(-4))}</text>`+
+    (rotulos?(corPor==='tempo'?(temTempo(h)?[(h.tempos&&h.tempos.length>1?h.tempos.map(v=>fmt(v)).join('/'):fmt(h.tempo))+' ms']:[]):rotuloFuro(h)).map((t,k)=>`<text x="${cx}" y="${cy+r*(1.5+k*0.56)}" text-anchor="middle" font-size="${r*0.5}" fill="${corPor!=='tempo'&&k===0&&h.caminhao?camCor(h.caminhao):'#14202b'}" font-weight="700" stroke="#fff" stroke-width="${r*0.15}" paint-order="stroke" pointer-events="none">${esc(t)}</text>`).join(''):'')+`</g>`;});
+  const lines={};p.holes.forEach(h=>{if(h.line&&lines[h.line]==null)lines[h.line]=h.y;});
+  Object.entries(lines).forEach(([l,y])=>{s+=`<text x="${g.pad*0.3}" y="${g.Y(y)+r*0.3}" font-size="${r*0.7}" fill="#5d6b78">L${l}</text>`;});
+  const fs=falhaSet(p);if(fs.size)p.holes.forEach(h=>{if(!fs.has(String(h.id).toUpperCase()))return;const cx=g.X(h.x),cy=g.Y(h.y),q=r*1.15;s+=`<path d="M${cx-q} ${cy-q}L${cx+q} ${cy+q}M${cx+q} ${cy-q}L${cx-q} ${cy+q}" stroke="#000" stroke-width="${r*0.3}" pointer-events="none"/>`;});
+  s+=`<g id="gpsG" pointer-events="none"></g>`;lastGeom=g;
+  const pxPerM=19/r;
+  const camOpts=[...new Set([...CAMS,...p.holes.map(h=>h.caminhao).filter(Boolean)])];
+  $('#tabBox').innerHTML=`<div class="seg" id="corPor" style="margin-bottom:8px"><button data-c="status" class="${corPor==='status'?'on':''}">Status</button><button data-c="caminhao" class="${corPor==='caminhao'?'on':''}">Caminhão</button><button data-c="desvio" class="${corPor==='desvio'?'on':''}">Projeto</button><button data-c="tempo" class="${corPor==='tempo'?'on':''}">Tempo</button></div>
+  ${corPor==='tempo'&&p.holes.some(temTempo)?`<div class="card" style="padding:10px;margin-bottom:8px"><div class="row" style="align-items:center"><button class="btn sm pri" id="simPlay" style="flex:0 0 auto">▶ Simular sequência</button><input type="range" id="simR" min="0" max="1000" value="${simK==null?1000:Math.round(simK*1000)}" style="flex:1 1 120px;padding:0"><b id="simLbl" style="flex:0 0 auto;min-width:70px;text-align:right">${simK==null?'todos':''}</b></div></div>`:''}
+  ${corPor==='caminhao'?`<div class="card" style="padding:10px;margin-bottom:8px"><label style="margin-top:0">Marcar caminhão tocando nos furos</label><div class="row"><select id="pinSel">${opts(camOpts,pincel||'','— desligado (toque abre o furo) —')}</select></div><p class="mut" style="margin:6px 0 0">${pincel?`Toque nos furos que o <b style="color:${camCor(pincel)}">${esc(pincel)}</b> carregou. Tocar de novo desmarca.`:'Escolha um caminhão para marcar vários furos rápido.'}</p></div>`:''}
+  <div class="legend">${legendaHTML(p)}</div>
+  <div class="btns" style="margin:0 0 8px"><button class="btn sm" id="zOut">− Zoom</button><button class="btn sm" id="zIn">+ Zoom</button><button class="btn sm pri" id="nextP">Próximo pendente</button>${p.bg?`<button class="btn sm" id="bgT">${g.bgOn?'Ocultar croqui':'Mostrar croqui'}</button>`:''}<button class="btn sm" id="rotT">${rotulos?'Ocultar caminhão/carga':'Mostrar caminhão/carga'}</button><button class="btn sm" id="expC">Gerar croqui (imagem)</button><button class="btn sm" id="vozM">🎤 Falar</button><button class="btn sm ${selMode?'pri':''}" id="selT">${selMode?'Sair da seleção':'Selecionar vários'}</button>${podeDesfazer(p)?`<button class="btn sm" id="undo">↶ Desfazer</button>`:''}${p.geo?`<button class="btn sm ${gpsOn?'pri':''}" id="gpsT">📍 ${gpsOn?'GPS ligado':'Onde estou'}</button>`:''}</div>
+  <div class="row" style="margin:0 0 8px;gap:6px"><input id="busca" placeholder="Buscar furo (nº)" style="flex:1 1 120px"><button class="btn sm" id="buscaGo" style="flex:0 0 auto">Abrir furo</button></div>
+  ${gpsOn?`<div class="hint" id="gpsInfo" style="margin:0 0 8px">Procurando sinal do GPS…</div>`:''}
+  <div class="mapwrap" id="mw"><svg id="map" viewBox="0 0 ${g.W} ${g.H}" width="${g.W*pxPerM*zoom}" height="${g.H*pxPerM*zoom}">${s}</svg></div>
+  ${selMode?`<div class="selbar"><b style="flex:1 1 100%">${nf(selSet.size)} selecionado(s)</b><button class="btn" id="sPend">+ Pendentes</button>${Object.keys(lnMap(p)).length?`<select id="sLin" style="flex:1 1 110px;min-height:38px;padding:6px"><option value="">+ Linha…</option>${Object.keys(lnMap(p)).map(l=>`<option>${esc(l)}</option>`).join('')}</select>`:''}<button class="btn" id="sAll">Todos</button><button class="btn" id="sClr">Limpar</button><button class="btn ok" id="sGo" ${selSet.size?'':'disabled style="opacity:.5"'}>Lançar nos selecionados</button></div>`:''}
+  <p class="mut">${selMode?'Toque nos furos para marcar ou desmarcar.':pincel&&corPor==='caminhao'?'Modo marcação de caminhão ligado.':'Toque num furo para lançar. A borda azul indica furo com água; o ponto marrom, furo com ocorrência.'}</p>`;
+  const mw=$('#mw'),sx=mapScroll.x,sy=mapScroll.y;mw.scrollLeft=sx;mw.scrollTop=sy;mw.onscroll=()=>{mapScroll.x=mw.scrollLeft;mapScroll.y=mw.scrollTop;};
+  $('#map').onclick=e=>{const a=e.target.getAttribute('data-i');if(a==null)return;const i=+a;
+    if(corPor==='caminhao'&&pincel){const h=p.holes[i];pushUndo(p,[h],'caminhão no furo '+h.id);if(h.caminhao===pincel){h.caminhao='';}else{h.caminhao=pincel;if(h.status==='pendente')h.status='carregado';}carimbaLotes(p,h);histAdd(h,'Caminhão pelo mapa: '+(h.caminhao||'(sem)'));h.ts=Date.now();h.por=meuNome();markF(p.id,h.id);save();tabMapa(p);return;}
+    if(selMode){selSet.has(i)?selSet.delete(i):selSet.add(i);tabMapa(p);return;}
+    editHole(i);};
+  document.querySelectorAll('#corPor button').forEach(b=>b.onclick=()=>{setCorPor(b.dataset.c);if(corPor!=='caminhao')pincel=null;tabMapa(p);});
+  if($('#pinSel'))$('#pinSel').onchange=e=>{pincel=e.target.value||null;if(pincel){selMode=false;selSet.clear();}tabMapa(p);};
+  $('#zIn').onclick=()=>{zoom=Math.min(4,zoom*1.4);tabMapa(p);};
+  $('#zOut').onclick=()=>{zoom=Math.max(.4,zoom/1.4);tabMapa(p);};
+  if($('#bgT'))$('#bgT').onclick=()=>{p.bg.on=!g.bgOn;save();tabMapa(p);};
+  $('#nextP').onclick=()=>{const i=p.holes.findIndex(h=>h.status==='pendente');if(i<0)toast('Nenhum furo pendente');else editHole(i);};
+  $('#expC').onclick=()=>exportCroqui(p);
+  if($('#simPlay'))ligaSimulacao(p);
+  $('#rotT').onclick=()=>{rotulos=!rotulos;tabMapa(p);};
+  $('#vozM').onclick=()=>vozNoMapa(p);
+  $('#selT').onclick=()=>{selMode=!selMode;selSet.clear();pincel=null;tabMapa(p);};
+  if($('#undo'))$('#undo').onclick=()=>desfazer(p);
+  if($('#gpsT'))$('#gpsT').onclick=()=>{gpsOn?gpsStop():gpsStart();tabMapa(p);};
+  const abrir=()=>{const q=$('#busca').value.trim().toUpperCase();if(!q)return;const i=p.holes.findIndex(h=>String(h.id).toUpperCase()===q||String(h.n??'')===q);const j=i>=0?i:p.holes.findIndex(h=>String(h.id).toUpperCase().endsWith(q));if(j<0)toast('Furo '+q+' não encontrado');else editHole(j);};
+  $('#buscaGo').onclick=abrir;$('#busca').onkeydown=e=>{if(e.key==='Enter')abrir();};
+  if(selMode){
+    $('#sPend').onclick=()=>{p.holes.forEach((h,i)=>{if(h.status==='pendente')selSet.add(i);});tabMapa(p);};
+    $('#sAll').onclick=()=>{p.holes.forEach((h,i)=>selSet.add(i));tabMapa(p);};
+    $('#sClr').onclick=()=>{selSet.clear();tabMapa(p);};
+    if($('#sLin'))$('#sLin').onchange=e=>{(lnMap(p)[e.target.value]||[]).forEach(i=>selSet.add(i));tabMapa(p);};
+    $('#sGo').onclick=()=>{if(selSet.size)loteSheet(p,[...selSet]);};
+  }
+  gpsDraw();
+}
+const lnMap=p=>{const m={};p.holes.forEach((h,i)=>{if(h.line!=null){(m['L'+h.line]=m['L'+h.line]||[]).push(i);}});return m;};
+let selMode=false;const selSet=new Set();let lastGeom=null;
+const mapScroll={x:0,y:0};
+let simK=null,simTimer=null;
+function pintaSim(p){const [t0,t1]=faixaTempo(p);const tc=simK==null?Infinity:t0+simK*(t1-t0);
+  document.querySelectorAll('#map circle[data-i]').forEach(c=>{const h=p.holes[+c.dataset.i];const on=temTempo(h)&&h.tempo<=tc;c.setAttribute('fill',simK==null?corFuro(h):on?corTempo(h.tempo,t0,t1):'#e3e7eb');c.setAttribute('r',c.dataset.r0*(on&&simK!=null&&h.tempo>tc-(t1-t0)*0.04?1.25:1));});
+  const l=$('#simLbl');if(l)l.textContent=simK==null?'todos':fmt(tc)+' ms';}
+function ligaSimulacao(p){
+  document.querySelectorAll('#map circle[data-i]').forEach(c=>c.dataset.r0=c.getAttribute('r'));
+  const parar=()=>{clearInterval(simTimer);simTimer=null;const b=$('#simPlay');if(b)b.textContent='▶ Simular sequência';};
+  $('#simR').oninput=e=>{parar();simK=+e.target.value/1000;pintaSim(p);};
+  $('#simPlay').onclick=()=>{if(simTimer){parar();return;}if(simK==null||simK>=1)simK=0;$('#simPlay').textContent='⏸ Pausar';
+    simTimer=setInterval(()=>{if(!$('#simR')){parar();return;}simK=Math.min(1,simK+0.01);$('#simR').value=Math.round(simK*1000);pintaSim(p);if(simK>=1){parar();setTimeout(()=>{simK=null;pintaSim(p);},900);}},60);};
+  if(simK!=null)pintaSim(p);
+}
+
+/* ----- Croqui em imagem (para WhatsApp / arquivo) ----- */
+async function croquiCanvas(p){
+    if(p.bg&&!(p.id in bgCache))await bgGet(p.id);
+    const g=geom(p,true),r=g.r;
+    const K=Math.min(2600/g.W,40/r,6000/g.H);           // px por unidade
+    const res=resumo(p);
+    const cams=[...new Set(p.holes.map(h=>h.caminhao).filter(Boolean))].sort();
+    const legL=corPor==='tempo'?5:corPor==='caminhao'?Math.max(1,cams.length)+3:corPor==='desvio'?Object.keys(DV).length+1:Object.keys(ST).length+1;
+    const top=130,legH=40+legL*44,Wc=Math.max(1100,Math.round(g.W*K)),Hc=top+Math.round(g.H*K)+legH;
+    const c=document.createElement('canvas');c.width=Wc;c.height=Hc;const x=c.getContext('2d');
+    x.fillStyle='#fff';x.fillRect(0,0,Wc,Hc);
+    x.fillStyle='#102a43';x.fillRect(0,0,Wc,top-20);
+    x.fillStyle='#fff';x.font='bold 40px system-ui,sans-serif';x.fillText(`Croqui de carregamento – POL ${p.pol}`,30,52);
+    x.font='26px system-ui,sans-serif';x.fillText(`${p.mina}${p.cava?' / '+p.cava:''}${p.banco?' · Banco '+p.banco:''} · ${brDate(p.data)}${p.resp?' · '+p.resp:''} · ${corPor==='caminhao'?'cor por caminhão':corPor==='desvio'?'projeto x executado':corPor==='tempo'?'tempos de detonação':'cor por status'}`,30,92);
+    x.save();x.translate(0,top);x.scale(K,K);x.beginPath();x.rect(0,0,g.W,g.H);x.clip();
+    if(g.useBg){const im=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=g.bgUrl;});
+      x.save();x.translate(g.pad+g.off-g.minX,g.pad-g.minY);const m=p.bg.m;x.transform(m[0],m[1],m[2],m[3],m[4],m[5]);x.globalAlpha=.95;x.drawImage(im,0,0,p.bg.w,p.bg.h);x.restore();}
+    p.holes.forEach(h=>{const cx=g.X(h.x),cy=g.Y(h.y);x.beginPath();x.arc(cx,cy,r,0,7);x.fillStyle=corFuro(h);x.globalAlpha=g.useBg?.88:1;x.fill();x.globalAlpha=1;
+      const ag=h.agua!=='seca';x.lineWidth=ag?r*.32:r*.12;x.strokeStyle=ag?'#1971c2':'#fff';x.stroke();
+      x.fillStyle='#fff';x.font=`bold ${r*.8}px system-ui,sans-serif`;x.textAlign='center';x.fillText(String(h.n!=null?h.n:h.id).slice(-4),cx,cy+r*.3);
+      if(rotulos)(corPor==='tempo'?(temTempo(h)?[(h.tempos&&h.tempos.length>1?h.tempos.map(v=>fmt(v)).join('/'):fmt(h.tempo))+' ms']:[]):rotuloFuro(h)).forEach((t,k)=>{const yy=cy+r*(1.5+k*.56);x.font=`bold ${r*.5}px system-ui,sans-serif`;x.lineWidth=r*.15;x.strokeStyle='#fff';x.strokeText(t,cx,yy);x.fillStyle=corPor!=='tempo'&&k===0&&h.caminhao?camCor(h.caminhao):'#14202b';x.fillText(t,cx,yy);});});
+    x.restore();x.textAlign='left';
+    let y=top+Math.round(g.H*K)+30;x.fillStyle='#102a43';x.font='bold 28px system-ui,sans-serif';x.fillText('Legenda',30,y);y+=40;x.font='24px system-ui,sans-serif';
+    const item=(cor,txt)=>{x.fillStyle=cor;x.beginPath();x.arc(46,y-8,13,0,7);x.fill();x.fillStyle='#14202b';x.fillText(txt,72,y);y+=44;};
+    if(corPor==='caminhao'){
+      if(!cams.length)item(camCor(''),'Nenhum caminhão marcado');
+      cams.forEach(cm=>{const n=p.holes.filter(h=>h.caminhao===cm).length;const kg=Object.entries(res.cam[cm]||{}).filter(([pr])=>pr!=='Sem produto').map(([pr,k])=>`${pr} ${fmt(k)} kg`).join(' / ');item(camCor(cm),`${cm} – ${nf(n)}${kg?' – '+kg:''}${(p.nfs||{})[cm]?' – NF '+p.nfs[cm]:''}`);});
+      const sem=p.holes.filter(h=>!h.caminhao&&h.status!=='perdido'&&h.status!=='nao').length;item(camCor(''),`Sem caminhão – ${nf(sem)}`);
+      item(ST.perdido.c,`Perdido / não carregar – ${nf(res.st.perdido+res.st.nao)}`);
+      item('#102a43',`Total lançado: ${Object.entries(res.prod).map(([pr,k])=>`${pr} ${fmt(k)} kg`).join(' / ')||'0 kg'} · Booster ${fmt(res.booster)} un`);
+    }else if(corPor==='tempo'){const a=analiseTempo(p);
+      x.fillStyle='#14202b';x.fillText(`${fmt(a.t0)} ms`,30,y);const gw=360,gx=150;const gr=x.createLinearGradient(gx,0,gx+gw,0);[0,.25,.5,.75,1].forEach(k=>gr.addColorStop(k,corTempo(a.t0+k*(a.t1-a.t0),a.t0,a.t1)));x.fillStyle=gr;x.fillRect(gx,y-20,gw,22);x.fillStyle='#14202b';x.fillText(`${fmt(a.t1)} ms`,gx+gw+16,y);y+=44;
+      item('#b8c0c8',`Sem tempo – ${nf(a.sem.length)}`);item('#343a40',`Perdido / não carregar – ${nf(p.holes.filter(h=>h.status==='perdido'||h.status==='nao').length)}`);item('#f08c00',`Tempos repetidos – ${a.rep.length}`);item('#102a43',`Detonadores com tempo: ${a.dets}${p.dvtProg!=null?' · DVT programado: '+p.dvtProg:''}`);
+    }else if(corPor==='desvio'){const cf=conferencia(p);Object.entries(DV).forEach(([k,v])=>item(v.c,`${v.n} – ${nf(cf.n[k])}`));item('#102a43',`Carga: projeto ${fmt(cf.kgProj)} kg · executado ${fmt(cf.kgExec)} kg`);
+    }else{Object.entries(ST).forEach(([k,v])=>item(v.c,`${v.n} – ${nf(res.st[k])}`));item('#1971c2',`Com água – ${nf(res.agua)}`);}
+    return c;
+}
+async function exportCroqui(p){
+  busy('Gerando croqui…');
+  try{
+    const c=await croquiCanvas(p);
+    busy();
+    const blob=await new Promise(ok=>c.toBlob(ok,'image/jpeg',.9));const nome=`croqui-POL${p.pol}-${p.data||today()}.jpg`;
+    // celular fora do Claude: abre o compartilhar (WhatsApp etc.)
+    try{const file=new File([blob],nome,{type:'image/jpeg'});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:nome});return;}}catch(e){if(e&&e.name==='AbortError')return;}
+    const url=c.toDataURL('image/jpeg',.9);
+    openSheet(`<h3>Croqui gerado<button class="btn sm" id="eClose">Fechar</button></h3><img src="${url}" style="width:100%;border:1px solid var(--line);border-radius:8px"><div class="btns"><button class="btn pri" id="eDown">Baixar imagem</button></div><p class="mut">Se o botão não funcionar aqui, toque e segure na imagem para salvar ou compartilhar.</p>`);
+    $('#eClose').onclick=closeSheet;
+    $('#eDown').onclick=()=>{try{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();a.remove();}catch(e){toast('Toque e segure na imagem para salvar');}};
+  }catch(e){busy();toast('Não consegui gerar o croqui');console.error(e);}
+}
+
+/* ===== Desfazer e histórico ===== */
+const undoSt=[];
+const SNAPK=[...DYN,'tempo','tempos','cargaProj'];
+function snapH(h){const o={};SNAPK.forEach(k=>o[k]=h[k]==null?null:JSON.parse(JSON.stringify(h[k])));return o;}
+function pushUndo(p,hs,txt){undoSt.push({pid:p.id,txt,s:hs.map(h=>[h.id,snapH(h)])});if(undoSt.length>30)undoSt.shift();}
+function podeDesfazer(p){return undoSt.length>0&&undoSt[undoSt.length-1].pid===p.id;}
+function desfazer(p){
+  if(!podeDesfazer(p)){toast('Nada para desfazer');return;}
+  const u=undoSt.pop();const byId=new Map(p.holes.map(h=>[h.id,h]));let tz=false;
+  u.s.forEach(([id,o])=>{const h=byId.get(id);if(!h)return;if(h.tempo!==o.tempo)tz=true;Object.assign(h,o);if(!h.decks)h.decks=[];if(!h.status)h.status='pendente';histAdd(h,'Desfeito ('+u.txt+')');h.ts=Date.now();h.por=meuNome();markF(p.id,h.id);});
+  if(tz)markP(p.id);save();renderPoly();toast('Desfeito: '+u.txt);
+}
+function histAdd(h,t){h.hist=(h.hist||[]).slice(-19);h.hist.push({ts:Date.now(),por:meuNome()||'',t});}
+function resumoFuro(h){const kg=holeKg(h);return[ST[h.status].n,kg?fmt(kg)+' kg':'',h.caminhao||'',h.profMed!=null?'prof. '+fmt(h.profMed,1)+' m':'',(h.cond||[]).join('/')].filter(Boolean).join(' · ');}
+function carimbaLotes(p,h){if(h.status==='carregado'&&!h.lotes&&p.lotes&&Object.values(p.lotes).some(Boolean))h.lotes=Object.assign({},p.lotes);}
+
+/* ===== Lançamento em lote (vários furos selecionados no mapa) ===== */
+function loteSheet(p,idx){
+  const hs=idx.map(i=>p.holes[i]).filter(Boolean);
+  const camOpts=[...new Set([...CAMS,...p.holes.map(h=>h.caminhao).filter(Boolean)])];
+  openSheet(`<h3>Lançar em ${nf(hs.length)}<button class="btn sm" id="lsClose">Fechar</button></h3>
+  <p class="mut" style="margin:0">Só os campos preenchidos são aplicados. O resto continua como está em cada furo.</p>
+  <label>Status</label><select id="lsSt"><option value="">— não mudar —</option>${Object.entries(ST).map(([k,v])=>`<option value="${k}">${v.n}</option>`).join('')}</select>
+  <label style="display:flex;gap:8px;align-items:center;font-size:15px;color:var(--ink)"><input type="checkbox" id="lsPj" style="width:22px;height:22px"> Usar a carga do projeto em cada furo</label>
+  <div class="row"><div><label>Produto (1 deck)</label><select id="lsPr">${opts(PRODUTOS,'','— não mudar —')}</select></div><div><label>kg por furo</label><input id="lsKg" inputmode="decimal"></div></div>
+  <div class="row"><div><label>Booster (un)</label><input id="lsBo" inputmode="numeric"></div><div><label>Brinel (un)</label><input id="lsBr" inputmode="numeric"></div></div>
+  <div class="row"><div><label>Detonador</label><select id="lsDt">${opts(DETS,'','— não mudar —')}</select></div><div><label>Qtd. detonadores</label><input id="lsDq" inputmode="numeric"></div></div>
+  <div class="row"><div><label>Tampão (m)</label><input id="lsTa" inputmode="decimal"></div><div><label>Caminhão</label><select id="lsCa">${opts(camOpts,'','— não mudar —')}</select></div></div>
+  <label>Água</label><select id="lsAg"><option value="">— não mudar —</option>${Object.entries(AGUA_N).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select>
+  <label>Observação (acrescenta à que já existe)</label><input id="lsOb">
+  <div class="btns"><button class="btn ok" id="lsOk">Aplicar em ${nf(hs.length)}</button></div>`);
+  $('#lsClose').onclick=closeSheet;
+  $('#lsOk').onclick=()=>{
+    const st=$('#lsSt').value,usePj=$('#lsPj').checked,prod=$('#lsPr').value,kg=num($('#lsKg').value),bo=num($('#lsBo').value),br=num($('#lsBr').value),dt=$('#lsDt').value,dq=num($('#lsDq').value),ta=num($('#lsTa').value),ca=$('#lsCa').value,ag=$('#lsAg').value,ob=$('#lsOb').value.trim();
+    const pr=projDe(p);let semPj=0;
+    pushUndo(p,hs,'lote de '+nf(hs.length));const agora=Date.now();
+    hs.forEach(h=>{
+      if(usePj){const kp=kgProj(p,h);if(kp==null)semPj++;else{const n=pr.decks||1;h.decks=Array.from({length:n},()=>({prod:pr.prod,kg:Math.round(kp/n*10)/10}));if(pr.booster!=null)h.booster=pr.booster;if(pr.tampao!=null)h.tampao=pr.tampao;if(pr.detTipo)h.detTipo=pr.detTipo;if(pr.detQtd!=null)h.detQtd=pr.detQtd;}}
+      if(kg!=null||prod){const d0=(h.decks&&h.decks[0])||{};h.decks=[{prod:prod||d0.prod||pr.prod||'',kg:kg!=null?kg:num(d0.kg)}];}
+      if(bo!=null)h.booster=bo;if(br!=null)h.brinel=br;if(dt)h.detTipo=dt;if(dq!=null)h.detQtd=dq;if(ta!=null)h.tampao=ta;if(ca)h.caminhao=ca;if(ag)h.agua=ag;
+      if(ob)h.obs=h.obs?h.obs+' · '+ob:ob;
+      if(st)h.status=st;else if(h.status==='pendente'&&(holeKg(h)>0||ca))h.status='carregado';
+      carimbaLotes(p,h);histAdd(h,'Lote: '+resumoFuro(h));h.ts=agora;h.por=meuNome();markF(p.id,h.id);});
+    save();closeSheet();selSet.clear();selMode=false;renderPoly();toast(`${nf(hs.length)} atualizados`+(semPj?` · ${semPj} sem carga de projeto`:''));
+    const fora=hs.filter(h=>alertasFuro(p,h).length);if(fora.length)aviso(`<b>${nf(fora.length)} fora do projeto</b><br>${fora.slice(0,8).map(h=>esc(h.id)+': '+esc(alertasFuro(p,h)[0])).join('<br>')}${fora.length>8?'<br>…':''}`);
+  };
+}
+function editLotes(p){
+  const l=p.lotes||{};
+  openSheet(`<h3>Lotes em uso<button class="btn sm" id="loClose">Fechar</button></h3><p class="mut" style="margin:0">Os lotes daqui são gravados em cada furo carregado a partir de agora. Troque quando mudar o lote no caminhão ou no paiol.</p>
+  <label>Lote do produto (emulsão / granel)</label><input id="loP" value="${esc(l.prod||'')}">
+  <label>Lote do booster</label><input id="loB" value="${esc(l.booster||'')}">
+  <label>Lote do detonador</label><input id="loD" value="${esc(l.det||'')}">
+  <div class="btns"><button class="btn pri" id="loOk">Salvar lotes</button></div>`);
+  $('#loClose').onclick=closeSheet;
+  $('#loOk').onclick=()=>{p.lotes={prod:$('#loP').value.trim(),booster:$('#loB').value.trim(),det:$('#loD').value.trim()};markP(p.id);save();closeSheet();toast('Lotes salvos');};
+}
+
+/* ===== Fotos do furo ===== */
+function verFoto(url,onDel){
+  const o=document.createElement('div');o.style.cssText='position:fixed;inset:0;z-index:45;background:rgba(0,0,0,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:12px';
+  o.innerHTML=`<img src="${url}" style="max-width:100%;max-height:80vh;border-radius:8px"><div class="btns" style="width:100%;max-width:420px"><button class="btn bad" data-a="del">Apagar foto</button><button class="btn" data-a="x">Fechar</button></div>`;
+  o.onclick=e=>{const a=e.target.dataset.a;if(a==='x'||e.target===o)o.remove();if(a==='del'){o.remove();onDel();}};document.body.appendChild(o);
+}
+async function fotosFuro(p,h){
+  const k=p.id+'|'+h.id;const box=$('#hFt');if(!box)return;
+  const pinta=arr=>{const b=$('#hFt');if(!b)return;b.innerHTML=arr.length?arr.map((f,i)=>`<img data-f="${i}" src="${f.url}">`).join(''):'<span class="mut">Nenhuma foto</span>';
+    b.querySelectorAll('img').forEach(im=>im.onclick=()=>verFoto(arr[+im.dataset.f].url,async()=>{arr.splice(+im.dataset.f,1);await fotoPut(k,arr);pinta(arr);}));};
+  let arr=await fotoGet(k);pinta(arr);
+  const rem=async()=>{const R=(await listarFotos(p.id)).filter(x=>x.furo_id===h.id&&!arr.some(a=>a.ts===x.ts));if(!R.length||!$('#hFt'))return;
+    const b=$('#hFt');if(!arr.length)b.innerHTML='';b.insertAdjacentHTML('beforeend',R.map((x,i)=>`<img data-r="${i}" src="${esc(x.url)}" title="${esc(x.por||'')}">`).join(''));
+    b.querySelectorAll('img[data-r]').forEach(im=>im.onclick=()=>verFoto(R[+im.dataset.r].url,async()=>{try{await api({acao:'foto_apagar',token:SY().token,poly_id:p.id,furo_id:h.id,ts:R[+im.dataset.r].ts});delete fotosRem[p.id];im.remove();toast('Foto apagada da equipe');}catch(e){toast(e.message);}}));};
+  rem();
+  const bt=$('#hFoto');if(bt)bt.onclick=async()=>{const file=await pickFile('image/*');if(!file)return;
+    try{const im=await imageFileToImage(file,1280);arr=await fotoGet(k);const ts=Date.now();arr.push({ts,url:im.url});const ok=await fotoPut(k,arr);pinta(arr);
+      if(ok&&SY().token&&!SY().fotoOff){filaFoto(p.id,h.id,ts);enviarFotos();toast('Foto guardada e enviada para a equipe');}else toast(ok?'Foto guardada neste celular':'Aparelho sem espaço para a foto');}catch(e){toast('Não consegui abrir a foto');}};
+}
+
+/* ===== GPS (só para polígono importado com coordenadas UTM) ===== */
+function geoUTM(g){return !!g&&g.mx>100000&&g.mx<900000&&-g.my>1000000&&-g.my<10000000;}
+function ll2utm(lat,lon){
+  const a=6378137,f=1/298.257223563,k0=0.9996,e2=f*(2-f),ep2=e2/(1-e2),zone=Math.floor((lon+180)/6)+1,l0=((zone-1)*6-177)*Math.PI/180;
+  const fi=lat*Math.PI/180,la=lon*Math.PI/180,sf=Math.sin(fi),cf=Math.cos(fi),N=a/Math.sqrt(1-e2*sf*sf),T=Math.tan(fi)**2,C=ep2*cf*cf,A=cf*(la-l0);
+  const M=a*((1-e2/4-3*e2*e2/64-5*e2**3/256)*fi-(3*e2/8+3*e2*e2/32+45*e2**3/1024)*Math.sin(2*fi)+(15*e2*e2/256+45*e2**3/1024)*Math.sin(4*fi)-(35*e2**3/3072)*Math.sin(6*fi));
+  const E=k0*N*(A+(1-T+C)*A**3/6+(5-18*T+T*T+72*C-58*ep2)*A**5/120)+500000;
+  let No=k0*(M+N*Math.tan(fi)*(A*A/2+(5-T+9*C+4*C*C)*A**4/24+(61-58*T+T*T+600*C-330*ep2)*A**6/720));if(lat<0)No+=10000000;
+  return{E,N:No,zone};
+}
+let gpsOn=false,gpsId=null,gpsPos=null,gpsErr='';
+function gpsStart(){
+  if(!navigator.geolocation){toast('Este aparelho não tem GPS no navegador');return;}
+  gpsOn=true;gpsErr='';
+  gpsId=navigator.geolocation.watchPosition(ps=>{gpsPos={lat:ps.coords.latitude,lon:ps.coords.longitude,acc:ps.coords.accuracy};gpsErr='';gpsDraw();},
+    e=>{gpsErr=e.code===1?'Permissão do GPS negada. Libere a localização para este site.':'Sem sinal do GPS.';gpsDraw();},{enableHighAccuracy:true,maximumAge:3000,timeout:20000});
+}
+function gpsStop(){gpsOn=false;if(gpsId!=null)navigator.geolocation.clearWatch(gpsId);gpsId=null;gpsPos=null;}
+function gpsDraw(){
+  const gG=$('#gpsG'),info=$('#gpsInfo'),p=cur();if(!gG||!p||!p.geo||!lastGeom)return;
+  if(!gpsOn){gG.innerHTML='';return;}
+  if(!gpsPos){if(info)info.textContent=gpsErr||'Procurando sinal do GPS…';return;}
+  const u=ll2utm(gpsPos.lat,gpsPos.lon),x=u.E-p.geo.mx,y=-u.N-p.geo.my,g=lastGeom;
+  let best=null,bd=Infinity;p.holes.forEach(h=>{const d=Math.hypot(h.x-x,h.y-y);if(d<bd){bd=d;best=h;}});
+  const ext=Math.max(g.W,g.H);
+  if(bd>ext*3){gG.innerHTML='';if(info)info.innerHTML=`Você está a <b>${fmt(bd)} m</b> do polígono (fora do mapa). Precisão ${fmt(gpsPos.acc)} m.`;return;}
+  gG.innerHTML=`<circle cx="${g.X(x)}" cy="${g.Y(y)}" r="${Math.max(gpsPos.acc,g.r)}" fill="rgba(11,92,173,.12)" stroke="#0b5cad" stroke-width="${g.r*0.08}"/><circle cx="${g.X(x)}" cy="${g.Y(y)}" r="${g.r*0.55}" fill="#0b5cad" stroke="#fff" stroke-width="${g.r*0.2}"/>`;
+  if(info)info.innerHTML=`📍 Furo mais perto: <b>${esc(best.id)}</b> a ${fmt(bd,1)} m · precisão do GPS ${fmt(gpsPos.acc)} m${gpsPos.acc>5?' (fraca)':''} <button class="btn sm" id="gpsOpen" style="margin-left:6px">Abrir ${esc(best.id)}</button>`;
+  const b=$('#gpsOpen');if(b)b.onclick=()=>editHole(p.holes.indexOf(best));
+}
+
+/* ===== Liberação: situação do polígono e checklists ===== */
+const situDe=p=>p.situ||'aberto';
+function tabLiber(p){
+  p.check=p.check||{};
+  const bloco=(k,tit,itens)=>{const c=p.check[k]||{it:{}};const nOk=itens.filter((_,i)=>c.it&&c.it[i]).length;
+    return`<div class="card"><h2>${tit} <span class="mut">(${nOk}/${itens.length})</span></h2>${itens.map((t,i)=>`<label class="chk"><input type="checkbox" data-k="${k}" data-i="${i}" ${c.it&&c.it[i]?'checked':''}>${esc(t)}</label>`).join('')}
+    <div class="row" style="margin-top:6px"><div><label>Liberado por</label><input id="nm_${k}" value="${esc(c.nome||meuNome()||p.resp||'')}"></div><div style="align-self:end"><button class="btn ${c.ts?'':'pri'}" data-lib="${k}" style="width:100%">${c.ts?'Registrar de novo':'Registrar liberação'}</button></div></div>
+    ${c.ts?`<div class="hint" style="background:#eaf7ef;border-color:#b5e0c4">✔ Registrado por <b>${esc(c.nome)}</b> em ${new Date(c.ts).toLocaleString('pt-BR')}${nOk<itens.length?` · <b style="color:var(--bad)">${itens.length-nOk} item(ns) não marcado(s)</b>`:''}</div>`:''}</div>`;};
+  const si=situDe(p);
+  $('#tabBox').innerHTML=`<div class="card"><h2>Situação do polígono</h2><div class="seg" id="situ">${Object.entries(SITU).map(([k,v])=>`<button data-s="${k}" class="${si===k?'on':''}">${v.n}</button>`).join('')}</div>
+  ${si==='detonado'?`<div class="row"><div><label>Data e hora da detonação</label><input id="detAt" type="datetime-local" value="${esc(p.detAt||'')}"></div></div>`:''}</div>
+  ${bloco('pre','Antes do carregamento',CHK_PRE)}${bloco('fim','Fechamento do carregamento',CHK_FIM)}
+  <p class="mut">O checklist é registro do que foi conferido em campo. Ele não substitui os procedimentos e liberações da mina.</p>`;
+  document.querySelectorAll('#situ button').forEach(b=>b.onclick=()=>{
+    const v=b.dataset.s;const pend=p.holes.filter(h=>h.status==='pendente').length;
+    const ap=()=>{p.situ=v;markP(p.id);save();tabLiber(p);toast('Situação: '+SITU[v].n);};
+    if(v!=='aberto'&&pend)confirmBox(`Ainda há ${nf(pend)} pendente(s). Marcar como "${SITU[v].n}" mesmo assim?`,ap,'Marcar');else ap();});
+  if($('#detAt'))$('#detAt').onchange=e=>{p.detAt=e.target.value;markP(p.id);save();};
+  document.querySelectorAll('#tabBox input[data-k]').forEach(c=>c.onchange=()=>{const k=c.dataset.k;p.check[k]=p.check[k]||{it:{}};p.check[k].it=p.check[k].it||{};p.check[k].it[c.dataset.i]=c.checked;markP(p.id);save();});
+  document.querySelectorAll('[data-lib]').forEach(b=>b.onclick=()=>{const k=b.dataset.lib;const nm=$('#nm_'+k).value.trim();if(!nm){toast('Informe quem liberou');return;}p.check[k]=p.check[k]||{it:{}};p.check[k].nome=nm;p.check[k].ts=Date.now();
+    if(k==='fim'&&situDe(p)==='aberto'&&!p.holes.some(h=>h.status==='pendente'))p.situ='carregado';markP(p.id);save();tabLiber(p);toast('Liberação registrada');});
+}
+
+/* ===== Relatório completo para imprimir / salvar em PDF ===== */
+async function imprimir(p){
+  busy('Montando relatório…');
+  try{
+    const r=resumo(p),cf=conferencia(p),pj=projDe(p),tz=analiseTempo(p);
+    let img='';try{const c=await croquiCanvas(p);img=c.toDataURL('image/jpeg',.85);}catch(e){}
+    const T=(rows,head)=>`<table><thead><tr>${head.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(rw=>`<tr>${rw.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    const cams=[...new Set([...Object.keys(r.cam),...Object.keys(p.cams||{})])].filter(c=>c!=='Sem caminhão'||r.cam[c]);
+    const ck=k=>{const c=(p.check||{})[k];const it=k==='pre'?CHK_PRE:CHK_FIM;return T(it.map((t,i)=>[esc(t),c&&c.it&&c.it[i]?'✔':'—']),['Item','Conferido'])+`<p>${c&&c.ts?'Registrado por <b>'+esc(c.nome)+'</b> em '+new Date(c.ts).toLocaleString('pt-BR'):'Não registrado'}</p>`;};
+    let h=`<h1>Relatório de carregamento – POL ${esc(p.pol)}</h1><div>${esc(p.mina)}${p.cava?' / '+esc(p.cava):''}${p.banco?' · Banco '+esc(p.banco):''} · Data ${brDate(p.data)}${p.resp?' · Responsável: '+esc(p.resp):''} · Situação: <b>${SITU[situDe(p)].n}</b>${p.detAt?' em '+new Date(p.detAt).toLocaleString('pt-BR'):''}</div><div style="color:#555">Gerado em ${new Date().toLocaleString('pt-BR')}${meuNome()?' por '+esc(meuNome()):''}</div>
+    <h2>Resumo</h2>${T([[r.total,r.st.carregado,r.st.pendente,r.st.repasse,r.st.perdido,r.st.nao,r.agua,fmt(r.kg)+' kg',fmt(r.pmMed,1)+' / '+fmt(r.ppMed,1)+' m']],['Furos','Carregados','Pendentes','Repasse','Perdidos','Não carregar','Com água','Total lançado','Prof. média med./proj.'])}
+    <h2>Consumo lançado</h2>${T([...Object.entries(r.prod).map(([k,v])=>[esc(k),fmt(v)+' kg']),['Booster',fmt(r.booster)+' un'],['Brinel',fmt(r.brinel)+' un'],...Object.entries(r.det).map(([k,v])=>[esc(k),fmt(v)+' un'])],['Item','Quantidade'])}`;
+    if(pj.kg!=null||p.holes.some(x=>x.cargaProj!=null)){const lanc=cf.n.ok+cf.n.abaixo+cf.n.acima;h+=`<h2>Projeto x executado</h2>${T([[fmt(cf.kgProj)+' kg',fmt(cf.kgExec)+' kg',cf.kgProj?fmt((cf.kgExec-cf.kgProj)/cf.kgProj*100,1)+'%':'–',`${cf.n.ok}/${lanc}`,cf.n.abaixo,cf.n.acima,cf.profBaixa]],['Carga projeto','Executado','Diferença',`Na tolerância (±${fmt(pj.tolKg,0)}%)`,'Abaixo','Acima','Prof. abaixo'])}`;}
+    if(cams.length)h+=`<h2>Caminhões</h2>${T(cams.map(c=>{const d=(p.cams||{})[c]||{};const kl=Object.values(r.cam[c]||{}).reduce((a,b)=>a+b,0);const cd=camDif(p,c,kl);return[esc(c),esc(d.nf||(p.nfs||{})[c]||''),fmt(num(d.kgNF)),fmt(num(d.kgRet)),fmt(kl),cd?cd.txt:'–',esc(d.dens||''),esc(d.temp||''),esc(d.oper||''),esc([d.ini,d.fim].filter(Boolean).join(' – '))];}),['Caminhão','NF','kg NF','Retorno','Lançado','Diferença','Dens.','Temp.','Operador','Horário'])}`;
+    const ac=acessRows(p,r);if(ac.length)h+=`<h2>Acessórios</h2>${T(ac.map(a=>[esc(a.n),fmt(a.ret),fmt(a.apl),fmt(a.dev),a.ret==null?'–':'<b>'+fmt(a.saldo)+'</b>']),['Item','Retirado','Aplicado','Devolvido','Saldo'])}`;
+    if(tz.com.length)h+=`<h2>Temporização (importada)</h2><p>Furos com tempo ${tz.com.length}/${tz.ativos} · ${fmt(tz.t0)} a ${fmt(tz.t1)} ms · detonadores com tempo ${tz.dets}${p.dvtProg!=null?' · DVT programado '+p.dvtProg:''}${tz.rep.length?' · tempos repetidos: '+tz.rep.length:''}</p>`;
+    const lt=p.lotes&&Object.values(p.lotes).some(Boolean)?`<p>Lotes em uso: produto ${esc(p.lotes.prod||'–')} · booster ${esc(p.lotes.booster||'–')} · detonador ${esc(p.lotes.det||'–')}</p>`:'';
+    h+=`<h2>Liberação – antes do carregamento</h2>${ck('pre')}<h2>Liberação – fechamento</h2>${ck('fim')}${lt}`;
+    const po=p.pos;if(po&&po.ts)h+=`<h2>Pós-fogo</h2>${T([[po.dt?new Date(po.dt).toLocaleString('pt-BR'):'',esc(po.nome||''),po.falhas&&po.falhas.length?esc(po.falhas.join(', ')):'Nenhuma',esc(FRAG[po.frag]||''),po.matacoes??'',po.ultra==='sim'?'Sim'+(po.ultraDist!=null?' ('+fmt(po.ultraDist)+' m)':''):'Não',esc(FUMACA[po.fumaca]||''),po.vib!=null?fmt(po.vib,1):'',po.ruido!=null?fmt(po.ruido,0):'']],['Inspeção','Por','Falhas','Fragmentação','Matacões','Ultralanç.','Fumaça','Vib. mm/s','dB'])}${po.obs?'<p>'+esc(po.obs)+'</p>':''}`;
+    if(img)h+=`<h2 class="pb">Croqui</h2><img src="${img}">`;
+    try{const fot=[];for(const x of [...p.holes,{id:'_pos'}]){const a=await fotoGet(p.id+'|'+x.id);a.forEach(f=>fot.push([x.id,f.url,f.ts]));}
+      (await listarFotos(p.id)).forEach(r=>{if(!fot.some(f=>f[0]===r.furo_id&&f[2]===r.ts))fot.push([r.furo_id,r.url,r.ts]);});
+      if(fot.length)h+=`<h2 class="pb">Fotos</h2><div style="display:flex;flex-wrap:wrap;gap:8px">${fot.map(([id,u])=>`<div style="width:31%"><img src="${esc(u)}" style="width:100%"><div>${id==='_pos'?'Pós-fogo':'Furo '+esc(id)}</div></div>`).join('')}</div>`;}catch(e){}
+    h+=`<h2 class="pb">Furo a furo</h2>${T(p.holes.map(x=>[`<b>${esc(x.id)}</b>`,ST[x.status].n,fmt(x.profProj,1),fmt(x.profMed,1),AGUA_N[x.agua]||'',(x.decks||[]).map(d=>`${esc(d.prod||'')} ${fmt(num(d.kg))}`).join(' + '),holeKg(x)?fmt(holeKg(x)):'',x.booster??'',[x.detQtd,x.detTipo].filter(Boolean).join(' '),fmt(x.tampao,1),esc(camCurto(x.caminhao)),temTempo(x)?(x.tempos&&x.tempos.length>1?x.tempos.join('/'):fmt(x.tempo)):'',esc((x.cond||[]).join(', ')),esc(x.obs||''),esc(x.por||'')]),['Furo','Status','Proj.','Med.','Água','Decks (kg)','Total','Bst','Detonador','Tamp.','Cam.','ms','Condição','Obs.','Por'])}`;
+    h+=`<div class="sig"><div>Responsável pelo carregamento</div><div>Blaster</div><div>Supervisão</div></div>`;
+    let pr=$('#print');if(!pr){pr=document.createElement('div');pr.id='print';document.body.appendChild(pr);}pr.innerHTML=h;busy();
+    const fim=()=>{window.removeEventListener('afterprint',fim);};window.addEventListener('afterprint',fim);
+    setTimeout(()=>{try{window.print();}catch(e){toast('Este navegador não deixou imprimir');}},300);
+  }catch(e){busy();console.error(e);toast('Não consegui montar o relatório');}
+}
+
+/* ===== Caminhões (NF x lançado) e acessórios ===== */
+function camDif(p,c,kl){const d=(p.cams||{})[c]||{};const kn=num(d.kgNF);if(kn==null)return null;const sai=kn-(num(d.kgRet)||0);if(sai<=0)return null;const dif=kl-sai,pc=dif/sai*100,tol=projDe(p).tolCam;
+  return{dif,pc,ok:Math.abs(pc)<=tol,txt:`${dif>=0?'+':''}${fmt(dif)} kg (${pc>=0?'+':''}${fmt(pc,1)}%)`};}
+function acessRows(p,r){const A=p.acess||{};const it=[['Booster',r.booster],['Brinel',r.brinel],...DETS.map(t=>[t,r.det[t]||0])];
+  return it.filter(([n,apl])=>apl||A[n]).map(([n,apl])=>{const a=A[n]||{};const ret=num(a.ret),dev=num(a.dev);return{n,apl,ret,dev,saldo:ret==null?null:ret-apl-(dev||0)};});}
+
+/* ===== Painel geral (todos os polígonos) ===== */
+let painelPer='7',painelMina='';
+function painel(){
+  const ini=painelPer==='tudo'?'':(()=>{const d=new Date();d.setDate(d.getDate()-(+painelPer-1));return dayOf(d.getTime());})();
+  const ps=S.polys.filter(p=>!painelMina||p.mina===painelMina);
+  const R={furos:0,kg:0,prod:{},cam:{},booster:0,brinel:0,det:{},polys:new Set(),linhas:[]};
+  ps.forEach(p=>p.holes.forEach(h=>{if(!h.ts||(ini&&dayOf(h.ts)<ini))return;if(!(h.status==='carregado'||holeKg(h)>0))return;
+    R.furos++;R.polys.add(p.id);const c=h.caminhao||'Sem caminhão';
+    (h.decks||[]).forEach(d=>{const kg=num(d.kg)||0;if(!kg)return;const pr=d.prod||'Sem produto';R.kg+=kg;R.prod[pr]=(R.prod[pr]||0)+kg;R.cam[c]=(R.cam[c]||0)+kg;R.linhas.push([dayOf(h.ts),p.mina,p.pol,c,pr,kg]);});
+    R.booster+=num(h.booster)||0;R.brinel+=num(h.brinel)||0;if(h.detTipo&&h.detQtd)R.det[h.detTipo]=(R.det[h.detTipo]||0)+h.detQtd;}));
+  return R;
+}
+function painelHTML(){
+  const R=painel();
+  return`<h2>Painel geral</h2><div class="seg" id="pnPer">${[['1','Hoje'],['7','7 dias'],['30','30 dias'],['tudo','Tudo']].map(([k,t])=>`<button data-p="${k}" class="${painelPer===k?'on':''}">${t}</button>`).join('')}</div>
+  <select id="pnMina" style="margin-top:8px">${opts(MINAS,painelMina,'Todas as minas')}</select>
+  <div class="kpis" style="margin-top:8px"><div class="kpi"><b>${R.polys.size}</b><span>polígonos com lançamento</span></div><div class="kpi"><b>${fmt(R.furos)}</b><span>furos carregados</span></div><div class="kpi"><b>${fmt(R.kg)}</b><span>kg lançados</span></div><div class="kpi"><b>${fmt(R.booster)}</b><span>boosters</span></div></div>
+  ${R.kg?`<table style="margin-top:8px"><tbody>${Object.entries(R.prod).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n"><b>${fmt(v)} kg</b></td></tr>`).join('')}${Object.entries(R.det).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${fmt(v)} un</td></tr>`).join('')}${R.brinel?`<tr><td>Brinel</td><td class="n">${fmt(R.brinel)} un</td></tr>`:''}</tbody></table>
+  <table style="margin-top:8px"><thead><tr><th>Caminhão</th><th class="n">kg</th></tr></thead><tbody>${Object.entries(R.cam).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<tr><td><i class="dot" style="background:${camCor(k==='Sem caminhão'?'':k)}"></i>${esc(k)}</td><td class="n">${fmt(v)}</td></tr>`).join('')}</tbody></table>
+  <div class="btns"><button class="btn" id="pnCsv">Exportar consumo do período (CSV)</button></div>`:'<p class="mut">Nenhum lançamento no período.</p>'}`;
+}
+function bindPainel(){
+  document.querySelectorAll('#pnPer button').forEach(b=>b.onclick=()=>{painelPer=b.dataset.p;$('#painel').innerHTML=painelHTML();bindPainel();});
+  $('#pnMina').onchange=e=>{painelMina=e.target.value;$('#painel').innerHTML=painelHTML();bindPainel();};
+  if($('#pnCsv'))$('#pnCsv').onclick=()=>{const R=painel();const ag={};R.linhas.forEach(([d,m,pl,c,pr,kg])=>{const k=[d,m,pl,c,pr].join(';');ag[k]=(ag[k]||0)+kg;});
+    exportBox('Consumo do período','consumo-'+today()+'.csv',['Data;Mina;POL;Caminhao;Produto;Kg',...Object.entries(ag).sort().map(([k,v])=>k+';'+String(v).replace('.',','))].join('\n'),'text/csv');};
+}
+
+/* ===== Ler PDF de temporização em imagem (reconhece os números no desenho) ===== */
+let tessP=null,tessLocal=true;
+function loadTess(){return tessP||(tessP=(async()=>{if(!window.Tesseract){try{await loadScript(['lib/tesseract/tesseract.min.js']);}catch(e){tessLocal=false;await loadScript(['https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js']);}}return window.Tesseract;})().catch(e=>{tessP=null;throw e;}));}
+async function tessWorker(){
+  const T=await loadTess();
+  const o=tessLocal?{workerPath:'lib/tesseract/worker.min.js',corePath:'lib/tesseract/',langPath:'lib/tesseract/lang',gzip:true}
+    :{workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1',langPath:'https://tessdata.projectnaptha.com/4.0.0'};
+  const w=await T.createWorker('eng',1,o);await w.setParameters({tessedit_char_whitelist:'0123456789'});return w;
+}
+// furos = bolinhas coloridas (amarelas, verdes…); tempos = números azuis ao lado do furo
+const ehDot=(r,g,b)=>{const mx=Math.max(r,g,b),mn=Math.min(r,g,b);return mx-mn>90&&b<mx-60&&!(r>170&&g<90&&b<90);};
+const ehAzul=(r,g,b)=>b>130&&r<140&&g<140&&b-r>50;
+function manchas(mask,W,H){const lab=new Int32Array(W*H),out=[];let id=0;const st=[];
+  for(let i=0;i<W*H;i++){if(!mask[i]||lab[i])continue;id++;let n=0,sx=0,sy=0,x0=1e9,x1=-1,y0=1e9,y1=-1;lab[i]=id;st.push(i);
+    while(st.length){const k=st.pop(),x=k%W,y=(k-x)/W;n++;sx+=x;sy+=y;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;
+      for(const q of [k-1,k+1,k-W,k+W]){if(q>=0&&q<W*H&&mask[q]&&!lab[q]&&Math.abs(q%W-x)<=1){lab[q]=id;st.push(q);}}}
+    out.push({n,x:sx/n,y:sy/n,w:x1-x0+1,h:y1-y0+1});}
+  return out;}
+async function renderPagina(doc,i,esc){const page=await doc.getPage(i);const vp=page.getViewport({scale:esc});const c=document.createElement('canvas');c.width=Math.round(vp.width);c.height=Math.round(vp.height);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);await page.render({canvasContext:x,viewport:vp}).promise;return c;}
+function furosDaImagem(c){
+  const W=c.width,H=c.height,d=c.getContext('2d').getImageData(0,0,W,H).data;const m=new Uint8Array(W*H);
+  for(let i=0;i<W*H;i++){const r=d[i*4],g=d[i*4+1],b=d[i*4+2];if(ehDot(r,g,b))m[i]=1;}
+  const tudo=manchas(m,W,H);let ms=tudo.filter(s=>s.n>=12&&s.w<=3*s.h&&s.h<=3*s.w&&s.n>=0.45*s.w*s.h);
+  if(!ms.length)return[];
+  const ns=ms.map(s=>s.n).sort((a,b)=>a-b),med=ns[Math.floor(ns.length/2)];
+  ms=ms.filter(s=>s.n>=med*0.45&&s.n<=med*2.2);
+  const cor=tudo.reduce((a,s)=>a+s.n,0),dots=ms.reduce((a,s)=>a+s.n,0);ms.limpo=cor?dots/cor:0; // página "limpa" = quase só bolinhas
+  return ms;
+}
+async function lerPdfTempos(file,onMsg){
+  onMsg('Abrindo PDF…');const lib=await loadPdf();const doc=await lib.getDocument({data:new Uint8Array(await readBuf(file)),isEvalSupported:false}).promise;
+  const ESC=192/72;let best=null;
+  for(let i=1;i<=doc.numPages;i++){onMsg(`Procurando os furos (página ${i} de ${doc.numPages})…`);const c=await renderPagina(doc,i,ESC);const fs=furosDaImagem(c);
+    const W=c.width,H=c.height,dd=c.getContext('2d').getImageData(0,0,W,H).data;let az=0;for(let k=0;k<W*H;k+=7)if(ehAzul(dd[k*4],dd[k*4+1],dd[k*4+2]))az++;
+    const nota=fs.length*(az>200?1:0.2)*(fs.limpo||0);if(!best||nota>best.nota||(nota===best.nota&&i>best.i))best={i,c,fs,nota};}
+  if(!best||best.fs.length<3)throw new Error('Não achei os furos nesse PDF. Ele precisa ter uma página com as bolinhas dos furos e os tempos escritos ao lado.');
+  const {c,fs}=best,W=c.width,H=c.height;const r=Math.sqrt(fs.map(s=>s.n).sort((a,b)=>a-b)[Math.floor(fs.length/2)]/Math.PI);
+  // máscara só com o texto azul
+  const src=c.getContext('2d').getImageData(0,0,W,H),t=document.createElement('canvas');t.width=W;t.height=H;const tx=t.getContext('2d'),td=tx.createImageData(W,H);
+  for(let k=0;k<W*H;k++){const az=ehAzul(src.data[k*4],src.data[k*4+1],src.data[k*4+2]);const v=az?0:255;td.data[k*4]=td.data[k*4+1]=td.data[k*4+2]=v;td.data[k*4+3]=255;}tx.putImageData(td,0,0);
+  onMsg('Carregando o leitor de números (a 1ª vez pode demorar)…');const w=await tessWorker();
+  const votos=fs.map(()=>({}));
+  const passes=[[3,'11'],[4,'12']];let pn=0;
+  for(const [S,psm] of passes){pn++;onMsg(`Lendo os tempos (passada ${pn} de ${passes.length})…`);
+    const big=document.createElement('canvas');big.width=W*S;big.height=H*S;const bx=big.getContext('2d');bx.imageSmoothingEnabled=true;bx.imageSmoothingQuality='high';bx.drawImage(t,0,0,W*S,H*S);
+    await w.setParameters({tessedit_pageseg_mode:psm});const {data}=await w.recognize(big);
+    (data.words||[]).forEach(wd=>{const s=String(wd.text||'').replace(/\D/g,'');if(s.length<2||s.length>5)return;const x=wd.bbox.x0/S,y=wd.bbox.y0/S;
+      let bi=-1,bd=Infinity;fs.forEach((f,i)=>{const dd=Math.hypot(x-f.x-2.1*r,y-f.y-1.7*r);if(dd<bd){bd=dd;bi=i;}});
+      if(bi>=0&&bd<1.3*r){const v=votos[bi];v[s]=(v[s]||0)+(wd.confidence>70?2:1);}});}
+  await w.terminate();
+  const furos=fs.map((f,i)=>{const e=Object.entries(votos[i]).sort((a,b)=>b[1]-a[1]);const t=e.length?e[0][0]:'';const ok=!!t&&t.length>=3&&e[0][1]>=3&&(e.length<2||e[0][1]>=2*e[1][1]);return{x:f.x,y:f.y,t,ok,alt:e.slice(1,3).map(q=>q[0])};});
+  // fundo: 1ª página (normalmente a foto de satélite) ou a própria página
+  let fundo=best.c;if(best.i!==1){try{const p1=await renderPagina(doc,1,ESC);if(p1.width===W&&p1.height===H)fundo=p1;}catch(e){}}
+  return{furos,canvas:c,fundo,r,pagina:best.i};
+}
+function recorteFuro(c,f,r){const w=Math.round(12*r),h=Math.round(6*r),x0=Math.max(0,Math.round(f.x-2*r)),y0=Math.max(0,Math.round(f.y-2*r));const o=document.createElement('canvas');o.width=w*2;o.height=h*2;o.getContext('2d').drawImage(c,x0,y0,w,h,0,0,w*2,h*2);return o.toDataURL('image/png');}
+// tela de conferência: o usuário confirma os números duvidosos antes de usar
+function conferirOcr(res,aoFim){
+  const F=res.furos;let soDuv=true;
+  const lens={};F.forEach(f=>{if(f.t)lens[f.t.length]=(lens[f.t.length]||0)+1;});const lenMod=+(Object.entries(lens).sort((a,b)=>b[1]-a[1])[0]||[0])[0];
+  const draw=()=>{const cnt={};F.forEach(f=>{if(f.t)cnt[f.t]=(cnt[f.t]||0)+1;});
+    const duv=F.map((f,i)=>[f,i]).filter(([f])=>!f.ok||!f.t||cnt[f.t]>1||!/^\d{3,5}$/.test(f.t)||(lenMod&&f.t.length!==lenMod&&!f.conf));
+    const lista=soDuv?duv:F.map((f,i)=>[f,i]);
+    openSheet(`<h3>Conferir tempos lidos<button class="btn sm" id="ocX">Cancelar</button></h3>
+    <p style="margin:0">${nf(F.length)} achados na página ${res.pagina} · <b style="color:${duv.length?'var(--bad)':'var(--ok)'}">${duv.length} para conferir</b></p>
+    <p class="mut" style="margin:4px 0 8px">Olhe o número ao lado da bolinha na imagem e corrija se estiver errado. Furo sem tempo pode ficar vazio.</p>
+    <div class="seg" id="ocM" style="margin-bottom:8px"><button data-m="1" class="${soDuv?'on':''}">Só duvidosos (${duv.length})</button><button data-m="0" class="${soDuv?'':'on'}">Todos (${F.length})</button></div>
+    <div style="max-height:50vh;overflow:auto">${lista.map(([f,i])=>`<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)"><img src="${recorteFuro(res.canvas,f,res.r)}" style="height:${Math.round(12*res.r)}px;max-width:55%;border:1px solid var(--line);border-radius:6px;background:#fff"><input data-o="${i}" inputmode="numeric" value="${esc(f.t)}" style="flex:1;${(!f.ok||cnt[f.t]>1)?'border-color:var(--bad)':''}">${cnt[f.t]>1?'<span class="mut">repetido</span>':''}</div>`).join('')||'<p class="mut">Nada para conferir.</p>'}</div>
+    <div class="btns"><button class="btn pri" id="ocOk">Usar estes tempos</button></div>`);
+    $('#ocX').onclick=closeSheet;
+    document.querySelectorAll('#ocM button').forEach(b=>b.onclick=()=>{soDuv=b.dataset.m==='1';draw();});
+    document.querySelectorAll('[data-o]').forEach(inp=>inp.onchange=()=>{const f=F[+inp.dataset.o];f.t=inp.value.replace(/\D/g,'');f.ok=true;f.conf=true;});
+    $('#ocOk').onclick=()=>{document.querySelectorAll('[data-o]').forEach(inp=>{const f=F[+inp.dataset.o];f.t=inp.value.replace(/\D/g,'');});
+      const rep=Object.entries(F.reduce((a,f)=>{if(f.t)a[f.t]=(a[f.t]||0)+1;return a;},{})).filter(([,n])=>n>1);
+      const fim=()=>{closeSheet();aoFim(F.filter(f=>f.t));};
+      if(rep.length)confirmBox(`Há tempo repetido (${rep.map(r=>r[0]).slice(0,5).join(', ')}). No plano isso significa furos detonando juntos. Usar mesmo assim?`,fim,'Usar');else fim();};};
+  draw();
+}
+async function pdfTemposFluxo(destino){ // destino: polígono existente (encaixa tempos) ou null (devolve dados para novo polígono)
+  const file=await pickFile('.pdf');if(!file)return null;
+  try{const res=await lerPdfTempos(file,m=>busy(m));busy();
+    return await new Promise(ok=>conferirOcr(res,F=>{
+      const xs=F.map(f=>f.x),ys=F.map(f=>f.y),mg=res.r*14;const x0=Math.max(0,Math.min(...xs)-mg),y0=Math.max(0,Math.min(...ys)-mg),x1=Math.min(res.fundo.width,Math.max(...xs)+mg),y1=Math.min(res.fundo.height,Math.max(...ys)+mg);
+      const T=F.map(f=>({id:f.t,x:f.x-x0,y:f.y-y0,tempo:+f.t,tempos:null}));
+      if(destino){tzEncaixar(destino,T);ok(true);return;}
+      const cc=document.createElement('canvas');cc.width=Math.round(x1-x0);cc.height=Math.round(y1-y0);cc.getContext('2d').drawImage(res.fundo,x0,y0,cc.width,cc.height,0,0,cc.width,cc.height);
+      ok({holes:T.map(t=>{const h=novoFuro(t.id,t.x,t.y,null);h.tempo=t.tempo;return h;}),bg:{url:cc.toDataURL('image/jpeg',.8),w:cc.width,h:cc.height},nome:file.name.replace(/\.pdf$/i,''),resumo:`tempos lidos do PDF (${T.length} furos, conferidos)`});}));
+  }catch(e){busy();console.error(e);toast(e.message&&e.message.length<160?e.message:'Não consegui ler o PDF');return null;}
+}
+
+/* ===== Alertas de tolerância ===== */
+function alertasFuro(p,h){
+  const pr=projDe(p),a=[];if(h.status==='perdido'||h.status==='nao')return a;
+  if(h.profMed!=null&&h.profProj!=null&&h.profMed<h.profProj-pr.tolProf)a.push(`profundidade ${fmt(h.profMed,1)} m (projeto ${fmt(h.profProj,1)} m)`);
+  const dv=desvio(p,h);if(dv.c==='abaixo'||dv.c==='acima')a.push(`carga ${fmt(holeKg(h))} kg: ${dv.t.toLowerCase()}`);
+  if(pr.tampao!=null&&h.tampao!=null&&Math.abs(h.tampao-pr.tampao)>0.5)a.push(`tampão ${fmt(h.tampao,1)} m (projeto ${fmt(pr.tampao,1)} m)`);
+  if(pr.booster!=null&&h.booster!=null&&num(h.booster)!==pr.booster)a.push(`booster ${h.booster} (projeto ${pr.booster})`);
+  if(pr.detQtd!=null&&h.detQtd!=null&&num(h.detQtd)!==pr.detQtd)a.push(`detonadores ${h.detQtd} (projeto ${pr.detQtd})`);
+  return a;
+}
+function camFora(p,c){if(!c)return null;const kl=p.holes.filter(h=>h.caminhao===c).reduce((s,h)=>s+holeKg(h),0);const d=camDif(p,c,kl);return d&&!d.ok?d:null;}
+function aviso(txt,grave=true){
+  let b=$('#aviso');if(!b){b=document.createElement('div');b.id='aviso';b.style.cssText='position:fixed;left:8px;right:8px;top:62px;z-index:44;border-radius:12px;padding:12px 14px;color:#fff;font-size:15px;box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer';b.onclick=()=>b.remove();document.body.appendChild(b);}
+  b.style.background=grave?'#c92a2a':'#e67700';b.innerHTML=txt+'<div style="font-size:12px;opacity:.85;margin-top:4px">toque para fechar</div>';
+  clearTimeout(aviso._t);aviso._t=setTimeout(()=>{const x=$('#aviso');if(x)x.remove();},9000);
+  try{navigator.vibrate&&navigator.vibrate([180,90,180]);}catch(e){}
+}
+function notificar(titulo,txt){
+  try{if(S.ui&&S.ui.avisos&&'Notification' in window&&Notification.permission==='granted'&&document.hidden){new Notification(titulo,{body:txt,tag:'carreg-'+titulo});return;}}catch(e){}
+  aviso(`<b>${esc(titulo)}</b><br>${esc(txt)}`);
+}
+function checarAlertas(p,h,camAntes){
+  const a=alertasFuro(p,h);const c=camFora(p,h.caminhao);
+  const L=[];if(a.length)L.push(`<b>Furo ${esc(h.id)} fora do projeto</b><br>${a.map(esc).join('<br>')}`);
+  if(c&&!camAntes)L.push(`<b>${esc(h.caminhao)}</b>: lançado x NF fora da tolerância (${esc(c.txt)})`);
+  if(L.length)aviso(L.join('<hr style="border:0;border-top:1px solid rgba(255,255,255,.4)">'));
+}
+
+/* ===== Lançamento por voz ===== */
+const NUMP={zero:0,um:1,uma:1,dois:2,duas:2,'três':3,tres:3,quatro:4,cinco:5,seis:6,sete:7,oito:8,nove:9,dez:10,onze:11,doze:12,treze:13,quatorze:14,catorze:14,quinze:15,dezesseis:16,dezessete:17,dezoito:18,dezenove:19,vinte:20,meio:0.5,meia:0.5};
+function vozNum(tk,i){ // lê número a partir do token i: "2,5" "2 vírgula 5" "dois e meio"
+  let t=tk[i];if(t==null)return null;let v=num(t);if(v==null&&t in NUMP)v=NUMP[t];if(v==null)return null;let used=1;
+  if((tk[i+1]==='vírgula'||tk[i+1]==='virgula'||tk[i+1]==='ponto')&&tk[i+2]!=null&&/^\d+$/.test(tk[i+2])){v=num(t+'.'+tk[i+2]);used=3;}
+  else if(tk[i+1]==='e'&&(tk[i+2]==='meio'||tk[i+2]==='meia')){v+=0.5;used=3;}
+  return{v,used};
+}
+function parseVoz(txt,camList){
+  const s=' '+txt.toLowerCase().replace(/(\d)\s*kg\b/g,'$1 kg').replace(/(\d)\s*m\b/g,'$1 m').replace(/[.;:!?]/g,' ')+' ';
+  const tk=s.trim().split(/\s+/);const r={};
+  const kw=(w,arr)=>arr.some(a=>w===a||w.startsWith(a));
+  for(let i=0;i<tk.length;i++){const w=tk[i];
+    if(kw(w,['furo','buraco'])&&tk[i+1]){let id=tk[i+1];if(/^(número|numero|n)$/.test(id))id=tk[i+2];if(id!=null){const n=vozNum(tk,tk[i+1]===id?i+1:i+2);r.furo=n&&/^\d/.test(id)?String(n.v):id.toUpperCase();}continue;}
+    if(kw(w,['tampão','tampao','tampa'])){const n=vozNum(tk,i+1);if(n){r.tampao=n.v;i+=n.used;}continue;}
+    if(kw(w,['booster','buster','bus'])){const n=vozNum(tk,i+1);if(n){r.booster=n.v;i+=n.used;}else{const b=vozNum(tk,i-1);if(b)r.booster=b.v;}continue;}
+    if(kw(w,['brinel','brinell'])){const n=vozNum(tk,i+1);if(n){r.brinel=n.v;i+=n.used;}continue;}
+    if(kw(w,['detonador','espoleta'])){const n=vozNum(tk,i+1);if(n){r.detQtd=n.v;i+=n.used;}else{const b=vozNum(tk,i-1);if(b)r.detQtd=b.v;}continue;}
+    if(kw(w,['profundidade','prof','medida','medido','fundo'])){const n=vozNum(tk,i+1);if(n){r.profMed=n.v;i+=n.used;}continue;}
+    if(kw(w,['caminhão','caminhao','umt','umb'])){const id=tk[i+1];if(id){const c=camList.find(c=>c.toLowerCase().replace(/\s/g,'').endsWith(id.replace(/\D/g,''))&&id.replace(/\D/g,''));if(c)r.caminhao=c;i++;}continue;}
+    if(kw(w,['kg','quilo','kilo'])){const b=vozNum(tk,i-1);if(b&&r.kg==null)r.kg=b.v;continue;}
+    if(kw(w,['carga','carreguei','carregado','carregou'])&&w!=='carregado'){const n=vozNum(tk,i+1);if(n&&!['kg','quilo','quilos'].includes(tk[i+1+n.used])){r.kg=n.v;i+=n.used;}else if(n&&r.kg==null){r.kg=n.v;i+=n.used;}continue;}
+    if(w==='seco'||w==='seca')r.agua='seca';
+    if(w==='úmido'||w==='umido'||w==='úmida'||w==='umida'||w==='molhado')r.agua='umida';
+    if(w==='água'||w==='agua'){r.agua='agua';const n=vozNum(tk,i+1);if(n){r.aguaM=n.v;i+=n.used;}}
+    if(w==='perdido')r.status='perdido';if(w==='repasse')r.status='repasse';
+    if(w==='carregado'&&!r.status)r.status='carregado';
+    if(w==='não'&&(tk[i+1]||'').startsWith('carreg'))r.status='nao';
+    const pr=PRODUTOS.find(x=>x.toLowerCase()===w);if(pr)r.prod=pr;
+  }
+  // "furo 32 180" sem unidade: número solto depois do furo vira kg
+  if(r.kg==null&&r.furo){const i=tk.findIndex(w=>w.startsWith('furo'));const n=vozNum(tk,i+2);if(n&&!/^(tampão|tampao|booster|prof)/.test(tk[i+2+n.used]||'')&&tk[i+1+n.used+1]===undefined)r.kg=n.v;}
+  return r;
+}
+function vozOuvir(ok){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('Este navegador não tem reconhecimento de voz. Use o Chrome no Android.');return;}
+  const rec=new SR();rec.lang='pt-BR';rec.interimResults=false;rec.maxAlternatives=1;
+  aviso('🎤 Pode falar… ex.: "furo 32, 180 quilos, tampão 2,5, booster 1"',false);
+  rec.onresult=e=>{const t=e.results[0][0].transcript;const x=$('#aviso');if(x)x.remove();ok(t);};
+  rec.onerror=e=>{const x=$('#aviso');if(x)x.remove();toast(e.error==='not-allowed'?'Libere o microfone para este site':e.error==='network'?'A voz precisa de internet neste celular':'Não entendi, tente de novo');};
+  try{rec.start();}catch(e){toast('Não consegui ligar o microfone');}
+}
+function aplicaVoz(p,f,r){
+  if(r.kg!=null){const pr=projDe(p);const prod=r.prod||(f.decks[0]&&f.decks[0].prod)||pr.prod||'';f.decks=[{prod,kg:r.kg}];}
+  else if(r.prod&&f.decks[0])f.decks[0].prod=r.prod;
+  ['tampao','booster','brinel','detQtd','profMed','caminhao','agua','aguaM','status'].forEach(k=>{if(r[k]!=null)f[k]=r[k];});
+  if(f.status==='pendente'&&(r.kg!=null))f.status='carregado';
+}
+function vozNoMapa(p){vozOuvir(t=>{const camList=[...new Set([...CAMS,...p.holes.map(h=>h.caminhao).filter(Boolean)])];const r=parseVoz(t,camList);
+  if(!r.furo){toast(`Ouvi "${t}" — diga o número do furo primeiro`);return;}
+  const i=p.holes.findIndex(h=>String(h.id).toUpperCase()===r.furo||String(h.n??'')===r.furo);if(i<0){toast(`Furo ${r.furo} não encontrado (ouvi "${t}")`);return;}
+  editHole(i,r,t);});}
+
+/* ===== Ligação com o Medição Enaex (mesmo site, mesmo celular) ===== */
+// lê o banco do app (IndexedDB) sem criar nada: se o banco não existir, a abertura é cancelada
+function idbOutroApp(nome,store){return new Promise(res=>{try{const r=indexedDB.open(nome);let novo=false;
+  r.onupgradeneeded=e=>{novo=true;try{e.target.transaction.abort();}catch(_){}};
+  r.onsuccess=()=>{const d=r.result;if(novo||!d.objectStoreNames.contains(store)){d.close();return res([]);}try{const q=d.transaction(store).objectStore(store).getAll();q.onsuccess=()=>{d.close();res(q.result||[]);};q.onerror=()=>{d.close();res([]);};}catch(e){d.close();res([]);}};
+  r.onerror=()=>res([]);r.onblocked=()=>res([]);}catch(e){res([]);}});}
+async function acharMedicoesApps(){
+  const out=[];
+  for(const [db,app,rot] of [['croqui-real','croqui-real','Medição Enaex'],['temporizacao','temporizacao','Temporização']]){
+    (await idbOutroApp(db,'polys')).filter(P=>P&&!P.sample&&Array.isArray(P.holes)).forEach(P=>out.push({key:db,P,app,origem:rot,nome:P.nome||P.arquivo||'(sem nome)',n:P.holes.filter(h=>!h.ghost).length,data:P.upd?new Date(P.upd).toLocaleDateString('pt-BR'):''}));}
+  acharMedicoes().forEach(m=>{if(!out.some(o=>o.P.id&&o.P.id===m.P.id))out.push(Object.assign(m,{origem:'neste celular'}));});
+  return out.sort((a,b)=>(b.P.upd||0)-(a.P.upd||0));
+}
+function acharMedicoes(){
+  const out=[];const visto=new Set();
+  const busca=(o,key,d)=>{if(!o||typeof o!=='object'||d>4)return;
+    if(Array.isArray(o.holes)&&o.holes.length&&o.holes.some(h=>h&&typeof h==='object'&&'x' in h&&'y' in h&&('n' in h||'tl' in h))){const id=key+'|'+(o.nome||o.id||out.length);if(!visto.has(id)){visto.add(id);out.push({key,P:o,nome:o.nome||o.pol||o.id||'(sem nome)',n:o.holes.filter(h=>!h.ghost).length,data:o.data||o.dt||''});}return;}
+    (Array.isArray(o)?o:Object.values(o)).forEach(v=>busca(v,key,d+1));};
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k||k===KEY||k.startsWith('carregamento'))continue;const v=localStorage.getItem(k);if(!v||v[0]!=='{'&&v[0]!=='[')continue;try{busca(JSON.parse(v),k,0);}catch(e){}}}catch(e){}
+  return out;
+}
+async function escolherMedicao(ok){
+  const L=await acharMedicoesApps();
+  openSheet(`<h3>Medição Enaex deste celular<button class="btn sm" id="mdX">Fechar</button></h3>
+  ${L.length?`<p class="mut" style="margin:0 0 6px">Polígonos encontrados nos apps Medição Enaex e Temporização deste celular:</p>${L.map((m,i)=>`<button class="btn" data-md="${i}" style="width:100%;margin-bottom:6px;justify-content:space-between;text-align:left"><span><b>${esc(m.nome)}</b><br><span class="mut" style="font-size:12px">${esc(m.origem)}</span></span><span class="mut">${nf(m.n)}${m.data?' · '+esc(m.data):''}</span></button>`).join('')}`
+  :`<div class="hint">Não achei medições neste celular. O Carregamento precisa estar publicado no mesmo site do Medição Enaex (medicaoenaex.github.io) e ser aberto no mesmo navegador. Se a medição foi feita em outro celular, use o backup .json do Medição Enaex.</div>`}
+  <button class="btn" id="mdF" style="width:100%;margin-top:6px">Escolher arquivo do Medição Enaex (.json ou .csv)</button>`);
+  $('#mdX').onclick=closeSheet;
+  document.querySelectorAll('[data-md]').forEach(b=>b.onclick=()=>{const m=L[+b.dataset.md];try{const r=lerMedicao(JSON.stringify({app:m.app,poly:m.P}),'');r.nome=r.nome||String(m.nome);closeSheet();ok(r);}catch(e){toast(e.message);}});
+  $('#mdF').onclick=async()=>{const file=await pickFile('.json,.csv,.txt');if(!file)return;try{const r=lerMedicao(await readTxt(file),file.name);closeSheet();ok(r);}catch(e){toast(e.message);}};
+}
+function atualizarMedicao(p){
+  escolherMedicao(m=>{
+    const by=new Map(m.holes.map(h=>[String(h.id).toUpperCase(),h]));const mud=[];let novos=0;
+    p.holes.forEach(h=>{const g=by.get(String(h.id).toUpperCase());if(!g)return;const nv={};
+      if(g.profMed!=null&&g.profMed!==h.profMed)nv.profMed=g.profMed;
+      if(g.profProj!=null&&g.profProj!==h.profProj)nv.profProj=g.profProj;
+      if(g.agua==='agua'&&(h.agua!=='agua'||g.aguaM!==h.aguaM)){nv.agua='agua';nv.aguaM=g.aguaM;}
+      if(h.status==='pendente'&&g.status!=='pendente'&&g.status!==h.status)nv.status=g.status;
+      if(g.obsCroqui&&g.obsCroqui!==h.obsCroqui)nv.obsCroqui=g.obsCroqui;
+      if(Object.keys(nv).length)mud.push([h,nv]);});
+    m.holes.forEach(g=>{if(!p.holes.some(h=>String(h.id).toUpperCase()===String(g.id).toUpperCase()))novos++;});
+    openSheet(`<h3>Atualizar com a medição<button class="btn sm" id="amX">Cancelar</button></h3><p><b>${nf(mud.length)}</b> com medição nova (profundidade, água, status do croqui)${novos?` · ${nf(novos)} da medição não existem aqui`:''}.</p>
+    ${mud.length?`<div style="max-height:40vh;overflow:auto;border:1px solid var(--line);border-radius:10px"><table><tbody>${mud.map(([h,nv])=>`<tr><td><b>${esc(h.id)}</b></td><td>${Object.entries(nv).map(([k,v])=>`${{profMed:'prof. medida',profProj:'prof. projeto',agua:'água',aguaM:'coluna água',status:'status',obsCroqui:'croqui'}[k]}: ${k==='status'?ST[v].n:esc(typeof v==='number'?fmt(v,1):v)}`).join(' · ')}</td></tr>`).join('')}</tbody></table></div>`:''}
+    <p class="mut">Só muda o que foi medido. Carga, caminhão e o resto do lançamento ficam como estão.</p>
+    <div class="btns"><button class="btn pri" id="amOk" ${mud.length?'':'disabled style="opacity:.5"'}>Aplicar</button></div>`);
+    $('#amX').onclick=closeSheet;
+    if(mud.length)$('#amOk').onclick=()=>{pushUndo(p,mud.map(x=>x[0]),'medição');const ag=Date.now();mud.forEach(([h,nv])=>{Object.assign(h,nv);histAdd(h,'Medição: '+Object.keys(nv).join(', '));h.ts=ag;h.por=meuNome();markF(p.id,h.id);});
+      if(mud.some(([,nv])=>'profProj' in nv||'obsCroqui' in nv))markP(p.id);save();closeSheet();renderPoly();toast(nf(mud.length)+' atualizados pela medição');};
+  });
+}
+
+/* ===== Pós-detonação ===== */
+const FRAG={boa:'Boa',regular:'Regular',ruim:'Ruim (muito matacão)'};
+const FUMACA={nenhuma:'Sem fumaça anormal',branca:'Branca / cinza',laranja:'Amarela / laranja'};
+function tabPos(p){
+  const o=p.pos||{};const det=situDe(p)==='detonado';
+  const ids=new Set(p.holes.map(h=>String(h.id).toUpperCase()));const fal=(o.falhas||[]);
+  $('#tabBox').innerHTML=`${det?'':`<div class="hint" style="margin:0 0 10px">O polígono ainda não está marcado como detonado (aba Liberação). Você pode preencher assim mesmo.</div>`}
+  <div class="card"><h2>Resultado do fogo</h2>
+  <div class="row"><div><label>Data e hora da inspeção</label><input id="poDt" type="datetime-local" value="${esc(o.dt||'')}"></div><div><label>Inspecionado por</label><input id="poNm" value="${esc(o.nome||meuNome()||'')}"></div></div>
+  <label>Furos que falharam (não detonaram)</label><input id="poFa" value="${esc(fal.join(', '))}" placeholder="ex.: 12, 35, L3-F4 — vazio se não houve">
+  <div id="poFaI" class="mut"></div>
+  <div class="row"><div><label>Fragmentação</label><select id="poFr">${Object.entries(FRAG).map(([k,v])=>`<option value="${k}" ${o.frag===k?'selected':''}>${v}</option>`).join('')}<option value="" ${!o.frag?'selected':''}>—</option></select></div><div><label>Matacões (quantidade)</label><input id="poMa" inputmode="numeric" value="${esc(o.matacoes??'')}"></div></div>
+  <div class="row"><div><label>Ultralançamento</label><select id="poUl"><option value="nao" ${o.ultra!=='sim'?'selected':''}>Não houve</option><option value="sim" ${o.ultra==='sim'?'selected':''}>Houve</option></select></div><div><label>Distância do ultralançamento (m)</label><input id="poUd" inputmode="decimal" value="${esc(o.ultraDist??'')}"></div></div>
+  <div class="row"><div><label>Fumaça</label><select id="poFu">${Object.entries(FUMACA).map(([k,v])=>`<option value="${k}" ${o.fumaca===k?'selected':''}>${v}</option>`).join('')}<option value="" ${!o.fumaca?'selected':''}>—</option></select></div><div><label>Repé / pé do banco</label><select id="poRp"><option value="">—</option>${['Sem repé','Repé pequeno','Repé grande'].map(v=>`<option ${o.repe===v?'selected':''}>${v}</option>`).join('')}</select></div></div>
+  <div class="row"><div><label>Vibração medida (mm/s)</label><input id="poVi" inputmode="decimal" value="${esc(o.vib??'')}"></div><div><label>Pressão acústica (dB)</label><input id="poRu" inputmode="decimal" value="${esc(o.ruido??'')}"></div></div>
+  <label>Observações</label><textarea id="poOb" style="min-height:70px;font-family:inherit;font-size:15px">${esc(o.obs||'')}</textarea>
+  <label>Fotos do pós-fogo</label><div class="thumbs" id="hFt"></div><button class="btn sm" id="hFoto" style="margin-top:6px">📷 Adicionar foto</button>
+  <div class="btns"><button class="btn pri" id="poOk">Salvar pós-fogo</button></div>
+  ${o.ts?`<p class="mut">Salvo em ${new Date(o.ts).toLocaleString('pt-BR')}${o.por?' por '+esc(o.por):''}</p>`:''}</div>
+  <p class="mut">Os furos com falha aparecem com um X no mapa e entram no relatório e nos indicadores.</p>`;
+  const chk=()=>{const v=$('#poFa').value.split(/[,;\s]+/).map(s=>s.trim().toUpperCase()).filter(Boolean);const no=v.filter(x=>!ids.has(x));$('#poFaI').innerHTML=v.length?`${nf(v.length)} com falha${no.length?` · <b style="color:var(--bad)">não existem: ${esc(no.join(', '))}</b>`:''}`:'';return v;};
+  $('#poFa').oninput=chk;chk();
+  fotosFuro(p,{id:'_pos'});
+  $('#poOk').onclick=()=>{const v=chk();p.pos={dt:$('#poDt').value,nome:$('#poNm').value.trim(),falhas:v.filter(x=>ids.has(x)),frag:$('#poFr').value,matacoes:num($('#poMa').value),ultra:$('#poUl').value,ultraDist:num($('#poUd').value),fumaca:$('#poFu').value,repe:$('#poRp').value,vib:num($('#poVi').value),ruido:num($('#poRu').value),obs:$('#poOb').value.trim(),ts:Date.now(),por:meuNome()};
+    markP(p.id);save();tabPos(p);toast('Pós-fogo salvo');
+    if(p.pos.falhas.length||p.pos.ultra==='sim'||p.pos.fumaca==='laranja')aviso(`<b>POL ${esc(p.pol)}: atenção no pós-fogo</b><br>${[p.pos.falhas.length?nf(p.pos.falhas.length)+' com falha':'',p.pos.ultra==='sim'?'ultralançamento':'',p.pos.fumaca==='laranja'?'fumaça laranja':''].filter(Boolean).join(' · ')}`);};
+}
+const falhaSet=p=>new Set(((p.pos||{}).falhas||[]).map(x=>String(x).toUpperCase()));
+
+/* ===== Indicadores e histórico entre polígonos ===== */
+let indMina='',indMeses='6';
+function indPoly(p){
+  const ativos=p.holes.filter(h=>h.status!=='perdido'&&h.status!=='nao');const carr=p.holes.filter(h=>h.status==='carregado'||holeKg(h)>0);
+  const kg=carr.reduce((s,h)=>s+holeKg(h),0);const pr=projDe(p);const temPj=pr.kg!=null||p.holes.some(h=>h.cargaProj!=null);
+  const cf=temPj?conferencia(p):null;const lanc=cf?cf.n.ok+cf.n.abaixo+cf.n.acima:0;
+  const comProf=p.holes.filter(h=>h.profMed!=null&&h.profProj!=null);
+  return{p,mes:(p.data||'').slice(0,7),furos:p.holes.length,carr:carr.length,kg,kgFuro:carr.length?kg/carr.length:null,
+    tol:lanc?cf.n.ok/lanc*100:null,fora:lanc?(cf.n.abaixo+cf.n.acima):null,agua:p.holes.length?p.holes.filter(h=>h.agua!=='seca').length/p.holes.length*100:null,
+    profBaixa:comProf.length?comProf.filter(h=>h.profMed<h.profProj-pr.tolProf).length/comProf.length*100:null,perd:p.holes.length-ativos.length,
+    falhas:((p.pos||{}).falhas||[]).length,frag:(p.pos||{}).frag||'',ultra:(p.pos||{}).ultra==='sim',booster:carr.reduce((s,h)=>s+(num(h.booster)||0),0)};
+}
+function renderIndic(){
+  $('#ttl').textContent='Indicadores';
+  const lim=indMeses==='tudo'?'':(()=>{const d=new Date();d.setMonth(d.getMonth()-(+indMeses-1));return d.toISOString().slice(0,7);})();
+  const L=S.polys.filter(p=>(!indMina||p.mina===indMina)&&(!lim||(p.data||'').slice(0,7)>=lim)).map(indPoly).sort((a,b)=>(b.p.data||'').localeCompare(a.p.data||''));
+  const M={};L.forEach(x=>{const m=M[x.mes]=M[x.mes]||{n:0,furos:0,carr:0,kg:0,tolS:0,tolN:0,aguaS:0,falhas:0,ultra:0,profS:0,profN:0};m.n++;m.furos+=x.furos;m.carr+=x.carr;m.kg+=x.kg;if(x.tol!=null){m.tolS+=x.tol;m.tolN++;}if(x.profBaixa!=null){m.profS+=x.profBaixa;m.profN++;}m.aguaS+=x.agua||0;m.falhas+=x.falhas;if(x.ultra)m.ultra++;});
+  const meses=Object.keys(M).sort();const mx=Math.max(1,...meses.map(m=>M[m].kg));const mesN=m=>{const [a,b]=m.split('-');return['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+b-1]+'/'+a.slice(2);};
+  const tot=L.reduce((a,x)=>{a.kg+=x.kg;a.carr+=x.carr;a.f+=x.falhas;return a;},{kg:0,carr:0,f:0});
+  let h=`<div class="seg" id="imM">${[['3','3 meses'],['6','6 meses'],['12','12 meses'],['tudo','Tudo']].map(([k,t])=>`<button data-m="${k}" class="${indMeses===k?'on':''}">${t}</button>`).join('')}</div>
+  <select id="imMi" style="margin:8px 0">${opts(MINAS,indMina,'Todas as minas')}</select>
+  <div class="kpis"><div class="kpi"><b>${L.length}</b><span>polígonos</span></div><div class="kpi"><b>${fmt(tot.carr)}</b><span>furos carregados</span></div><div class="kpi"><b>${fmt(tot.kg)}</b><span>kg lançados</span></div><div class="kpi"><b>${tot.carr?fmt(tot.kg/tot.carr):'–'}</b><span>kg por furo (média)</span></div><div class="kpi"><b style="color:${tot.f?'var(--bad)':'inherit'}">${tot.f}</b><span>furos com falha</span></div></div>`;
+  if(meses.length){h+=`<div class="card" style="margin-top:12px"><h2>Por mês</h2><svg viewBox="0 0 ${Math.max(300,meses.length*60)} 150" style="width:100%;height:150px">${meses.map((m,i)=>{const v=M[m].kg,hh=v/mx*100;return`<rect x="${i*60+12}" y="${118-hh}" width="36" height="${hh}" rx="4" fill="#0b5cad"><title>${fmt(v)} kg</title></rect><text x="${i*60+30}" y="${112-hh}" font-size="10" text-anchor="middle" fill="#14202b">${fmt(v/1000,1)} t</text><text x="${i*60+30}" y="134" font-size="11" text-anchor="middle" fill="#5d6b78">${mesN(m)}</text>`;}).join('')}</svg>
+    <div style="overflow:auto"><table><thead><tr><th>Mês</th><th class="n">POL</th><th class="n">Furos</th><th class="n">kg/furo</th><th class="n">Na tol.</th><th class="n">Água</th><th class="n">Prof. baixa</th><th class="n">Falhas</th></tr></thead><tbody>${meses.slice().reverse().map(m=>{const x=M[m];return`<tr><td>${mesN(m)}</td><td class="n">${x.n}</td><td class="n">${fmt(x.carr)}</td><td class="n">${x.carr?fmt(x.kg/x.carr):'–'}</td><td class="n">${x.tolN?fmt(x.tolS/x.tolN,0)+'%':'–'}</td><td class="n">${fmt(x.aguaS/x.n,0)}%</td><td class="n">${x.profN?fmt(x.profS/x.profN,0)+'%':'–'}</td><td class="n">${x.falhas}${x.ultra?' · '+x.ultra+' UL':''}</td></tr>`;}).join('')}</tbody></table></div></div>`;}
+  h+=`<div class="card" style="padding:4px 8px;overflow:auto"><h2 style="margin:10px 6px">Polígonos</h2><table><thead><tr><th>POL</th><th>Data</th><th class="n">Furos</th><th class="n">kg/furo</th><th class="n">Na tol.</th><th class="n">Água</th><th class="n">Falhas</th><th>Frag.</th></tr></thead><tbody>${L.map(x=>`<tr class="click" data-id="${x.p.id}"><td><b>${esc(x.p.pol)}</b> <span class="mut">${esc(x.p.mina)}</span></td><td>${brDate(x.p.data)}</td><td class="n">${x.carr}/${x.furos}</td><td class="n">${x.kgFuro==null?'–':fmt(x.kgFuro)}</td><td class="n" style="color:${x.tol!=null&&x.tol<90?'var(--bad)':'inherit'}">${x.tol==null?'–':fmt(x.tol,0)+'%'}</td><td class="n">${x.agua==null?'–':fmt(x.agua,0)+'%'}</td><td class="n" style="color:${x.falhas?'var(--bad)':'inherit'}">${x.falhas}${x.ultra?' UL':''}</td><td>${esc(FRAG[x.frag]?FRAG[x.frag].split(' ')[0]:'')}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">Nenhum polígono no período</td></tr>'}</tbody></table></div>
+  <div class="btns"><button class="btn" id="imCsv">Exportar indicadores (CSV)</button></div><p class="mut">Só mostra o que foi lançado e comparado com o projeto informado. UL = ultralançamento.</p>`;
+  $('#app').innerHTML=h;
+  document.querySelectorAll('#imM button').forEach(b=>b.onclick=()=>{indMeses=b.dataset.m;renderIndic();});
+  $('#imMi').onchange=e=>{indMina=e.target.value;renderIndic();};
+  document.querySelectorAll('tr.click[data-id]').forEach(tr=>tr.onclick=()=>{S.cur=tr.dataset.id;save();tab='conf';go('poly');});
+  $('#imCsv').onclick=()=>{const n=v=>v==null?'':String(Math.round(v*10)/10).replace('.',',');exportBox('Indicadores','indicadores-'+today()+'.csv',['Data;Mina;POL;Banco;Furos;Carregados;Kg;KgPorFuro;NaTolerancia%;FurosForaTol;Agua%;ProfBaixa%;PerdidosNaoCarregar;Booster;Falhas;Fragmentacao;Ultralancamento',...L.map(x=>[x.p.data,x.p.mina,x.p.pol,x.p.banco,x.furos,x.carr,n(x.kg),n(x.kgFuro),n(x.tol),x.fora??'',n(x.agua),n(x.profBaixa),x.perd,x.booster,x.falhas,FRAG[x.frag]||'',x.ultra?'sim':''].join(';'))].join('\n'),'text/csv');};
+}
+
+/* ===== Modo caminhão (tela simples para o operador) ===== */
+let camPoly=null,camFiltro='pend';
+function renderCam(){
+  const meu=(S.ui&&S.ui.meuCam)||'';$('#ttl').textContent=meu?'🚛 '+meu:'Modo caminhão';
+  const abertos=S.polys.filter(p=>situDe(p)==='aberto').sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  if(!camPoly||!S.polys.find(p=>p.id===camPoly))camPoly=(abertos[0]||{}).id||null;
+  const p=S.polys.find(x=>x.id===camPoly);
+  let h=`<div class="card"><div class="row"><div><label style="margin-top:0">Meu caminhão</label><select id="cmC">${opts([...new Set([...CAMS,...S.polys.flatMap(p=>p.holes.map(h=>h.caminhao)).filter(Boolean)])],meu,'Escolha')}</select></div><div><label style="margin-top:0">Polígono</label><select id="cmP">${abertos.map(x=>`<option value="${x.id}" ${x.id===camPoly?'selected':''}>POL ${esc(x.pol)} · ${esc(x.mina)}</option>`).join('')||'<option value="">Nenhum em carregamento</option>'}</select></div></div></div>`;
+  if(!meu||!p){$('#app').innerHTML=h+`<div class="card empty">${!meu?'Escolha o seu caminhão.':'Nenhum polígono em carregamento.'}</div>`;bindCam();return;}
+  const meus=p.holes.filter(x=>x.caminhao===meu);const kg=meus.reduce((s,x)=>s+holeKg(x),0);const pend=p.holes.filter(x=>x.status==='pendente');const cd=camDif(p,meu,kg);
+  h+=`<div class="kpis"><div class="kpi"><b>${meus.length}</b><span>furos que carreguei</span></div><div class="kpi"><b>${fmt(kg)}</b><span>kg lançados</span></div><div class="kpi"><b>${pend.length}</b><span>pendentes no POL</span></div>${cd?`<div class="kpi"><b style="color:${cd.ok?'var(--ok)':'var(--bad)'}">${esc(cd.txt)}</b><span>lançado x NF</span></div>`:''}</div>
+  <div class="btns"><button class="btn pri" id="cmV" style="font-size:17px">🎤 Falar lançamento</button></div>
+  <div class="seg" id="cmF" style="margin:10px 0">${[['pend','Pendentes'],['meus','Meus'],['todos','Todos']].map(([k,t])=>`<button data-f="${k}" class="${camFiltro===k?'on':''}">${t}</button>`).join('')}</div>
+  <div class="card" style="padding:4px 8px">${(camFiltro==='pend'?pend:camFiltro==='meus'?meus:p.holes).map(x=>{const i=p.holes.indexOf(x);return`<div class="poly" data-i="${i}" style="padding:12px 4px;border-bottom:1px solid var(--line)"><div><b style="font-size:18px">Furo ${esc(x.id)}</b>${x.agua!=='seca'?' 💧':''}<div class="mut">${ST[x.status].n}${holeKg(x)?' · '+fmt(holeKg(x))+' kg':''}${x.caminhao?' · '+esc(camCurto(x.caminhao)):''}${x.profMed!=null?' · prof. '+fmt(x.profMed,1)+' m':''}</div></div><span style="font-size:22px;color:var(--mut)">›</span></div>`;}).join('')||'<p class="mut" style="padding:10px">Nada aqui.</p>'}</div>`;
+  $('#app').innerHTML=h;bindCam(p,meu);
+}
+function bindCam(p,meu){
+  $('#cmC').onchange=e=>{S.ui=Object.assign(S.ui||{},{meuCam:e.target.value});save();renderCam();};
+  if($('#cmP'))$('#cmP').onchange=e=>{camPoly=e.target.value;renderCam();};
+  if(!p)return;S.cur=p.id;
+  document.querySelectorAll('#cmF button').forEach(b=>b.onclick=()=>{camFiltro=b.dataset.f;renderCam();});
+  document.querySelectorAll('.poly[data-i]').forEach(el=>el.onclick=()=>camFuro(p,+el.dataset.i,meu));
+  $('#cmV').onclick=()=>vozOuvir(t=>{const r=parseVoz(t,[...CAMS]);if(!r.furo){toast(`Ouvi "${t}" — diga o furo primeiro`);return;}const i=p.holes.findIndex(h=>String(h.id).toUpperCase()===r.furo);if(i<0){toast('Furo '+r.furo+' não encontrado');return;}camFuro(p,i,meu,r);});
+}
+function camFuro(p,i,meu,voz){
+  const h=p.holes[i],pr=projDe(p);const kp=kgProj(p,h);
+  const d0=(h.decks||[])[0]||{};let kg=voz&&voz.kg!=null?voz.kg:(holeKg(h)||kp);const prod=(voz&&voz.prod)||d0.prod||pr.prod||'';
+  openSheet(`<h3>Furo ${esc(h.id)}<button class="btn sm" id="cfX">Fechar</button></h3>
+  <p class="mut" style="margin:0">${kp!=null?'Projeto: '+fmt(kp)+' kg':'Sem carga de projeto'}${h.profMed!=null?' · prof. medida '+fmt(h.profMed,1)+' m':''}${h.agua!=='seca'?' · 💧 '+AGUA_N[h.agua]:''}${h.obsCroqui?' · croqui: '+esc(h.obsCroqui):''}</p>
+  <div class="row"><div><label>Produto</label><select id="cfP">${opts(PRODUTOS,prod,'—')}</select></div><div><label>kg colocados</label><input id="cfK" inputmode="decimal" value="${kg??''}" style="font-size:22px;font-weight:700"></div></div>
+  <div class="row"><div><label>Tampão (m)</label><input id="cfT" inputmode="decimal" value="${(voz&&voz.tampao)??h.tampao??pr.tampao??''}"></div><div><label>Água</label><select id="cfA">${Object.entries(AGUA_N).map(([k,v])=>`<option value="${k}" ${((voz&&voz.agua)||h.agua)===k?'selected':''}>${v}</option>`).join('')}</select></div></div>
+  <label>Observação</label><input id="cfO" value="${esc(h.obs||'')}">
+  <div class="btns"><button class="btn ok" id="cfOk" style="font-size:18px;min-height:56px">✔ Carregado pelo ${esc(camCurto(meu))}</button></div>
+  <div class="btns"><button class="btn" id="cfRe">Não deu para carregar (repasse)</button></div>`);
+  $('#cfX').onclick=closeSheet;
+  const salva=st=>{const antes=camFora(p,meu);pushUndo(p,[h],'furo '+h.id);const k=num($('#cfK').value);
+    if(st==='carregado'){h.decks=k!=null?[{prod:$('#cfP').value,kg:k}]:h.decks;h.caminhao=meu;}
+    h.status=st;h.tampao=num($('#cfT').value);h.agua=$('#cfA').value;h.obs=$('#cfO').value.trim();carimbaLotes(p,h);histAdd(h,'Modo caminhão: '+resumoFuro(h));h.ts=Date.now();h.por=meuNome()||meu;markF(p.id,h.id);save();closeSheet();renderCam();toast('Furo '+h.id+' salvo');checarAlertas(p,h,antes);};
+  $('#cfOk').onclick=()=>salva('carregado');$('#cfRe').onclick=()=>salva('repasse');
+}
+
+/* ===== Fotos na nuvem (Supabase Storage pela função carregamento) ===== */
+const fotosRem={};let fotoEnviando=false;
+function filaFoto(pid,hid,ts){const y=SY();y.fq=y.fq||{};y.fq[pid+'|'+hid+'|'+ts]=1;save();}
+async function enviarFotos(){
+  const y=SY();if(!y.token||fotoEnviando||!y.fq)return;const ks=Object.keys(y.fq).slice(0,4);if(!ks.length)return;fotoEnviando=true;
+  try{for(const k of ks){const [pid,hid,ts]=k.split('|');const arr=await fotoGet(pid+'|'+hid);const f=arr.find(x=>String(x.ts)===ts);if(!f){delete y.fq[k];continue;}
+      const r=await api({acao:'foto_enviar',token:y.token,poly_id:pid,furo_id:hid,ts:+ts,img:f.url.split(',')[1]});if(r&&r.ok){delete y.fq[k];f.nuvem=true;await fotoPut(pid+'|'+hid,arr);}}
+    save();}
+  catch(e){if(/desconhecida/i.test(e.message||''))y.fotoOff=true;}finally{fotoEnviando=false;}
+}
+async function listarFotos(pid,forca){
+  const y=SY();if(!y.token||y.fotoOff)return[];const c=fotosRem[pid];if(c&&!forca&&Date.now()-c.t<5*60e3)return c.l;
+  try{const r=await api({acao:'foto_listar',token:y.token,poly_id:pid});fotosRem[pid]={t:Date.now(),l:r.fotos||[]};return fotosRem[pid].l;}catch(e){return c?c.l:[];}
+}
+
+/* ----- Lista ----- */
+function tabLista(p){
+  const f=listFilter,q=listQ.trim().toUpperCase();const rows=p.holes.map((h,i)=>[h,i]).filter(([h])=>(f==='todos'||(f==='agua'?h.agua!=='seca':f==='cond'?(h.cond||[]).length:h.status===f))&&(!q||String(h.id).toUpperCase().includes(q)));
+  $('#tabBox').innerHTML=`<select id="lf" style="margin-bottom:10px"><option value="todos">Todos os furos (${p.holes.length})</option>${Object.entries(ST).map(([k,v])=>`<option value="${k}" ${f===k?'selected':''}>${v.n} (${p.holes.filter(h=>h.status===k).length})</option>`).join('')}<option value="agua" ${f==='agua'?'selected':''}>Com água (${p.holes.filter(h=>h.agua!=='seca').length})</option><option value="cond" ${f==='cond'?'selected':''}>Com ocorrência (${p.holes.filter(h=>(h.cond||[]).length).length})</option></select><input id="lq" placeholder="Buscar furo" value="${esc(listQ)}" style="margin-bottom:10px">
+  <div class="card" style="padding:4px 8px;overflow:auto"><table><thead><tr><th>Furo</th><th>Status</th><th class="n">Proj.</th><th class="n">Med.</th><th class="n">kg</th><th>Cam.</th></tr></thead><tbody>${rows.map(([h,i])=>`<tr class="click" data-i="${i}"><td><b>${esc(h.id)}</b>${h.agua!=='seca'?' 💧':''}${(h.cond||[]).length?' ⚠️':''}</td><td><span class="chip" style="background:${ST[h.status].c}">${ST[h.status].n}</span></td><td class="n">${fmt(h.profProj,1)}</td><td class="n">${fmt(h.profMed,1)}</td><td class="n">${holeKg(h)?fmt(holeKg(h)):'–'}</td><td>${esc((h.caminhao||'').replace('UMT ','').replace('UMB ',''))}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nenhum furo neste filtro</td></tr>'}</tbody></table></div>`;
+  $('#lf').onchange=e=>{listFilter=e.target.value;tabLista(p);};
+  $('#lq').oninput=e=>{listQ=e.target.value;tabLista(p);const n=$('#lq');n.focus();n.setSelectionRange(n.value.length,n.value.length);};
+  document.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>editHole(+tr.dataset.i));
+}
+
+/* ----- Lançamento do furo ----- */
+function editHole(i,voz,vozTxt){
+  const p=cur(),h=p.holes[i];sel=i;
+  const f=JSON.parse(JSON.stringify(h));if(!f.decks||!f.decks.length)f.decks=[{prod:'',kg:''}];
+  if(voz){aplicaVoz(p,f,voz);setTimeout(()=>toast(`Ouvi: "${vozTxt}" — confira e salve`),50);}
+  const draw=()=>{
+    openSheet(`<h3>Furo ${esc(f.id)}<span><button class="btn sm" id="hVoz">🎤 Falar</button> <button class="btn sm" id="hClose">Fechar</button></span></h3><p class="mut" style="margin:0 0 8px">${h.ts?'Último lançamento: '+new Date(h.ts).toLocaleString('pt-BR')+(h.por?' por '+esc(h.por):''):'Ainda não lançado'}${h.obsCroqui?'<br>No croqui: '+esc(h.obsCroqui.replace(/_/g,' ')):''}</p>
+    <div class="stbtns">${Object.entries(ST).map(([k,v])=>`<button data-s="${k}" class="${f.status===k?'on':''}" style="${f.status===k?`background:${v.c};border-color:${v.c}`:`border-color:${v.c}`}">${v.n}</button>`).join('')}</div>
+    <div class="row"><div><label>Prof. projeto (m)</label><input id="hPP" inputmode="decimal" value="${f.profProj??''}"></div><div><label>Prof. medida (m)</label><input id="hPM" inputmode="decimal" value="${f.profMed??''}" placeholder="trena"></div></div>
+    <div id="hDif" class="mut"></div>
+    <label>Água no furo</label><div class="seg" id="hAg">${[['seca','Seca'],['umida','Úmida'],['agua','Com água']].map(a=>`<button data-a="${a[0]}" class="${f.agua===a[0]?'on':''}">${a[1]}</button>`).join('')}</div>
+    ${f.agua==='agua'?`<label>Coluna de água (m)</label><input id="hAM" inputmode="decimal" value="${f.aguaM??''}">`:''}
+    <div class="hint" id="hPj" style="background:#eef4fb;border-color:#c9dcf2"></div>
+    <label>Carga lançada (o que foi colocado no furo)</label><div class="seg" id="hND">${[1,2,3].map(n=>`<button data-n="${n}" class="${f.decks.length===n?'on':''}">${n} deck${n>1?'s':''}</button>`).join('')}</div>
+    ${f.decks.map((d,k)=>`<div class="deck"><b>Deck ${k+1}</b><select data-dp="${k}">${opts(PRODUTOS,d.prod,'Produto')}</select><input data-dk="${k}" inputmode="decimal" placeholder="kg" value="${d.kg??''}"></div>`).join('')}
+    <div class="row"><div><label>Booster (un)</label><input id="hBo" inputmode="numeric" value="${f.booster??''}"></div><div><label>Brinel (un)</label><input id="hBr" inputmode="numeric" value="${f.brinel??''}"></div></div>
+    <div class="row"><div><label>Detonador</label><select id="hDT">${opts(DETS,f.detTipo,'—')}</select></div><div><label>Qtd. detonadores</label><input id="hDQ" inputmode="numeric" value="${f.detQtd??''}"></div></div>
+    <div class="row"><div><label>Tampão (m)</label><input id="hTa" inputmode="decimal" value="${f.tampao??''}"></div><div><label>Caminhão</label><select id="hCa">${opts(CAMS,f.caminhao,'—')}</select></div></div>
+ <div class="row"><div><label>Tempo de detonação (ms)</label><input id="hTz" inputmode="decimal" value="${f.tempos&&f.tempos.length>1?f.tempos.join(';'):(f.tempo??'')}" placeholder="do plano"></div><div></div></div>
+ <label>Carga de projeto deste furo (kg) — só se for diferente do padrão</label><input id="hCP" inputmode="decimal" value="${f.cargaProj??''}" placeholder="padrão do polígono: ${projDe(p).kg!=null?fmt(projDe(p).kg)+' kg':'não definido'}">
+    <label>Condição do furo</label><div class="conds" id="hCo">${CONDS.map(c=>`<button data-c="${esc(c)}" class="${(f.cond||[]).includes(c)?'on':''}">${esc(c)}</button>`).join('')}</div>
+    <label>Observação</label><input id="hOb" value="${esc(f.obs)}" placeholder="ex.: obstruído a 8 m, repasse">
+    <div class="row"><div><label>Lote produto</label><input id="hLp" value="${esc(f.lotes?.prod||'')}" placeholder="${esc(p.lotes?.prod||'')}"></div><div><label>Lote booster</label><input id="hLb" value="${esc(f.lotes?.booster||'')}" placeholder="${esc(p.lotes?.booster||'')}"></div><div><label>Lote detonador</label><input id="hLd" value="${esc(f.lotes?.det||'')}" placeholder="${esc(p.lotes?.det||'')}"></div></div>
+    <label>Fotos (ficam só neste celular)</label><div class="thumbs" id="hFt"></div><button class="btn sm" id="hFoto" style="margin-top:6px">📷 Adicionar foto</button>
+    ${p.situ==='detonado'?'<div class="hint">⚠️ Este polígono está marcado como detonado.</div>':''}
+    <div class="btns"><button class="btn" id="hUsePj">Usar carga do projeto</button><button class="btn" id="hRep">Repetir último</button><button class="btn" id="hNear">+ Furo ao lado</button></div>
+    <div class="btns"><button class="btn pri" id="hSave">Salvar</button><button class="btn ok" id="hNext">Salvar e próximo ›</button></div>
+    ${(h.hist||[]).length?`<details style="margin-top:10px"><summary class="mut">Histórico do furo (${h.hist.length})</summary><div class="hist">${h.hist.slice().reverse().map(x=>`<div>${new Date(x.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${x.por?' · <b>'+esc(x.por)+'</b>':''} — ${esc(x.t)}</div>`).join('')}</div></details>`:''}`);
+    bind();showDif();showPj();fotosFuro(p,h);
+  };
+  const grab=()=>{
+    f.profProj=num($('#hPP').value);f.profMed=num($('#hPM').value);
+    if($('#hAM'))f.aguaM=num($('#hAM').value);
+    f.decks.forEach((d,k)=>{d.prod=document.querySelector(`[data-dp="${k}"]`).value;d.kg=num(document.querySelector(`[data-dk="${k}"]`).value);});
+    f.booster=num($('#hBo').value);f.brinel=num($('#hBr').value);f.detTipo=$('#hDT').value;f.detQtd=num($('#hDQ').value);
+    f.tampao=num($('#hTa').value);f.caminhao=$('#hCa').value;f.obs=$('#hOb').value.trim();f.cargaProj=num($('#hCP').value);{const l={prod:$('#hLp').value.trim(),booster:$('#hLb').value.trim(),det:$('#hLd').value.trim()};f.lotes=Object.values(l).some(Boolean)?l:null;}{const ts=$('#hTz').value.split(/[;\/]/).map(num).filter(v=>v!=null);f.tempo=ts.length?ts[0]:null;f.tempos=ts.length>1?ts:null;}
+  };
+  const showPj=()=>{const el=$('#hPj');if(!el)return;const pr=projDe(p);const tmp=Object.assign({},h,{decks:f.decks.map((d,k)=>({prod:d.prod,kg:num((document.querySelector(`[data-dk="${k}"]`)||{}).value)})),status:f.status,cargaProj:num(($('#hCP')||{}).value)});
+    const kp=kgProj(p,tmp);if(kp==null&&pr.tampao==null&&pr.booster==null){el.style.display='none';return;}el.style.display='';
+    const dv=desvio(p,tmp);const ke=holeKg(tmp);
+    el.innerHTML=`<b>Projeto:</b> ${kp!=null?fmt(kp)+' kg':'—'}${pr.prod?' '+esc(pr.prod):''}${pr.decks>1?' · '+pr.decks+' decks':''}${pr.tampao!=null?' · tampão '+fmt(pr.tampao,1)+' m':''}${pr.booster!=null?' · '+pr.booster+' booster':''}${pr.detQtd?' · '+pr.detQtd+' '+esc(pr.detTipo||'det.'):''}<br><b>Executado:</b> ${ke?fmt(ke)+' kg':'—'} ${ke&&kp!=null?`<span class="chip" style="background:${DV[dv.c].c}">${dv.t}</span>`:''}`;};
+  const showDif=()=>{const pp=num($('#hPP').value),pm=num($('#hPM').value);const el=$('#hDif');if(pp!=null&&pm!=null){const d=pm-pp;el.innerHTML=`Diferença: <b style="color:${d<-0.5?'var(--bad)':d>0.5?'var(--warn)':'var(--ok)'}">${d>0?'+':''}${fmt(d,1)} m</b>${d<-0.5?' — abaixo do projeto (avaliar repasse)':''}`;}else el.textContent='';};
+  const bind=()=>{
+    $('#hClose').onclick=()=>{closeSheet();sel=null;};
+    $('#hVoz').onclick=()=>{grab();vozOuvir(t=>{const r=parseVoz(t,[...new Set([...CAMS,...p.holes.map(x=>x.caminhao).filter(Boolean)])]);delete r.furo;aplicaVoz(p,f,r);draw();toast(`Ouvi: "${t}"`);});};
+    document.querySelectorAll('.stbtns button').forEach(b=>b.onclick=()=>{grab();f.status=b.dataset.s;draw();});
+    document.querySelectorAll('#hAg button').forEach(b=>b.onclick=()=>{grab();f.agua=b.dataset.a;draw();});
+    document.querySelectorAll('#hCo button').forEach(b=>b.onclick=()=>{grab();const c=b.dataset.c;f.cond=(f.cond||[]).includes(c)?f.cond.filter(x=>x!==c):[...(f.cond||[]),c];draw();});
+    document.querySelectorAll('#hND button').forEach(b=>b.onclick=()=>{grab();const n=+b.dataset.n;while(f.decks.length<n)f.decks.push({prod:f.decks[0]?.prod||'',kg:''});f.decks.length=n;draw();});
+    $('#hPP').oninput=showDif;$('#hPM').oninput=showDif;
+    document.querySelectorAll('[data-dk]').forEach(e=>e.addEventListener('input',showPj));$('#hCP').oninput=showPj;
+    $('#hUsePj').onclick=()=>{const pr=projDe(p);const kp=kgProj(p,Object.assign({},h,{cargaProj:num($('#hCP').value)}));if(kp==null){toast('Defina o projeto no menu ⋯ do polígono');return;}grab();
+      const n=pr.decks||1;f.decks=Array.from({length:n},()=>({prod:pr.prod,kg:Math.round(kp/n*10)/10}));if(pr.booster!=null)f.booster=pr.booster;if(pr.tampao!=null)f.tampao=pr.tampao;if(pr.detTipo)f.detTipo=pr.detTipo;if(pr.detQtd!=null)f.detQtd=pr.detQtd;if(f.status==='pendente')f.status='carregado';draw();toast('Preenchido com o projeto — ajuste se o real foi diferente');};
+    $('#hRep').onclick=()=>{const L=S.last&&S.last.furo;if(!L){toast('Nenhum lançamento anterior');return;}grab();
+      f.decks=JSON.parse(JSON.stringify(L.decks));['booster','brinel','detTipo','detQtd','tampao','caminhao'].forEach(k=>f[k]=L[k]);if(f.status==='pendente')f.status='carregado';draw();toast('Carga do último furo copiada');};
+    $('#hNear').onclick=()=>{grab();commit(false);closeSheet();addExtra(p,h);};
+    $('#hSave').onclick=()=>{grab();commit(false);};
+    $('#hNext').onclick=()=>{grab();commit(true);};
+  };
+  const commit=next=>{
+    if(f.status==='pendente'&&f.decks.some(d=>num(d.kg)>0))f.status='carregado';
+    f.decks=f.decks.filter(d=>d.prod||num(d.kg));
+    f.ts=Date.now();f.por=meuNome();const tzMudou=h.tempo!==f.tempo||JSON.stringify(h.tempos||null)!==JSON.stringify(f.tempos||null)||h.cargaProj!==f.cargaProj;pushUndo(p,[h],'furo '+h.id);delete f.hist;const camAntes=camFora(p,f.caminhao);Object.assign(h,f);carimbaLotes(p,h);histAdd(h,resumoFuro(h));markF(p.id,h.id);if(tzMudou)markP(p.id);
+    if(f.status==='carregado')S.last=Object.assign(S.last||{},{furo:{decks:f.decks,booster:f.booster,brinel:f.brinel,detTipo:f.detTipo,detQtd:f.detQtd,tampao:f.tampao,caminhao:f.caminhao}});
+    save();toast(`Furo ${f.id} salvo`);setTimeout(()=>checarAlertas(p,h,camAntes),60);
+    if(next){let j=-1;for(let k=1;k<=p.holes.length;k++){const q=(i+k)%p.holes.length;if(p.holes[q].status==='pendente'){j=q;break;}}
+      renderPoly();if(j<0){closeSheet();toast('Todos os furos lançados');}else editHole(j);}
+    else{closeSheet();renderPoly();}
+  };
+  draw();
+}
+
+/* ----- Planilha de carregamento (Excel) — ida e volta ----- */
+const PL_COLS=[['Furo','id',8],['Status','status',14],['Prof. projeto (m)','profProj',11],['Prof. medida (m)','profMed',11],['Água','agua',10],['Coluna água (m)','aguaM',10],
+  ['Produto deck 1','p1',14],['kg deck 1','k1',9],['Produto deck 2','p2',14],['kg deck 2','k2',9],['Produto deck 3','p3',14],['kg deck 3','k3',9],['Total kg','tot',10],
+  ['Booster (un)','booster',9],['Brinel (un)','brinel',9],['Detonador','detTipo',13],['Qtd det.','detQtd',8],['Tampão (m)','tampao',9],['Caminhão','caminhao',12],['Tempo (ms)','tempo',10],['Observação','obs',28],['Condição','cond',20],['Lote produto','lp',12],['Lote booster','lb',12],['Lote detonador','ld',12],['Lançado por','por',14],['Data/hora','ts',17]];
+const AGUA_N={seca:'Seca',umida:'Úmida',agua:'Com água'};
+const stDeNome=t=>{t=String(t||'').trim().toLowerCase();return Object.keys(ST).find(k=>ST[k].n.toLowerCase()===t)||(t.startsWith('carreg')?'carregado':t.startsWith('pend')?'pendente':t.startsWith('rep')?'repasse':t.startsWith('perd')?'perdido':t.startsWith('não')||t.startsWith('nao')?'nao':null);};
+const aguaDeNome=t=>{t=String(t||'').trim().toLowerCase();return t.startsWith('com')||t==='agua'||t==='água'?'agua':t.startsWith('úm')||t.startsWith('um')?'umida':t?'seca':null;};
+async function exportarPlanilha(p){
+  busy('Montando planilha…');
+  try{
+    const EX=await loadExcel();const wb=new EX.Workbook();wb.creator='Carregamento de Campo';
+    const camList=[...new Set([...CAMS,...p.holes.map(h=>h.caminhao).filter(Boolean)])];
+    // Listas (para as caixas de seleção)
+    const rng=(c,n)=>`Listas!$${String.fromCharCode(65+c)}$2:$${String.fromCharCode(65+c)}$${n+1}`;
+    // Carregamento
+    const ws=wb.addWorksheet('Carregamento',{views:[{state:'frozen',xSplit:1,ySplit:4}],pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
+    ws.mergeCells(1,1,1,10);ws.getCell('A1').value=`Planilha de carregamento – POL ${p.pol} · ${p.mina}${p.cava?' / '+p.cava:''}${p.banco?' · Banco '+p.banco:''}`;ws.getCell('A1').font={bold:true,size:14,color:{argb:'FF102A43'}};
+    ws.mergeCells(2,1,2,14);ws.getCell('A2').value=`Data ${brDate(p.data)}${p.resp?' · '+p.resp:''} · gerada pelo app em ${new Date().toLocaleString('pt-BR')}. Preencha ou corrija e importe de volta no app (menu ⋯ → Planilha de carregamento). Não mude a coluna Furo.`;ws.getCell('A2').font={italic:true,size:9,color:{argb:'FF5D6B78'}};
+    const H=4;PL_COLS.forEach(([t,,w],c)=>{const cell=ws.getCell(H,c+1);cell.value=t;cell.font={bold:true,color:{argb:'FFFFFFFF'}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF102A43'}};cell.alignment={vertical:'middle',horizontal:'center',wrapText:true};ws.getColumn(c+1).width=w;});
+    ws.getRow(H).height=32;
+    const col=k=>PL_COLS.findIndex(c=>c[1]===k)+1;const L=c=>ws.getColumn(c).letter;
+    p.holes.forEach((h,i)=>{const r=H+1+i;const d=[0,1,2].map(k=>h.decks[k]||{});
+      const v={id:h.id,status:ST[h.status].n,profProj:h.profProj,profMed:h.profMed,agua:AGUA_N[h.agua]||'Seca',aguaM:h.aguaM,p1:d[0].prod||null,k1:num(d[0].kg),p2:d[1].prod||null,k2:num(d[1].kg),p3:d[2].prod||null,k3:num(d[2].kg),
+        booster:num(h.booster),brinel:num(h.brinel),detTipo:h.detTipo||null,detQtd:num(h.detQtd),tampao:num(h.tampao),caminhao:h.caminhao||null,tempo:h.tempos&&h.tempos.length>1?h.tempos.join('/'):(h.tempo??null),obs:h.obs||null,cond:(h.cond||[]).join(', ')||null,lp:h.lotes?.prod||null,lb:h.lotes?.booster||null,ld:h.lotes?.det||null,por:h.por||null,ts:h.ts?new Date(h.ts):null};
+      PL_COLS.forEach(([,k],c)=>{const cell=ws.getCell(r,c+1);if(k==='tot')cell.value={formula:`IF(SUM(${L(col('k1'))}${r},${L(col('k2'))}${r},${L(col('k3'))}${r})=0,"",SUM(${L(col('k1'))}${r},${L(col('k2'))}${r},${L(col('k3'))}${r}))`};else if(v[k]!=null&&v[k]!=='')cell.value=v[k];});
+      ws.getCell(r,col('ts')).numFmt='dd/mm/yyyy hh:mm';ws.getCell(r,col('id')).font={bold:true};
+      [['status',0,5],['agua',1,3],['p1',2,PRODUTOS.length],['p2',2,PRODUTOS.length],['p3',2,PRODUTOS.length],['detTipo',3,DETS.length],['caminhao',4,camList.length]].forEach(([k,c,n])=>{ws.getCell(r,col(k)).dataValidation={type:'list',allowBlank:true,formulae:[rng(c,n)],showErrorMessage:true,errorTitle:'Valor inválido',error:'Escolha um item da lista'};});
+      ['profProj','profMed','aguaM','tampao'].forEach(k=>ws.getCell(r,col(k)).numFmt='0.0');
+      if(i%2)PL_COLS.forEach((_,c)=>ws.getCell(r,c+1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF3F6F9'}});});
+    const last=H+p.holes.length;
+    ws.autoFilter={from:{row:H,column:1},to:{row:last,column:PL_COLS.length}};
+    // cor do status
+    const sCol=L(col('status'));Object.values(ST).forEach(v=>ws.addConditionalFormatting({ref:`${sCol}${H+1}:${sCol}${last}`,rules:[{type:'cellIs',operator:'equal',formulae:[`"${v.n}"`],style:{fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FF'+v.c.slice(1).toUpperCase()}},font:{color:{argb:'FFFFFFFF'},bold:true}}}]}));
+    // Resumo por caminhão (fórmulas: atualiza sozinho enquanto edita no Excel)
+    const rs=wb.addWorksheet('Resumo');
+    rs.getCell('A1').value=`Resumo do carregamento – POL ${p.pol}`;rs.getCell('A1').font={bold:true,size:14,color:{argb:'FF102A43'}};
+    const R0=3;const hdr=['Caminhão','Furos',...PRODUTOS.map(x=>x+' (kg)'),'Total (kg)','Booster (un)','NF'];
+    hdr.forEach((t,c)=>{const cell=rs.getCell(R0,c+1);cell.value=t;cell.font={bold:true,color:{argb:'FFFFFFFF'}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF102A43'}};rs.getColumn(c+1).width=c?13:14;});
+    const rC=`Carregamento!$${L(col('caminhao'))}$${H+1}:$${L(col('caminhao'))}$${last}`;const rr=k=>`Carregamento!$${L(col(k))}$${H+1}:$${L(col(k))}$${last}`;
+    camList.forEach((cm,i)=>{const r=R0+1+i;rs.getCell(r,1).value=cm;rs.getCell(r,2).value={formula:`COUNTIF(${rC},A${r})`};
+      PRODUTOS.forEach((pr,j)=>{rs.getCell(r,3+j).value={formula:`SUMIFS(${rr('k1')},${rC},$A${r},${rr('p1')},"${pr}")+SUMIFS(${rr('k2')},${rC},$A${r},${rr('p2')},"${pr}")+SUMIFS(${rr('k3')},${rC},$A${r},${rr('p3')},"${pr}")`};rs.getCell(r,3+j).numFmt='#,##0';});
+      const tc=3+PRODUTOS.length;rs.getCell(r,tc).value={formula:`SUM(${rs.getColumn(3).letter}${r}:${rs.getColumn(tc-1).letter}${r})`};rs.getCell(r,tc).numFmt='#,##0';rs.getCell(r,tc).font={bold:true};
+      rs.getCell(r,tc+1).value={formula:`SUMIFS(${rr('booster')},${rC},$A${r})`};rs.getCell(r,tc+2).value=(p.nfs||{})[cm]||null;});
+    const rt=R0+1+camList.length;rs.getCell(rt,1).value='TOTAL';rs.getCell(rt,1).font={bold:true};
+    for(let c=2;c<=3+PRODUTOS.length+1;c++){const Lc=rs.getColumn(c).letter;rs.getCell(rt,c).value={formula:`SUM(${Lc}${R0+1}:${Lc}${rt-1})`};rs.getCell(rt,c).font={bold:true};rs.getCell(rt,c).numFmt='#,##0';}
+    const r2=rt+2;rs.getCell(r2,1).value='Status';rs.getCell(r2,2).value='Furos';[rs.getCell(r2,1),rs.getCell(r2,2)].forEach(c=>{c.font={bold:true,color:{argb:'FFFFFFFF'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF102A43'}};});
+    Object.values(ST).forEach((v,i)=>{rs.getCell(r2+1+i,1).value=v.n;rs.getCell(r2+1+i,2).value={formula:`COUNTIF(${rr('status')},A${r2+1+i})`};});
+    const li=wb.addWorksheet('Listas',{state:'hidden'});
+    [['Status',Object.values(ST).map(v=>v.n)],['Água',Object.values(AGUA_N)],['Produto',PRODUTOS],['Detonador',DETS],['Caminhão',camList]].forEach(([n,arr],c)=>{li.getCell(1,c+1).value=n;arr.forEach((v,r)=>li.getCell(r+2,c+1).value=v);});
+    wb.views=[{activeTab:0,firstSheet:0,visibility:'visible'}];
+    // Info (para o app reconhecer o polígono na volta)
+    const inf=wb.addWorksheet('Info',{state:'hidden'});inf.addRows([['app','carregamento-campo'],['poly_id',p.id],['pol',p.pol],['mina',p.mina],['exportado',new Date().toISOString()]]);
+    const buf=await wb.xlsx.writeBuffer();busy();
+    await entregarArquivo(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),`carregamento-POL${p.pol}-${p.data||today()}.xlsx`,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  }catch(e){busy();console.error(e);toast(e.message&&/internet/.test(e.message)?e.message:'Não consegui gerar a planilha');}
+}
+async function importarPlanilha(p){
+  const file=await pickFile('.xlsx,.xls,.csv');if(!file)return;
+  try{
+    busy('Lendo planilha…');const X=await loadXlsx();const wb=X.read(await readBuf(file),{type:'array',cellDates:true});busy();
+    const info={};if(wb.Sheets.Info)X.utils.sheet_to_json(wb.Sheets.Info,{header:1}).forEach(r=>info[r[0]]=r[1]);
+    const sh=wb.Sheets.Carregamento||wb.Sheets[wb.SheetNames[0]];const rows=X.utils.sheet_to_json(sh,{header:1,raw:true,defval:null});
+    const hi=rows.findIndex(r=>r&&r.some(v=>String(v||'').trim().toLowerCase()==='furo'));if(hi<0)throw new Error('Não achei a coluna "Furo" na planilha');
+    const head=rows[hi].map(v=>String(v||'').trim().toLowerCase());const ci={};PL_COLS.forEach(([t,k])=>{const i=head.indexOf(t.toLowerCase());if(i>=0)ci[k]=i;});
+    const byId=new Map(p.holes.map(h=>[String(h.id).toUpperCase(),h]));const mud=[],naoAchou=[];
+    const tx=v=>v==null?'':String(v).trim();
+    rows.slice(hi+1).forEach(r=>{if(!r)return;const id=tx(r[ci.id]);if(!id)return;const h=byId.get(id.toUpperCase());if(!h){naoAchou.push(id);return;}
+      const g=k=>ci[k]!=null?r[ci[k]]:undefined;const nv={};
+      if(g('status')!==undefined){const st=stDeNome(g('status'));if(st)nv.status=st;}
+      ['profMed','aguaM','booster','brinel','detQtd','tampao'].forEach(k=>{if(g(k)!==undefined)nv[k]=num(g(k));});
+      if(g('agua')!==undefined){const a=aguaDeNome(g('agua'));if(a)nv.agua=a;}
+      if(g('detTipo')!==undefined)nv.detTipo=tx(g('detTipo'));if(g('caminhao')!==undefined)nv.caminhao=tx(g('caminhao'));if(g('obs')!==undefined)nv.obs=tx(g('obs'));
+      if(g('cond')!==undefined)nv.cond=tx(g('cond')).split(/[,;\/]/).map(v=>v.trim()).filter(Boolean);
+      if(ci.lp!=null||ci.lb!=null||ci.ld!=null){const l={prod:tx(g('lp')),booster:tx(g('lb')),det:tx(g('ld'))};nv.lotes=Object.values(l).some(Boolean)?l:null;}
+      if(ci.k1!=null||ci.p1!=null){nv.decks=[1,2,3].map(n=>({prod:tx(g('p'+n)),kg:num(g('k'+n))})).filter(d=>d.prod||d.kg);}
+      if(g('tempo')!==undefined){const ts=String(g('tempo')??'').split(/[\/;]/).map(num).filter(v=>v!=null);nv.tempo=ts.length?ts[0]:null;nv.tempos=ts.length>1?ts:null;}
+      // o que mudou?
+      const dif=[];const eq=(a,b)=>(a??'')===(b??'')||(a==null&&b==='')||(a===''&&b==null);
+      Object.keys(nv).forEach(k=>{const J=['tempos','cond','lotes'];const a=k==='decks'?JSON.stringify((h.decks||[]).map(d=>({prod:d.prod||'',kg:num(d.kg)}))):k==='cond'?JSON.stringify(h.cond||[]):J.includes(k)?JSON.stringify(h[k]||null):h[k];const b=k==='decks'?JSON.stringify(nv.decks):k==='cond'?JSON.stringify(nv.cond||[]):J.includes(k)?JSON.stringify(nv[k]||null):nv[k];if(!eq(a,b))dif.push(k);});
+      if(!dif.length)return;
+      // furo pendente que ganhou carga/caminhão na planilha vira carregado
+      if((nv.status||h.status)==='pendente'&&((nv.decks&&nv.decks.some(d=>d.kg))||(nv.caminhao&&!h.caminhao)))nv.status='carregado';
+      mud.push({h,nv,dif});});
+    const outroPol=info.poly_id&&info.poly_id!==p.id;
+    const NOMES={status:'status',profMed:'prof.',agua:'água',aguaM:'água',decks:'carga',booster:'booster',brinel:'brinel',detTipo:'detonador',detQtd:'detonador',tampao:'tampão',caminhao:'caminhão',obs:'obs.',tempo:'tempo',tempos:'tempo',cond:'condição',lotes:'lotes'};
+    openSheet(`<h3>Importar planilha<button class="btn sm" id="ipClose">Cancelar</button></h3>
+      ${outroPol?`<div class="hint">⚠️ Esta planilha foi gerada para o <b>POL ${esc(info.pol)} (${esc(info.mina)})</b>, e você está no POL ${esc(p.pol)}. Confira antes de aplicar.</div>`:''}
+      <p><b>${mud.length}</b> furo(s) com alteração${naoAchou.length?` · ${naoAchou.length} furo(s) da planilha não existem neste polígono (${esc(naoAchou.slice(0,6).join(', '))}${naoAchou.length>6?'…':''})`:''}.</p>
+      ${mud.length?`<div style="max-height:40vh;overflow:auto;border:1px solid var(--line);border-radius:10px"><table><thead><tr><th>Furo</th><th>O que muda</th></tr></thead><tbody>${mud.map(m=>`<tr><td><b>${esc(m.h.id)}</b></td><td>${[...new Set(m.dif.map(k=>NOMES[k]||k))].join(', ')}${m.dif.includes('caminhao')?` → <b style="color:${camCor(m.nv.caminhao)}">${esc(m.nv.caminhao||'(sem)')}</b>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<p class="mut">Nada diferente do que já está no app.</p>'}
+      <div class="btns"><button class="btn pri" id="ipOk" ${mud.length?'':'disabled style="opacity:.5"'}>Aplicar no app</button></div>`);
+    $('#ipClose').onclick=closeSheet;
+    if(mud.length)$('#ipOk').onclick=()=>{const agora=Date.now();const quem=(meuNome()||'')+' (planilha)';let tz=false;
+      pushUndo(p,mud.map(m=>m.h),'importação da planilha');mud.forEach(({h,nv})=>{if('tempo' in nv&&(h.tempo!==nv.tempo||JSON.stringify(h.tempos||null)!==JSON.stringify(nv.tempos||null)))tz=true;Object.assign(h,nv);histAdd(h,'Planilha: '+resumoFuro(h));h.ts=agora;h.por=quem.trim();markF(p.id,h.id);});
+      if(tz)markP(p.id);save();closeSheet();corPor='caminhao';tab='mapa';renderPoly();toast(`${mud.length} furo(s) atualizados pela planilha`);};
+  }catch(e){busy();toast(e.message||'Não consegui ler a planilha');}
+}
+
+/* ----- Projeto x Executado ----- */
+function tabConf(p){
+  const pr=projDe(p);
+  if(pr.kg==null&&!p.holes.some(h=>h.cargaProj!=null)){
+    $('#tabBox').innerHTML=`<div class="card empty">Ainda não há projeto de carregamento para este polígono.<br><br><button class="btn pri" id="cfNew">Informar projeto</button></div>`;$('#cfNew').onclick=()=>editProjeto(p);return;}
+  const r=conferencia(p);const lanc=r.n.ok+r.n.abaixo+r.n.acima;const dif=r.kgProj?(r.kgExec-r.kgProj)/r.kgProj*100:null;
+  let h=`<div class="kpis"><div class="kpi"><b>${lanc?fmt(r.n.ok/lanc*100,0)+'%':'–'}</b><span>furos dentro da tolerância (±${fmt(pr.tolKg,0)}%)</span></div><div class="kpi"><b>${r.n.abaixo}</b><span>abaixo do projeto</span></div><div class="kpi"><b>${r.n.acima}</b><span>acima do projeto</span></div><div class="kpi"><b>${r.n.sem}</b><span>sem carga lançada</span></div></div>
+  <div class="card" style="margin-top:12px"><h2>Carga total</h2><table><tbody><tr><td>Projeto (furos a carregar)</td><td class="n">${fmt(r.kgProj)} kg</td></tr><tr><td>Executado (lançado)</td><td class="n"><b>${fmt(r.kgExec)} kg</b></td></tr><tr><td>Diferença</td><td class="n">${dif==null?'–':(dif>=0?'+':'')+fmt(dif,1)+'%'}</td></tr></tbody></table>
+  <p class="mut">A diferença total só fecha quando todos os furos estiverem lançados.</p></div>
+  <div class="card"><h2>Outros pontos</h2><table><tbody><tr><td>Profundidade abaixo do projeto (> ${fmt(pr.tolProf,1)} m)</td><td class="n">${r.profBaixa}</td></tr>${pr.tampao!=null?`<tr><td>Tampão diferente do projeto (> 0,5 m)</td><td class="n">${r.tampDif}</td></tr>`:''}${pr.booster!=null?`<tr><td>Booster diferente do projeto</td><td class="n">${r.boosterDif}</td></tr>`:''}<tr><td>Perdidos / não carregar</td><td class="n">${r.n.fora}</td></tr></tbody></table></div>`;
+  if(r.lista.length)h+=`<div class="card" style="padding:4px 8px;overflow:auto"><h2 style="margin:10px 6px">Furos fora da tolerância</h2><table><thead><tr><th>Furo</th><th class="n">Projeto</th><th class="n">Exec.</th><th class="n">Desvio</th><th>Cam.</th></tr></thead><tbody>${r.lista.sort((a,b)=>Math.abs(b[1].d)-Math.abs(a[1].d)).map(([x,dv])=>`<tr class="click" data-i="${p.holes.indexOf(x)}"><td><b>${esc(x.id)}</b></td><td class="n">${fmt(kgProj(p,x))}</td><td class="n">${fmt(holeKg(x))}</td><td class="n" style="color:${DV[dv.c].c};font-weight:700">${dv.d>0?'+':''}${fmt(dv.d,0)}%</td><td>${esc(camCurto(x.caminhao))}</td></tr>`).join('')}</tbody></table></div>`;
+  h+=`<div class="btns"><button class="btn" id="cfEd">Editar projeto</button><button class="btn" id="cfMap">Ver no mapa</button></div>`;
+  $('#tabBox').innerHTML=h;
+  $('#cfEd').onclick=()=>editProjeto(p);$('#cfMap').onclick=()=>{corPor='desvio';tab='mapa';renderPoly();};
+  document.querySelectorAll('#tabBox tr.click').forEach(tr=>tr.onclick=()=>editHole(+tr.dataset.i));
+}
+
+/* ----- Resumo ----- */
+function resumo(p,dia){
+  const hs=dia?p.holes.filter(h=>dayOf(h.ts)===dia):p.holes;
+  const r={total:p.holes.length,st:{},prod:{},det:{},cam:{},booster:0,brinel:0,agua:0,pm:[],pp:[],metros:0,abaixo:0};
+  Object.keys(ST).forEach(k=>r.st[k]=0);
+  hs.forEach(h=>{r.st[h.status]++;if(h.agua!=='seca')r.agua++;
+    if(h.profMed!=null){r.pm.push(h.profMed);r.metros+=h.profMed;if(h.profProj!=null&&h.profMed<h.profProj-0.5)r.abaixo++;}
+    if(h.profProj!=null)r.pp.push(h.profProj);
+    if(h.status==='carregado'||holeKg(h)>0){
+      h.decks.forEach(d=>{const kg=num(d.kg)||0;if(!kg)return;const pr=d.prod||'Sem produto';r.prod[pr]=(r.prod[pr]||0)+kg;const c=h.caminhao||'Sem caminhão';r.cam[c]=r.cam[c]||{};r.cam[c][pr]=(r.cam[c][pr]||0)+kg;});
+      r.booster+=num(h.booster)||0;r.brinel+=num(h.brinel)||0;if(h.detTipo&&h.detQtd)r.det[h.detTipo]=(r.det[h.detTipo]||0)+h.detQtd;}
+  });
+  r.lancados=hs.length;r.kg=Object.values(r.prod).reduce((a,b)=>a+b,0);
+  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;r.pmMed=avg(r.pm);r.ppMed=avg(r.pp);
+  return r;
+}
+function tabResumo(p){
+  const r=resumo(p);const pend=r.st.pendente;
+  let h=`<div class="kpis"><div class="kpi"><b>${r.st.carregado}/${r.total}</b><span>furos carregados</span></div><div class="kpi"><b>${pend}</b><span>pendentes</span></div><div class="kpi"><b>${r.st.repasse+r.st.perdido}</b><span>repasse / perdidos</span></div><div class="kpi"><b>${r.agua}</b><span>com água</span></div><div class="kpi"><b>${fmt(r.kg)}</b><span>kg lançados</span></div><div class="kpi"><b>${fmt(r.pmMed,1)}</b><span>prof. média medida (m) · proj. ${fmt(r.ppMed,1)}</span></div></div>`;
+  if(r.abaixo)h+=`<div class="hint">⚠️ ${r.abaixo} furo(s) medidos mais de 0,5 m abaixo do projeto.</div>`;
+  h+=`<div class="card" style="margin-top:12px"><h2>Consumo lançado</h2><table><tbody>${Object.entries(r.prod).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n"><b>${fmt(v)} kg</b></td></tr>`).join('')}
+  <tr><td>Booster</td><td class="n">${fmt(r.booster)} un</td></tr><tr><td>Brinel</td><td class="n">${fmt(r.brinel)} un</td></tr>${Object.entries(r.det).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${fmt(v)} un</td></tr>`).join('')}</tbody></table><p class="mut">Soma do que foi lançado furo a furo. O app não calcula carga de projeto.</p></div>`;
+  const cams=[...new Set([...Object.keys(r.cam).filter(c=>c!=='Sem caminhão'),...Object.keys(p.cams||{})])];
+  const kgL=c=>Object.values(r.cam[c]||{}).reduce((a,b)=>a+b,0);
+  const difH=c=>{const d=camDif(p,c,kgL(c));return d?`<b style="color:${d.ok?'var(--ok)':'var(--bad)'}">${d.ok?'✔':'⚠️'} Lançado x saída do caminhão: ${d.txt}</b>`:'<span class="mut">Informe o kg da NF para conferir com o lançado</span>';};
+  const CF=[['nf','NF','numeric'],['kgNF','kg na NF / balança','decimal'],['kgRet','kg de retorno / sobra','decimal'],['dens','Densidade do copo (g/cm³)','decimal'],['temp','Temperatura (°C)','decimal'],['oper','Operador',''],['ini','Início','time'],['fim','Fim','time']];
+  h+=`<div class="card"><h2>Controle dos caminhões</h2><p class="mut" style="margin:0 0 6px">Compara o que saiu do caminhão (NF menos retorno) com a soma lançada nos furos. Tolerância ±${fmt(projDe(p).tolCam,1)}% (muda em Projeto).</p>
+  ${cams.length?cams.map((c,ix)=>{const d=(p.cams||{})[c]||{};if(d.nf==null&&(p.nfs||{})[c])d.nf=p.nfs[c];return`<details style="padding:8px 0;border-bottom:1px solid var(--line)" ${camAberto===c?'open':''} data-cd="${esc(c)}"><summary><i class="dot" style="background:${camCor(c)}"></i><b>${esc(c)}</b> — ${fmt(kgL(c))} kg lançados em ${nf(p.holes.filter(x=>x.caminhao===c).length)}<div id="cd${ix}" style="font-size:13px;margin-top:2px">${difH(c)}</div></summary>
+    <div class="row">${CF.map(([k,t,im])=>`<div><label>${t}</label><input data-cm="${esc(c)}" data-ix="${ix}" data-k="${k}" ${im==='time'?'type="time"':im?`inputmode="${im}"`:''} value="${esc(d[k]??'')}"></div>`).join('')}</div>
+    <p class="mut" style="margin:6px 0 0">${Object.entries(r.cam[c]||{}).map(([pr,kg])=>`${esc(pr)} ${fmt(kg)} kg`).join(' · ')||'Nada lançado ainda'}</p></details>`;}).join(''):'<p class="mut">Nenhum caminhão lançado ainda.</p>'}
+  <div class="row" style="margin-top:8px"><select id="camNovo">${opts(CAMS.filter(c=>!cams.includes(c)),'','+ Abrir controle de outro caminhão')}</select></div></div>`;
+  const ac=acessRows(p,r);const aItens=[...new Set(['Booster','Brinel',...DETS.filter(t=>r.det[t]||(p.acess||{})[t]),...ac.map(a=>a.n)])];
+  h+=`<div class="card"><h2>Acessórios: paiol x aplicado</h2><p class="mut" style="margin:0 0 6px">Saldo = retirado − aplicado nos furos − devolvido. Tem que fechar em zero.</p><div style="overflow:auto"><table><thead><tr><th>Item</th><th class="n">Retirado</th><th class="n">Aplicado</th><th class="n">Devolvido</th><th class="n">Saldo</th></tr></thead><tbody>${aItens.map((n,ix)=>{const a=(p.acess||{})[n]||{};const apl=n==='Booster'?r.booster:n==='Brinel'?r.brinel:(r.det[n]||0);return`<tr><td>${esc(n)}</td><td class="n"><input data-ac="${esc(n)}" data-k="ret" data-apl="${apl}" data-ix="${ix}" inputmode="numeric" value="${esc(a.ret??'')}" style="width:58px;padding:6px 4px"></td><td class="n">${fmt(apl)}</td><td class="n"><input data-ac="${esc(n)}" data-k="dev" data-apl="${apl}" data-ix="${ix}" inputmode="numeric" value="${esc(a.dev??'')}" style="width:58px;padding:6px 4px"></td><td class="n" id="as${ix}">${saldoH(a,apl)}</td></tr>`;}).join('')}</tbody></table></div></div>`;
+  $('#tabBox').innerHTML=h;
+  document.querySelectorAll('details[data-cd]').forEach(d=>d.ontoggle=()=>{if(d.open)camAberto=d.dataset.cd;else if(camAberto===d.dataset.cd)camAberto=null;});
+  document.querySelectorAll('[data-cm]').forEach(inp=>inp.onchange=()=>{const c=inp.dataset.cm,k=inp.dataset.k;p.cams=p.cams||{};p.cams[c]=p.cams[c]||{};const v=inp.value.trim();p.cams[c][k]=v===''?null:(['kgNF','kgRet','dens','temp'].includes(k)?num(v):v);
+    if(k==='nf'){p.nfs=p.nfs||{};p.nfs[c]=v;}markP(p.id);save();const el=$('#cd'+inp.dataset.ix);if(el)el.innerHTML=difH(c);});
+  $('#camNovo').onchange=e=>{const c=e.target.value;if(!c)return;p.cams=p.cams||{};p.cams[c]=p.cams[c]||{};camAberto=c;markP(p.id);save();tabResumo(p);};
+  document.querySelectorAll('[data-ac]').forEach(inp=>inp.onchange=()=>{const n=inp.dataset.ac;p.acess=p.acess||{};p.acess[n]=p.acess[n]||{};p.acess[n][inp.dataset.k]=num(inp.value);markP(p.id);save();$('#as'+inp.dataset.ix).innerHTML=saldoH(p.acess[n],+inp.dataset.apl);});
+}
+let camAberto=null;
+function saldoH(a,apl){const ret=num(a.ret);if(ret==null)return'<span class="mut">–</span>';const sd=ret-apl-(num(a.dev)||0);return`<b style="color:${sd===0?'var(--ok)':'var(--bad)'}">${fmt(sd)}</b>`;}
+
+/* ----- Relatório ----- */
+let relModo='acum';
+function relatorio(p,modo){
+  const r=resumo(p),hj=resumo(p,today());
+  const L=[];
+  L.push(`📍 *CARREGAMENTO – POL ${p.pol}*`);
+  L.push(`📅 Data: ${brDate(p.data)}`);
+  L.push(`⛏️ Mina: ${p.mina}${p.cava?' | Cava: '+p.cava:''}${p.banco?' | Banco: '+p.banco:''}`);
+  if(p.resp)L.push(`👷 Responsável: ${p.resp}`);
+  L.push(`🚦 Situação: ${SITU[situDe(p)].n}`);
+  L.push('');
+  L.push(`🕳️ Furos: ${r.total} | Carregados: ${r.st.carregado} | Pendentes: ${r.st.pendente}`);
+  if(r.st.repasse||r.st.perdido)L.push(`🔁 Repasse: ${r.st.repasse} | Perdidos: ${r.st.perdido}`);
+  if(r.st.nao)L.push(`🚫 Não carregar: ${r.st.nao}`);
+  L.push(`💧 Com água: ${r.agua}`);
+  if(r.pmMed!=null)L.push(`📏 Prof. média medida: ${fmt(r.pmMed,1)} m (projeto ${fmt(r.ppMed,1)} m)`);
+  const bloco=(t,x)=>{L.push('');L.push(t);Object.entries(x.prod).forEach(([k,v])=>L.push(`• ${k}: ${fmt(v)} kg`));L.push(`• Booster: ${fmt(x.booster)} un`);Object.entries(x.det).forEach(([k,v])=>L.push(`• ${k}: ${fmt(v)} un`));if(x.brinel)L.push(`• Brinel: ${fmt(x.brinel)} un`);};
+  if(modo!=='hoje')bloco('💥 *Consumo acumulado do POL*',r);
+  if(modo!=='acum')bloco(`💥 *Consumo de hoje (${brDate(today())})*`,hj);
+  const pj=projDe(p);
+  if(pj.kg!=null||p.holes.some(h=>h.cargaProj!=null)){const cf=conferencia(p);const lanc=cf.n.ok+cf.n.abaixo+cf.n.acima;L.push('');L.push('📐 *Projeto x executado*');
+    L.push(`• Carga: projeto ${fmt(cf.kgProj)} kg | executado ${fmt(cf.kgExec)} kg`);
+    if(lanc)L.push(`• Dentro da tolerância (±${fmt(pj.tolKg,0)}%): ${cf.n.ok}/${lanc} furos`);
+    if(cf.n.abaixo)L.push(`• Abaixo do projeto: ${cf.n.abaixo} furo(s)`);if(cf.n.acima)L.push(`• Acima do projeto: ${cf.n.acima} furo(s)`);
+    if(cf.profBaixa)L.push(`• Profundidade abaixo do projeto: ${cf.profBaixa} furo(s)`);}
+  const tz=analiseTempo(p);
+  if(tz.com.length){L.push('');L.push('⏱️ *Temporização*');L.push(`• Furos com tempo: ${tz.com.length}/${tz.ativos}${tz.sem.length?' | sem tempo: '+tz.sem.length:''}`);
+    L.push(`• Tempos: ${fmt(tz.t0)} a ${fmt(tz.t1)} ms`);if(tz.rep.length)L.push(`• Tempos repetidos: ${tz.rep.map(([t,v])=>`${fmt(t)} ms (${v.map(x=>x.id).join(', ')})`).join('; ')}`);
+    L.push(`• Detonadores com tempo: ${tz.dets}${p.dvtProg!=null?' | DVT programado: '+p.dvtProg+(p.dvtProg===tz.dets?' ✔':' ⚠️'):''}`);}
+  const cams=Object.keys(r.cam);
+  if(cams.length){L.push('');L.push('🚛 *Caminhões*');cams.forEach(c=>{const cd=camDif(p,c,Object.values(r.cam[c]).reduce((a,b)=>a+b,0));L.push(`• ${c} – ${Object.entries(r.cam[c]).map(([pr,kg])=>`${pr} ${fmt(kg)} kg`).join(' / ')}${(p.nfs||{})[c]?' – NF '+p.nfs[c]:''}${cd?` – NF x lançado ${cd.txt}${cd.ok?' ✔':' ⚠️'}`:''}`);});}
+  const ac=acessRows(p,r).filter(a=>a.ret!=null);
+  if(ac.length){L.push('');L.push('🧰 *Acessórios (saldo)*');ac.forEach(a=>L.push(`• ${a.n}: retirado ${fmt(a.ret)} | aplicado ${fmt(a.apl)} | devolvido ${fmt(a.dev||0)} | saldo ${fmt(a.saldo)}${a.saldo===0?' ✔':' ⚠️'}`));}
+  const oc={};p.holes.forEach(h=>(h.cond||[]).forEach(c=>(oc[c]=oc[c]||[]).push(h.id)));
+  if(Object.keys(oc).length){L.push('');L.push('⚠️ *Ocorrências nos furos*');Object.entries(oc).forEach(([c,v])=>L.push(`• ${c}: ${v.length} (${v.slice(0,12).join(', ')}${v.length>12?'…':''})`));}
+  const ck=p.check||{};if(ck.pre&&ck.pre.ts||ck.fim&&ck.fim.ts){L.push('');L.push('✅ *Liberação*');if(ck.pre&&ck.pre.ts)L.push(`• Antes do carregamento: ${ck.pre.nome} (${new Date(ck.pre.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})})`);if(ck.fim&&ck.fim.ts)L.push(`• Fechamento: ${ck.fim.nome} (${new Date(ck.fim.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})})`);}
+  const po=p.pos;if(po&&po.ts){L.push('');L.push('🧨 *Pós-fogo*');L.push(`• Falhas: ${po.falhas&&po.falhas.length?po.falhas.length+' ('+po.falhas.join(', ')+')':'nenhuma'}`);if(po.frag)L.push(`• Fragmentação: ${FRAG[po.frag]}${po.matacoes!=null?' | matacões: '+po.matacoes:''}`);L.push(`• Ultralançamento: ${po.ultra==='sim'?'houve'+(po.ultraDist!=null?' ('+fmt(po.ultraDist)+' m)':''):'não houve'}`);if(po.fumaca)L.push(`• Fumaça: ${FUMACA[po.fumaca]}`);if(po.vib!=null||po.ruido!=null)L.push(`• Vibração ${po.vib!=null?fmt(po.vib,1)+' mm/s':'–'} | pressão acústica ${po.ruido!=null?fmt(po.ruido,0)+' dB':'–'}`);if(po.obs)L.push('• '+po.obs);}
+  const obs=p.holes.filter(h=>h.obs).map(h=>`• ${h.id}: ${h.obs}`);
+  if(obs.length){L.push('');L.push('📝 *Observações*');L.push(...obs.slice(0,30));}
+  return L.join('\n');
+}
+function tabRelatorio(p){
+  const t=relatorio(p,relModo);
+  $('#tabBox').innerHTML=`<div class="seg" id="rm" style="margin-bottom:10px">${[['acum','Acumulado'],['hoje','Só hoje'],['ambos','Os dois']].map(m=>`<button data-m="${m[0]}" class="${relModo===m[0]?'on':''}">${m[1]}</button>`).join('')}</div>
+  <textarea id="rel" style="min-height:320px">${esc(t)}</textarea><div class="btns"><button class="btn pri" id="rCopy">Copiar relatório</button><button class="btn" id="rPrint">Relatório completo (imprimir / PDF)</button></div><p class="mut">Cole no WhatsApp. Você pode editar o texto antes de copiar.</p>`;
+  document.querySelectorAll('#rm button').forEach(b=>b.onclick=()=>{relModo=b.dataset.m;tabRelatorio(p);});
+  $('#rCopy').onclick=()=>copyText($('#rel').value);$('#rPrint').onclick=()=>imprimir(p);
+}
+
+/* ----- CSV ----- */
+function csv(p){
+  const n=v=>v==null?'':String(v).replace('.',',');
+  const head=['POL','Mina','Furo','Status','ProfProjeto','ProfMedida','Agua','ColunaAgua','Deck1Produto','Deck1Kg','Deck2Produto','Deck2Kg','Deck3Produto','Deck3Kg','TempoMs','TotalKg','CargaProjetoKg','DesvioCarga','Booster','Brinel','Detonador','QtdDetonador','Tampao','Caminhao','NF','Obs','Condicao','LoteProduto','LoteBooster','LoteDetonador','LancadoPor','DataHora'];
+  const rows=p.holes.map(h=>{const d=[0,1,2].map(k=>h.decks[k]||{});return[p.pol,p.mina,h.id,ST[h.status].n,n(h.profProj),n(h.profMed),h.agua,n(h.aguaM),d[0].prod||'',n(d[0].kg),d[1].prod||'',n(d[1].kg),d[2].prod||'',n(d[2].kg),(h.tempos&&h.tempos.length>1?h.tempos.join('/'):(h.tempo??'')),n(holeKg(h)||null),n(kgProj(p,h)),desvio(p,h).t,n(h.booster),n(h.brinel),h.detTipo,n(h.detQtd),n(h.tampao),h.caminhao,(p.nfs||{})[h.caminhao]||'',(h.obs||'').replace(/;/g,','),(h.cond||[]).join(', '),(h.lotes?.prod||''),(h.lotes?.booster||''),(h.lotes?.det||''),h.por||'',h.ts?new Date(h.ts).toLocaleString('pt-BR'):''].join(';');});
+  return [head.join(';'),...rows].join('\n');
+}
+
+render();
+if(SY().token)setTimeout(syncNow,800);
+</script>
+</body>
+</html>
