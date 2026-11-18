@@ -154,6 +154,18 @@ let excelP=null;
 function loadExcel(){return excelP||(excelP=(async()=>{if(!window.ExcelJS)await loadScript(['lib/exceljs.min.js','https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js']);return window.ExcelJS;})().catch(e=>{excelP=null;throw e;}));}
 let jspdfP=null;
 function loadJsPdf(){return jspdfP||(jspdfP=(async()=>{if(!(window.jspdf&&window.jspdf.jsPDF))await loadScript(['lib/jspdf.umd.min.js','https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js']);return window.jspdf.jsPDF;})().catch(e=>{jspdfP=null;throw e;}));}
+// planilha pronta: mostra um botão para baixar (o toque da pessoa garante o download no computador; no celular dá para compartilhar)
+function entregarPlanilha(blob,nome){
+  const tipo='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';const url=URL.createObjectURL(blob);
+  const file=new File([blob],nome,{type:tipo});const celular=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const podeComp=celular&&navigator.canShare&&(()=>{try{return navigator.canShare({files:[file]});}catch(e){return false;}})();
+  openSheet(`<h3>✅ Planilha pronta<button class="btn sm" id="epX">Fechar</button></h3>
+    <p><b>${esc(nome)}</b> · ${fmt(blob.size/1048576,1)} MB</p>
+    <div class="btns" style="flex-direction:column"><a class="btn pri" id="epDl" href="${url}" download="${esc(nome)}" style="text-align:center;text-decoration:none">⬇️ Baixar planilha</a>${podeComp?'<button class="btn" id="epSh">Compartilhar (WhatsApp, e-mail…)</button>':''}</div>
+    <p class="mut">${celular?'Depois de baixar, abra pelo app do Excel.':'O arquivo vai para a pasta Downloads (ou o Chrome pergunta onde salvar). Abra no Excel.'}</p>`);
+  $('#epX').onclick=closeSheet;$('#epDl').onclick=()=>{setTimeout(()=>toast('Planilha baixada: '+nome,3000),300);};
+  if(podeComp)$('#epSh').onclick=async()=>{try{await navigator.share({files:[file],title:nome});}catch(e){}};
+}
 async function entregarArquivo(blob,nome,tipo){
   try{const file=new File([blob],nome,{type:tipo});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:nome});return true;}}catch(e){if(e&&e.name==='AbortError')return true;}
   try{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();a.remove();toast('Arquivo gerado: '+nome);return true;}catch(e){toast('Este navegador bloqueou o download. Abra o app pelo link do GitHub.');return false;}
@@ -431,7 +443,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-18.2';
+const APP_VER='2026-11-18.3';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -2081,7 +2093,7 @@ async function exportarPlanilha(p){
     try{const r=await preencherModelo(m,{cam,todos,data,operador,auxiliar,blocos,dataModelo:L.dataModelo});busy();
       if(r.sobrou)toast(`⚠️ ${r.sobrou} furo(s) não couberam nas abas CARREG do modelo`,5000);
       if(fh){busy('Salvando e ligando o acompanhamento…');try{await planSalvarEAcompanhar(p,fh,r.blob);busy();}catch(e){busy();console.error(e);toast('Não consegui salvar nesse lugar. Feche o arquivo no Excel e tente de novo.',4500);}return;}
-      await entregarArquivo(r.blob,`PC_US-VGR_${todos?'todas-UMB':(cam||'todos').replace(/\s+/g,'')}_POL${p.pol}_${data}.xlsx`,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      entregarPlanilha(r.blob,`PC_US-VGR_${todos?'todas-UMB':(cam||'todos').replace(/\s+/g,'')}_POL${p.pol}_${data}.xlsx`);
     }catch(e){busy();console.error(e);toast(e.message&&/internet/.test(e.message)?e.message:'Não consegui gerar a planilha no modelo');}
   };
   $('#mdGo').onclick=()=>gerar(false);if($('#mdGoW'))$('#mdGoW').onclick=()=>gerar(true);
