@@ -430,7 +430,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-17.1';
+const APP_VER='2026-11-18.1';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -2022,43 +2022,59 @@ async function exportarPlanilha(p){
     $('#mdPick').onclick=async()=>{const v=await modeloEscolher();if(v){closeSheet();exportarPlanilha(p);}};return;}
   let L;try{busy('Lendo as listas do modelo…');L=await modeloListas(m);busy();}catch(e){busy();toast('Não consegui ler o modelo. Escolha de novo.');await bgDel(MOD_KEY);return;}
   const cams=camsPoly(p);const E=Object.assign({},S.enaex||{},p.enaex||{});
-  const camIni=E.cam&&cams.includes(E.cam)?E.cam:(cams[0]||'');
+  const todosCams=[...new Set([...cams,...CAMS,...(L.umb||[]).map(String).filter(c=>/^UM[BT]\s/i.test(c))])];
+  const marcados=new Set(Array.isArray(E.cams)&&E.cams.length?E.cams.filter(c=>todosCams.includes(c)).concat(cams):todosCams);
+  const modoIni=E.modo==='um'&&E.cam!=null?(E.cam===''?'':E.cam):'*';
+  const camIni=modoIni==='*'||modoIni===''||cams.includes(modoIni)||CAMS.includes(modoIni)?modoIni:'*';
   const dl=(id,arr)=>`<datalist id="${id}">${arr.map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`;
   const sel=(id,arr,v)=>{const vv=modCasa(arr,v);const tem=arr.some(x=>String(x)===String(vv));return `<select id="${id}"><option value="">—</option>${arr.map(x=>`<option ${String(x)===String(vv)?'selected':''}>${esc(x)}</option>`).join('')}${!tem&&vv!==''?`<option selected>${esc(vv)}</option>`:''}</select>`;};
-  const outros=()=>{const c=$('#mdCam')?$('#mdCam').value:camIni;return S.polys.filter(q=>q.id!==p.id&&(!c||camsPoly(q).includes(c))).sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));};
+  const outros=()=>{const c=$('#mdCam')?$('#mdCam').value:camIni;return S.polys.filter(q=>q.id!==p.id&&(!c||c==='*'||camsPoly(q).includes(c))).sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));};
   const optsP=v=>`<option value="">— vazia —</option>`+outros().map(q=>`<option value="${q.id}" ${q.id===v?'selected':''}>POL ${esc(q.pol)} · ${esc(q.mina||'')} · ${brDate(q.data)}</option>`).join('');
   const pr=projDe(p);
   openSheet(`<h3>Planilha de carregamento (modelo Enaex)<button class="btn sm" id="mdX">Fechar</button></h3>
     <p class="mut" style="margin:0 0 6px">Modelo: <b>${esc(m.nome)}</b> <button class="btn sm" id="mdTroca">Trocar modelo</button></p>
-    <div class="row"><div><label>Caminhão (UMB)</label><select id="mdCam">${cams.map(c=>`<option ${c===camIni?'selected':''}>${esc(c)}</option>`).join('')}<option value="" ${camIni?'':'selected'}>Todos os furos (sem separar caminhão)</option></select></div><div><label>Data</label><input id="mdData" type="date" value="${esc(p.data||today())}"></div></div>
+    <div class="row"><div><label>Caminhões</label><select id="mdCam"><option value="*" ${camIni==='*'?'selected':''}>Todos – uma aba CARREG por caminhão</option>${[...new Set([...cams,...CAMS])].map(c=>`<option value="${esc(c)}" ${c===camIni?'selected':''}>Só ${esc(c)}</option>`).join('')}<option value="" ${camIni===''?'selected':''}>Todos os furos numa aba (sem separar caminhão)</option></select></div><div><label>Data</label><input id="mdData" type="date" value="${esc(p.data||today())}"></div></div>
+    <div id="mdCamsBox"><label>Abas que vão na planilha (uma por caminhão)</label><div style="display:flex;flex-wrap:wrap;gap:6px 14px">${todosCams.map(c=>`<label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" class="mdCk" value="${esc(c)}" style="width:auto" ${marcados.has(c)?'checked':''}><span style="color:${camCor(c)};font-weight:700">●</span>${esc(c)}${cams.includes(c)?` <span class="mut">(${modFuros(p,c).length})</span>`:''}</label>`).join('')}</div></div>
     <div class="row"><div><label>Operador</label><input id="mdOp" list="mdOpL" value="${esc(E.operador||'')}">${dl('mdOpL',L.oper)}</div><div><label>Auxiliar</label><input id="mdAux" list="mdAuxL" value="${esc(E.auxiliar||'')}">${dl('mdAuxL',L.aux)}</div></div>
-    <p style="margin:12px 0 0"><b>CARREG.1 = POL ${esc(p.pol)}</b> <span class="mut" id="mdN"></span></p>
+    <p style="margin:12px 0 0"><b>POL ${esc(p.pol)}</b> <span class="mut" id="mdN"></span></p>
     <div class="row"><div><label>Banco</label><input id="mdBanco" value="${esc(p.banco||'')}"></div><div><label>Litologia</label>${sel('mdLito',L.lito,E.lito)}</div></div>
-    <div class="row"><div><label>Explosivo</label>${sel('mdExpl',L.expl,E.expl||modProd(p,camIni))}</div><div><label>Diâm. (pol.)</label>${sel('mdDiam',L.diam,E.diam)}</div></div>
+    <div class="row"><div><label>Explosivo</label>${sel('mdExpl',L.expl,E.expl||modProd(p,camIni==='*'?'':camIni))}</div><div><label>Diâm. (pol.)</label>${sel('mdDiam',L.diam,E.diam)}</div></div>
     <div class="row"><div><label>Alt. banco (m)</label><input id="mdAlt" inputmode="decimal" value="${esc(E.alt??'')}"></div><div><label>Dens. explosivo</label><input id="mdDens" inputmode="decimal" value="${esc(E.dens??'')}"></div></div>
     <div class="row"><div><label>Afast. (m)</label><input id="mdAf" inputmode="decimal" value="${esc(E.afast??'')}"></div><div><label>Espaç. (m)</label><input id="mdEs" inputmode="decimal" value="${esc(E.espac??'')}"></div></div>
     <div class="row"><div><label>Tampão programado (m)</label><input id="mdTp" inputmode="decimal" value="${esc(pr.tampao??'')}"></div><div></div></div>
-    <div class="row"><div><label>CARREG.2 (outro polígono do dia)</label><select id="mdP2">${optsP(E.p2)}</select></div><div><label>CARREG.3</label><select id="mdP3">${optsP(E.p3)}</select></div></div>
-    <p class="mut">Vão para a planilha só os furos com carga do caminhão escolhido, na ordem em que foram lançados (Carga 1/2/3 = decks dele). Os polígonos de CARREG.2 e 3 usam os dados técnicos salvos deles (ou estes, se ainda não tiverem).</p>
+    <div class="row" id="mdPBox"><div><label>CARREG.2 (outro polígono do dia)</label><select id="mdP2">${optsP(E.p2)}</select></div><div><label>CARREG.3</label><select id="mdP3">${optsP(E.p3)}</select></div></div>
+    <p class="mut" id="mdTxt"></p>
+    <div class="hint" id="mdSim" style="margin-top:8px">👥 <b>Várias pessoas preenchendo ao mesmo tempo:</b> salve a planilha no OneDrive/SharePoint e abra no Excel (todos editam juntos). Num computador com Chrome ou Edge, abra o app e use ⋯ → <b>Acompanhar planilha</b> no arquivo da pasta do OneDrive: o que cada um digitar entra no app e vai para os celulares da equipe pela base online.</div>
     <div class="btns"><button class="btn" id="mdOld">Planilha simples do app</button><button class="btn pri" id="mdGo">Gerar planilha</button></div>`);
-  const conta=()=>{const c=$('#mdCam').value;$('#mdN').textContent=`· ${modFuros(p,c).length} furo(s)`;};conta();
-  $('#mdCam').onchange=()=>{const v2=$('#mdP2').value,v3=$('#mdP3').value;$('#mdP2').innerHTML=optsP(v2);$('#mdP3').innerHTML=optsP(v3);conta();};
+  const ckd=()=>[...document.querySelectorAll('.mdCk')].filter(x=>x.checked).map(x=>x.value);
+  const atualiza=()=>{const c=$('#mdCam').value;const todos=c==='*';
+    $('#mdCamsBox').style.display=todos?'':'none';$('#mdPBox').style.display=todos?'none':'';
+    if(todos){const cs=ckd();const nf=cs.reduce((s,k)=>s+modFuros(p,k).length,0);$('#mdN').textContent=`· ${cs.length} caminhão(ões) · ${nf} furo(s) já lançados`;
+      $('#mdTxt').innerHTML=`Cada caminhão ganha a sua aba no modelo (CARREG.1, CARREG.2, CARREG.3, e o app cria CARREG.4, 5… se precisar), com a UMB no cabeçalho e os furos que ela já carregou, na ordem em que foram lançados. As linhas vazias são para continuar preenchendo no Excel: o que for digitado em cada aba volta para o app no caminhão daquela aba.`;}
+    else{$('#mdN').textContent=`· CARREG.1 · ${modFuros(p,c).length} furo(s)`;$('#mdTxt').innerHTML=c?'Vão para a planilha só os furos com carga desse caminhão, na ordem em que foram lançados (Carga 1/2/3 = decks dele). CARREG.2 e 3 podem levar outros polígonos do dia.':'Todos os furos do polígono numa aba só (Carga 1/2/3 = decks do furo, de qualquer caminhão).';}};
+  atualiza();
+  document.querySelectorAll('.mdCk').forEach(x=>x.onchange=atualiza);
+  $('#mdCam').onchange=()=>{const v2=$('#mdP2').value,v3=$('#mdP3').value;$('#mdP2').innerHTML=optsP(v2);$('#mdP3').innerHTML=optsP(v3);atualiza();};
   $('#mdX').onclick=closeSheet;$('#mdOld').onclick=()=>{closeSheet();exportarPlanilhaSimples(p);};
   $('#mdTroca').onclick=async()=>{const v=await modeloEscolher();if(v){closeSheet();exportarPlanilha(p);}};
   $('#mdGo').onclick=async()=>{
     const g=id=>$(id).value.trim();const nn=id=>num(g(id));const diamV=(()=>{const v=g('#mdDiam');const o=L.diam.find(x=>String(x)===v);return o!==undefined?o:(num(v)??v);})();
     const tec={lito:g('#mdLito'),expl:g('#mdExpl'),diam:diamV,alt:nn('#mdAlt'),dens:nn('#mdDens'),afast:nn('#mdAf'),espac:nn('#mdEs')};
-    const cam=g('#mdCam'),data=g('#mdData')||today(),operador=g('#mdOp'),auxiliar=g('#mdAux');
-    p.enaex=Object.assign({},p.enaex||{},tec,{p2:g('#mdP2'),p3:g('#mdP3'),cam});
+    const sel=g('#mdCam'),todos=sel==='*',data=g('#mdData')||today(),operador=g('#mdOp'),auxiliar=g('#mdAux');
+    const lista=todos?ckd():[];if(todos&&!lista.length){toast('Marque pelo menos um caminhão');return;}
+    const cam=todos?'':sel;
+    p.enaex=Object.assign({},p.enaex||{},tec,{p2:g('#mdP2'),p3:g('#mdP3'),cam,modo:todos?'todos':'um'});
     if(g('#mdBanco')!==String(p.banco||''))p.banco=g('#mdBanco');
     const tp=nn('#mdTp');if(tp!=null&&tp!==pr.tampao){p.proj=Object.assign({},p.proj||{},{tampao:tp});}
-    S.enaex=Object.assign({},S.enaex||{},tec,{operador,auxiliar,cam});markP(p.id);save();
-    const polys=[p,...[g('#mdP2'),g('#mdP3')].map(id=>S.polys.find(q=>q.id===id)).filter(Boolean)];
-    const blocos=[];polys.forEach(q=>{const t=Object.assign({},tec,q===p?{}:(q.enaex||{}));blocos.push({p:q,tec:t,furos:modFuros(q,cam)});});
+    S.enaex=Object.assign({},S.enaex||{},tec,{operador,auxiliar,cam,modo:todos?'todos':'um'},todos?{cams:lista}:{});markP(p.id);save();
+    let blocos;
+    if(todos)blocos=lista.map(c=>({p,tec,cam:c,furos:modFuros(p,c),sempre:true}));
+    else{const polys=[p,...[g('#mdP2'),g('#mdP3')].map(id=>S.polys.find(q=>q.id===id)).filter(Boolean)];
+      blocos=polys.map(q=>({p:q,tec:Object.assign({},tec,q===p?{}:(q.enaex||{})),cam,furos:modFuros(q,cam),sempre:q===p}));}
     closeSheet();busy('Montando a planilha no modelo…');
-    try{const r=await preencherModelo(m,{cam,data,operador,auxiliar,blocos,dataModelo:L.dataModelo});busy();
-      if(r.sobrou)toast(`⚠️ ${r.sobrou} furo(s) não couberam nas 3 abas CARREG do modelo`,5000);
-      await entregarArquivo(r.blob,`PC_US-VGR_${(cam||'todos').replace(/\s+/g,'')}_POL${p.pol}_${data}.xlsx`,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    try{const r=await preencherModelo(m,{cam,todos,data,operador,auxiliar,blocos,dataModelo:L.dataModelo});busy();
+      if(r.sobrou)toast(`⚠️ ${r.sobrou} furo(s) não couberam nas abas CARREG do modelo`,5000);
+      await entregarArquivo(r.blob,`PC_US-VGR_${todos?'todas-UMB':(cam||'todos').replace(/\s+/g,'')}_POL${p.pol}_${data}.xlsx`,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     }catch(e){busy();console.error(e);toast(e.message&&/internet/.test(e.message)?e.message:'Não consegui gerar a planilha no modelo');}
   };
 }
@@ -2089,62 +2105,122 @@ function xSheet(doc){
     semCache(){for(const c of doc.getElementsByTagNameNS(XNS,'c')){if(!temF(c))continue;for(const v of [...c.getElementsByTagNameNS(XNS,'v')])c.removeChild(v);const t=c.getAttribute('t');if(t&&t!=='array')c.removeAttribute('t');}}
   };
 }
+const ehCarreg=n=>/^CARREG\.\d+$/.test(n);
+const ordCarreg=(a,b)=>+a.split('.')[1]-+b.split('.')[1];
 async function preencherModelo(m,cfg){
   const JSZip=await loadZip();const zip=await JSZip.loadAsync(m.buf);
   const P=new DOMParser(),SER=new XMLSerializer();
   const ler=async f=>P.parseFromString(await zip.file(f).async('string'),'application/xml');
-  const gravar=(f,doc)=>{let t=SER.serializeToString(doc);if(!t.startsWith('<?xml'))t='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+t;zip.file(f,t,{createFolders:false});};
+  const gravar=(f,doc)=>{let t=typeof doc==='string'?doc:SER.serializeToString(doc);if(!t.startsWith('<?xml'))t='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+t;zip.file(f,t,{createFolders:false});};
   const rel=(base,t)=>{if(t.startsWith('/'))return t.slice(1);const parts=base.split('/');parts.pop();for(const s of t.split('/')){if(s==='..')parts.pop();else if(s!=='.')parts.push(s);}return parts.join('/');};
-  const relsDe=async f=>{const rf=f.replace(/([^/]+)$/,'_rels/$1.rels');if(!zip.file(rf))return [];const d=await ler(rf);return [...d.getElementsByTagName('Relationship')].map(r=>({id:r.getAttribute('Id'),type:r.getAttribute('Type'),target:rel(f,r.getAttribute('Target'))}));};
-  const wbDoc=await ler('xl/workbook.xml');const wbRels=await relsDe('xl/workbook.xml');
+  const relsDe=async f=>{const rf=f.replace(/([^/]+)$/,'_rels/$1.rels');if(!zip.file(rf))return [];const d=await ler(rf);return [...d.getElementsByTagName('Relationship')].map(r=>({id:r.getAttribute('Id'),type:r.getAttribute('Type'),target:rel(f,r.getAttribute('Target')),raw:r.getAttribute('Target')}));};
+  const wbDoc=await ler('xl/workbook.xml');let wbRels=await relsDe('xl/workbook.xml');
   const RNS='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
-  const abas=[...wbDoc.getElementsByTagNameNS(XNS,'sheet')].map((s,i)=>({nome:s.getAttribute('name'),i,arq:(wbRels.find(r=>r.id===s.getAttributeNS(RNS,'id'))||{}).target}));
+  const lerAbas=()=>[...wbDoc.getElementsByTagNameNS(XNS,'sheet')].map((s,i)=>({nome:s.getAttribute('name'),i,arq:(wbRels.find(r=>r.id===s.getAttributeNS(RNS,'id'))||{}).target}));
+  let abas=lerAbas();
   const arqDe=n=>(abas.find(a=>a.nome===n)||{}).arq;
-  const docs={};const sh=async n=>{const f=arqDe(n);if(!f||!zip.file(f))return null;if(!docs[f])docs[f]={doc:await ler(f)};docs[f].x=docs[f].x||xSheet(docs[f].doc);return docs[f].x;};
-  // última linha da tabela de cada aba CARREG
   const fimTabela=async n=>{const f=arqDe(n);let fim=246;for(const r of await relsDe(f))if(/\/table$/.test(r.type)&&zip.file(r.target)){const t=await ler(r.target);const ref=t.documentElement.getAttribute('ref')||'';const mm=/:([A-Z]+)(\d+)$/.exec(ref);if(mm)fim=+mm[2];}return fim;};
+  // quantas abas CARREG cada bloco precisa (polígono grande continua na aba seguinte)
+  const capDe={};for(const a of abas.filter(a=>ehCarreg(a.nome)))capDe[a.nome]=(await fimTabela(a.nome))-10;
+  const capNova=capDe['CARREG.1']||236;
+  let precisa=0;cfg.blocos.forEach(b=>{if(b.furos.length||b.sempre)precisa+=Math.max(1,Math.ceil(b.furos.length/capNova));});
+  const existentes=abas.filter(a=>ehCarreg(a.nome)).map(a=>a.nome).sort(ordCarreg);
+  if(precisa>existentes.length&&arqDe('CARREG.1')){await clonarCarreg(zip,wbDoc,ler,gravar,relsDe,precisa-existentes.length,existentes);wbRels=await relsDe('xl/workbook.xml');abas=lerAbas();for(const a of abas.filter(a=>ehCarreg(a.nome)&&!(a.nome in capDe)))capDe[a.nome]=capNova;}
+  const docs={};const sh=async n=>{const f=arqDe(n);if(!f||!zip.file(f))return null;if(!docs[f])docs[f]={doc:await ler(f)};docs[f].x=docs[f].x||xSheet(docs[f].doc);return docs[f].x;};
   const outroDia=!cfg.dataModelo||cfg.dataModelo!==cfg.data;
-  // CHECK LIST (topo) — e, se o modelo for de outro dia, limpa o que é do dia (km, horímetro, densidades, DF e UF)
   const ck=await sh('CHECK LIST');
   if(ck){ck.set(MOD_CHK.data,xlSerial(cfg.data));ck.set(MOD_CHK.umb,cfg.cam||'');ck.set(MOD_CHK.operador,cfg.operador||'');
     if(outroDia)['E4','G4','D5','G5'].forEach(r=>ck.clear(r));}
   if(outroDia){const de=await sh('Densidade');if(de)[3,6,9,12].forEach(r=>['B','C','D','G','H','I','L','M','N'].forEach(c=>de.clear(c+r)));
     const df=await sh('DF e UF');if(df)for(let r=4;r<=23;r++)['D','E','F','G','I'].forEach(c=>df.clear(c+r));}
-  // distribui os blocos (polígonos) nas abas CARREG; polígono grande continua na aba seguinte
-  const fila=[];cfg.blocos.forEach(b=>{if(b.furos.length||b===cfg.blocos[0])fila.push({...b,furos:b.furos.slice()});});
-  const usadas={};let sobrou=0;
-  for(const n of MOD_ABAS){const x=await sh(n);if(!x)continue;const fim=await fimTabela(n);const cap=fim-10;
+  const fila=[];cfg.blocos.forEach(b=>{if(b.furos.length||b.sempre)fila.push({...b,furos:b.furos.slice()});});
+  const usadas={},camAbas={};let sobrou=0;
+  for(const n of abas.filter(a=>ehCarreg(a.nome)).map(a=>a.nome).sort(ordCarreg)){const x=await sh(n);if(!x)continue;const fim=10+capDe[n];
     const preenche=fila.length>0;
-    // limpa cabeçalho e linhas (só valores digitados; fórmulas ficam)
     if(preenche||outroDia){Object.values(MOD_HDR).forEach(r=>x.clear(r));for(let r=11;r<=fim;r++)Object.values(MOD_COL).forEach(c=>x.clear(c+r));}
     if(!preenche)continue;
-    const b=fila[0];const q=b.p,t=b.tec;const parte=b.furos.splice(0,cap);if(!b.furos.length)fila.shift();
-    usadas[n]=q.id;
+    const b=fila[0];const q=b.p,t=b.tec;const parte=b.furos.splice(0,capDe[n]);if(!b.furos.length)fila.shift();
+    usadas[n]=q.id;camAbas[n]=b.cam||'';
     const H={pol:q.pol,banco:num(q.banco)??q.banco,lito:t.lito,expl:t.expl,diam:t.diam,alt:t.alt,dens:t.dens,mina:q.mina,cava:q.cava,afast:t.afast,espac:t.espac,operador:cfg.operador,auxiliar:cfg.auxiliar};
     Object.entries(MOD_HDR).forEach(([k,r])=>x.set(r,H[k]));
-    const tp=projDe(q).tampao;if(tp!=null)x.set(MOD_COL.tampProj+'11',tp);
-    parte.forEach((h,i)=>{const r=11+i;const kg=modKgs(h,cfg.cam);const id=/^\d+$/.test(String(h.id))?+h.id:String(h.id);
+    // modo todos os caminhões: a UMB de cada aba vai no cabeçalho (no lugar da fórmula que puxa do CHECK LIST)
+    if(cfg.todos)x.set(MOD_UMB,b.cam||'');
+    // tampão programado na 1ª linha (como no modelo); em aba ainda sem furo fica vazio para a fórmula da carga programada não mostrar número negativo
+    const tp=projDe(q).tampao;if(tp!=null&&parte.length)x.set(MOD_COL.tampProj+'11',tp);
+    parte.forEach((h,i)=>{const r=11+i;const kg=modKgs(h,b.cam);const id=/^\d+$/.test(String(h.id))?+h.id:String(h.id);
       x.set(MOD_COL.id+r,id);x.set(MOD_COL.prof+r,num(h.profMed)??num(h.profProj));
       ['k1','k2','k3'].forEach((k,j)=>x.set(MOD_COL[k]+r,kg[j]??null));
       x.set(MOD_COL.tampao+r,num(h.tampao));x.set(MOD_COL.obs+r,h.obs||'');});
   }
   fila.forEach(b=>sobrou+=b.furos.length);
-  // fórmulas sem resultado velho em todas as abas
   for(const a of abas){if(!a.arq||!zip.file(a.arq)||!/worksheets\//.test(a.arq))continue;if(!docs[a.arq])docs[a.arq]={doc:await ler(a.arq)};docs[a.arq].x=docs[a.arq].x||xSheet(docs[a.arq].doc);docs[a.arq].x.semCache();}
-  Object.entries(docs).forEach(([f,d])=>gravar(f,d.doc));
-  // recalcular ao abrir, abrir na aba CARREG.1, tabelas dinâmicas atualizam ao abrir
   let calc=wbDoc.getElementsByTagNameNS(XNS,'calcPr')[0];if(!calc){calc=wbDoc.createElementNS(XNS,'calcPr');const ref=wbDoc.getElementsByTagNameNS(XNS,'pivotCaches')[0]||wbDoc.getElementsByTagNameNS(XNS,'extLst')[0]||null;wbDoc.documentElement.insertBefore(calc,ref);}
   calc.setAttribute('fullCalcOnLoad','1');
   const bv=wbDoc.getElementsByTagNameNS(XNS,'workbookView')[0];const a1=abas.find(a=>a.nome==='CARREG.1');if(bv&&a1){bv.setAttribute('activeTab',a1.i);if(+(bv.getAttribute('firstSheet')||0)>a1.i)bv.setAttribute('firstSheet',a1.i);}
   for(const s of wbDoc.getElementsByTagNameNS(XNS,'sheet'))if(s.getAttribute('name')==='CARREG.1')s.removeAttribute('state');
   gravar('xl/workbook.xml',wbDoc);
   for(const r of wbRels)if(/pivotCacheDefinition$/.test(r.type)&&zip.file(r.target)){const d=await ler(r.target);d.documentElement.setAttribute('refreshOnLoad','1');gravar(r.target,d);}
-  // só uma aba ativa (senão o Excel abre com várias selecionadas)
   for(const a of abas){if(!a.arq||!zip.file(a.arq)||!docs[a.arq])continue;const d=docs[a.arq].doc;for(const v of d.getElementsByTagNameNS(XNS,'sheetView')){if(a.nome==='CARREG.1')v.setAttribute('tabSelected','1');else v.removeAttribute('tabSelected');}gravar(a.arq,d);}
-  // marca para o app reconhecer na volta (propriedade do arquivo, invisível na planilha)
-  await marcaInfo(zip,ler,gravar,{app:'carregamento-campo',v:1,cam:cfg.cam||'',abas:usadas,exportado:new Date().toISOString()});
+  await marcaInfo(zip,ler,gravar,{app:'carregamento-campo',v:2,cam:cfg.cam||'',todos:!!cfg.todos,abas:usadas,cams:camAbas,exportado:new Date().toISOString()});
   const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6},mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   return {blob,sobrou,usadas};
+}
+const MOD_UMB='B4';
+// cria CARREG.4, CARREG.5… copiando a CARREG.1 do modelo (mesmo visual, mesmas fórmulas, tabela própria)
+async function clonarCarreg(zip,wbDoc,ler,gravar,relsDe,qtd,existentes){
+  const RNS='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const wbRelsDoc=await ler('xl/_rels/workbook.xml.rels');const wbRels=await relsDe('xl/workbook.xml');
+  const sheets=[...wbDoc.getElementsByTagNameNS(XNS,'sheet')];
+  const s1=sheets.find(s=>s.getAttribute('name')==='CARREG.1');const src=wbRels.find(r=>r.id===s1.getAttributeNS(RNS,'id')).target;
+  const srcRels=await relsDe(src);const tabRel=srcRels.find(r=>/\/table$/.test(r.type)),drwRel=srcRels.find(r=>/\/drawing$/.test(r.type));
+  const sheetXml=await zip.file(src).async('string');
+  const tabXml=tabRel&&zip.file(tabRel.target)?await zip.file(tabRel.target).async('string'):null;
+  const tabNome=tabXml&&(/\bdisplayName="([^"]+)"/.exec(tabXml)||[])[1];
+  const drwXml=drwRel&&zip.file(drwRel.target)?await zip.file(drwRel.target).async('string'):null;
+  const drwRelsF=drwRel&&drwRel.target.replace(/([^/]+)$/,'_rels/$1.rels');const drwRelsXml=drwRelsF&&zip.file(drwRelsF)?await zip.file(drwRelsF).async('string'):null;
+  const ct=await ler('[Content_Types].xml');const ctRoot=ct.documentElement;
+  const ctDe=part=>{for(const o of ctRoot.childNodes)if(o.getAttribute&&o.getAttribute('PartName')==='/'+part)return o.getAttribute('ContentType');return null;};
+  const addCT=(part,type)=>{if(!type)return;const o=ct.createElementNS(ctRoot.namespaceURI,'Override');o.setAttribute('PartName','/'+part);o.setAttribute('ContentType',type);ctRoot.appendChild(o);};
+  const proximo=(pref,ext)=>{let n=1;while(zip.file(`${pref}${n}${ext}`))n++;return n;};
+  let maxTabId=0,nomesTab=new Set();for(const f of Object.keys(zip.files))if(/^xl\/tables\/[^/]+\.xml$/.test(f)){const t=await zip.file(f).async('string');const mm=/<table\b[^>]*\bid="(\d+)"/.exec(t);if(mm)maxTabId=Math.max(maxTabId,+mm[1]);const nn=/\bdisplayName="([^"]+)"/.exec(t);if(nn)nomesTab.add(nn[1].toLowerCase());}
+  let maxSheetId=Math.max(...sheets.map(s=>+s.getAttribute('sheetId')||0));
+  const idxUlt=Math.max(...sheets.map((s,i)=>existentes.includes(s.getAttribute('name'))?i:-1));let pos=idxUlt+1;
+  const dn=wbDoc.getElementsByTagNameNS(XNS,'definedName');
+  const iniNum=Math.max(...existentes.map(n=>+n.split('.')[1]));
+  const novos=[];
+  for(let k=1;k<=qtd;k++){
+    const nome='CARREG.'+(iniNum+k);
+    // nomes definidos de abas que vêm depois mudam de índice
+    for(const d of [...dn]){const l=d.getAttribute('localSheetId');if(l!=null&&+l>=pos)d.setAttribute('localSheetId',+l+1);}
+    const sn=proximo('xl/worksheets/sheet','.xml');const sf=`xl/worksheets/sheet${sn}.xml`;
+    let novoTab=null;
+    if(tabXml){let tn=proximo('xl/tables/table','.xml');const tf=`xl/tables/table${tn}.xml`;let nm='TabCarreg'+(iniNum+k);while(nomesTab.has(nm.toLowerCase()))nm+='_';nomesTab.add(nm.toLowerCase());maxTabId++;
+      const esc_=tabNome.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      let t=tabXml.replace(/(<table\b[^>]*?\bid=")\d+"/,`$1${maxTabId}"`).replace(new RegExp(`\\bname="${esc_}"`),`name="${nm}"`).replace(new RegExp(`\\bdisplayName="${esc_}"`),`displayName="${nm}"`).replace(new RegExp(esc_+'\\[','g'),nm+'[').replace(/\s(xr|xr3):uid="\{[^"]*\}"/g,'');
+      zip.file(tf,t,{createFolders:false});addCT(tf,ctDe(tabRel.target));novoTab={f:tf,nm};}
+    let novoDrw=null;
+    if(drwXml){const dn_=proximo('xl/drawings/drawing','.xml');const df=`xl/drawings/drawing${dn_}.xml`;zip.file(df,drwXml,{createFolders:false});addCT(df,ctDe(drwRel.target));
+      if(drwRelsXml)zip.file(`xl/drawings/_rels/drawing${dn_}.xml.rels`,drwRelsXml,{createFolders:false});novoDrw=df;}
+    let sx=sheetXml.replace(/(<worksheet\b[^>]*?)\sxr:uid="\{[^"]*\}"/,'$1').replace(/(<pageSetup\b[^>]*?)\sr:id="[^"]*"/,'$1');
+    if(tabNome&&novoTab)sx=sx.replace(new RegExp(tabNome.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\[','g'),novoTab.nm+'[');
+    zip.file(sf,sx,{createFolders:false});addCT(sf,ctDe(src)||'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml');
+    const rs=[];if(novoTab)rs.push(`<Relationship Id="${tabRel.id}" Type="${tabRel.type}" Target="../tables/${novoTab.f.split('/').pop()}"/>`);
+    if(novoDrw)rs.push(`<Relationship Id="${drwRel.id}" Type="${drwRel.type}" Target="../drawings/${novoDrw.split('/').pop()}"/>`);
+    zip.file(`xl/worksheets/_rels/sheet${sn}.xml.rels`,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rs.join('')}</Relationships>`,{createFolders:false});
+    let rid='rIdC'+(iniNum+k);while(wbRels.some(r=>r.id===rid))rid+='x';
+    const r=wbRelsDoc.createElementNS(wbRelsDoc.documentElement.namespaceURI,'Relationship');r.setAttribute('Id',rid);r.setAttribute('Type','http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet');r.setAttribute('Target',`worksheets/sheet${sn}.xml`);wbRelsDoc.documentElement.appendChild(r);wbRels.push({id:rid});
+    const s=wbDoc.createElementNS(XNS,'sheet');s.setAttribute('name',nome);s.setAttribute('sheetId',++maxSheetId);s.setAttributeNS(RNS,'r:id',rid);
+    const ref=[...wbDoc.getElementsByTagNameNS(XNS,'sheet')][pos]||null;wbDoc.getElementsByTagNameNS(XNS,'sheets')[0].insertBefore(s,ref);
+    // área de impressão e títulos iguais aos da CARREG.1
+    const i1=[...wbDoc.getElementsByTagNameNS(XNS,'sheet')].indexOf(s1);
+    for(const d of [...dn])if(d.getAttribute('localSheetId')===String(i1)&&/^_xlnm\.Print_(Area|Titles)$/.test(d.getAttribute('name'))){const c=d.cloneNode(true);c.setAttribute('localSheetId',pos);c.textContent=d.textContent.split("'CARREG.1'").join(`'${nome}'`);d.parentNode.appendChild(c);}
+    novos.push(nome);pos++;
+  }
+  // calcChain é refeito pelo Excel (as abas novas têm fórmulas que ele não lista)
+  const cc=wbRels.find(r=>/\/calcChain$/.test(r.type||''));
+  if(cc){zip.remove(cc.target);for(const x of [...wbRelsDoc.getElementsByTagName('Relationship')])if(/\/calcChain$/.test(x.getAttribute('Type')))x.parentNode.removeChild(x);for(const o of [...ctRoot.childNodes])if(o.getAttribute&&o.getAttribute('PartName')==='/'+cc.target)ctRoot.removeChild(o);}
+  gravar('xl/_rels/workbook.xml.rels',wbRelsDoc);gravar('[Content_Types].xml',ct);
+  return novos;
 }
 async function marcaInfo(zip,ler,gravar,info){
   const f='docProps/custom.xml',CP='http://schemas.openxmlformats.org/officeDocument/2006/custom-properties',VT='http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes';
@@ -2156,39 +2232,49 @@ async function marcaInfo(zip,ler,gravar,info){
   const pp=d.createElementNS(CP,'property');pp.setAttribute('fmtid','{D5CDD505-2E9C-101B-9397-08002B2CF9AE}');pp.setAttribute('pid',pid+1);pp.setAttribute('name','carreg_info');
   const s=d.createElementNS(VT,'vt:lpwstr');s.textContent=JSON.stringify(info);pp.appendChild(s);root.appendChild(pp);gravar(f,d);
 }
-// volta: lê CARREG.1/2/3 do modelo (preenchido no Excel) e devolve o que cada furo tem lá
+// volta: lê todas as abas CARREG.n do modelo (preenchido no Excel, por uma ou várias pessoas) e devolve o que cada furo tem lá.
+// Cada aba vale para o caminhão do seu cabeçalho (UMB); o deck de outro caminhão no mesmo furo não é apagado.
 function planLerModelo(p,X,wb){
   let mi={};try{const cp=wb.Custprops||{};if(cp.carreg_info)mi=JSON.parse(cp.carreg_info);}catch(e){}
   const tx=v=>v==null?'':String(v).trim();const normPol=v=>tx(v).toUpperCase().replace(/^POL\.?\s*/,'');
-  const ck=wb.Sheets['CHECK LIST'];const cam=mi.app?(mi.cam||''):tx(ck&&ck[MOD_CHK.umb]&&ck[MOD_CHK.umb].v);
-  const abas=MOD_ABAS.filter(n=>wb.Sheets[n]);
+  const ck=wb.Sheets['CHECK LIST'];const camCk=tx(ck&&ck[MOD_CHK.umb]&&ck[MOD_CHK.umb].v);
+  const abas=wb.SheetNames.filter(ehCarreg).sort(ordCarreg);
   const cel=(s,r)=>{const c=s[r];return c?c.v:null;};
-  let minhas=abas.filter(n=>mi.abas?mi.abas[n]===p.id:normPol(cel(wb.Sheets[n],MOD_HDR.pol))===normPol(p.pol));
+  // caminhão de cada aba: o que está escrito na UMB do cabeçalho; senão o que o app gravou; senão o do CHECK LIST
+  const camDe=n=>{const v=tx(cel(wb.Sheets[n],MOD_UMB));if(v)return v;if(mi.cams&&n in mi.cams)return mi.cams[n]||'';if(mi.app)return mi.cam||'';return camCk;};
+  const temFuro=n=>{const s=wb.Sheets[n];for(let r=11;r<=60;r++)if(cel(s,MOD_COL.id+r)!=null)return true;return false;};
+  let minhas=abas.filter(n=>mi.abas&&n in mi.abas?mi.abas[n]===p.id:normPol(cel(wb.Sheets[n],MOD_HDR.pol))===normPol(p.pol));
+  // aba que o app não criou (ex.: alguém usou uma aba vazia): vale se o polígono do cabeçalho for este
+  abas.forEach(n=>{if(!minhas.includes(n)&&mi.abas&&!(n in mi.abas)&&normPol(cel(wb.Sheets[n],MOD_HDR.pol))===normPol(p.pol))minhas.push(n);});
   const info={poly_id:p.id,pol:p.pol,mina:p.mina};
-  if(!minhas.length){const n1=abas.find(n=>cel(wb.Sheets[n],'A11')!=null)||abas[0];minhas=n1?[n1]:[];
+  if(!minhas.length){const n1=abas.find(temFuro)||abas[0];minhas=n1?[n1]:[];
     const pid=mi.abas&&n1&&mi.abas[n1];const q=pid&&S.polys.find(x=>x.id===pid);info.poly_id=pid||'?';info.pol=q?q.pol:tx(cel(wb.Sheets[n1]||{},MOD_HDR.pol))||'?';info.mina=q?q.mina:'';}
-  const byId=new Map(p.holes.map(h=>[String(h.id).toUpperCase(),h]));const linhas=[],naoAchou=[];
-  minhas.forEach(n=>{const s=wb.Sheets[n];const prodH=tx(cel(s,MOD_HDR.expl));const prodApp=prodH?modCasa(PRODUTOS,prodH.split(/\s/)[0]):'';
+  const byId=new Map(p.holes.map(h=>[String(h.id).toUpperCase(),h]));const naoAchou=[];
+  const work=new Map();// furo -> {nv, decks, caminhao}
+  minhas.forEach(n=>{const s=wb.Sheets[n];const cam=camDe(n);const prodH=tx(cel(s,MOD_HDR.expl));const prodApp=prodH?modCasa(PRODUTOS,prodH.split(/\s/)[0]):'';
     const rg=X.utils.decode_range(s['!ref']||'A1:K11');
-    for(let r=11;r<=rg.e.r+1;r++){const id=tx(cel(s,MOD_COL.id+r));if(!id)continue;const h=byId.get(id.toUpperCase());if(!h){naoAchou.push(id);continue;}
-      const nv={};const pf=num(cel(s,MOD_COL.prof+r));if(!(h.profMed==null&&(pf==null||pf===num(h.profProj))))nv.profMed=pf;
-      nv.tampao=num(cel(s,MOD_COL.tampao+r));nv.obs=tx(cel(s,MOD_COL.obs+r));
+    for(let r=11;r<=rg.e.r+1;r++){const id=tx(cel(s,MOD_COL.id+r));if(!id)continue;const h=byId.get(id.toUpperCase());if(!h){if(!naoAchou.includes(id))naoAchou.push(id);continue;}
+      let w=work.get(h);if(!w){w={nv:{},decks:(h.decks||[]).map(d=>Object.assign({},d)),caminhao:h.caminhao,vezes:0};work.set(h,w);}
+      const prim=!w.vezes++;
+      const pf=num(cel(s,MOD_COL.prof+r));if(pf!=null||prim){if(!(h.profMed==null&&(pf==null||pf===num(h.profProj))))w.nv.profMed=pf;}
+      const ta=num(cel(s,MOD_COL.tampao+r));if(ta!=null||prim)w.nv.tampao=ta;
+      const ob=tx(cel(s,MOD_COL.obs+r));if(ob||prim)w.nv.obs=ob;
       const kgs=['k1','k2','k3'].map(k=>num(cel(s,MOD_COL[k]+r)));
-      const dk=(h.decks||[]).map(d=>Object.assign({},d));
-      if(cam){const meus=dk.filter(d=>deckTemCarga(d)&&deckCam(h,d)===cam);dk.forEach(d=>{if(deckTemCarga(d))d.cam=deckCam(h,d);});
+      const dk=w.decks;
+      if(cam){const meus=dk.filter(d=>deckTemCarga(d)&&deckCam(w,d)===cam);dk.forEach(d=>{if(deckTemCarga(d))d.cam=deckCam(w,d);});
         const novos=kgs.map((kg,j)=>kg?{prod:(meus[j]&&meus[j].prod)||prodApp||(meus[0]&&meus[0].prod)||'',kg,cam}:null).filter(Boolean);
         // troca os decks deste caminhão no mesmo lugar (a ordem dos decks do furo não muda)
         let k=0;const decks=[];dk.forEach(d=>{if(!deckTemCarga(d))return;if(d.cam===cam){if(k<novos.length)decks.push(novos[k++]);}else decks.push(d);});
-        while(k<novos.length)decks.push(novos[k++]);decks.splice(3);const hc=h.caminhao||(decks[0]&&decks[0].cam)||cam;
-        const tmp=normCams({caminhao:hc,decks});nv.decks=tmp.decks;if(tmp.caminhao!==h.caminhao)nv.caminhao=tmp.caminhao;}
-      else{nv.decks=kgs.map((kg,j)=>kg?Object.assign({},dk[j]||{},{prod:(dk[j]&&dk[j].prod)||prodApp,kg}):null).filter(Boolean);
-        const tmp=normCams({caminhao:h.caminhao,decks:nv.decks});nv.decks=tmp.decks;}
-      // compara deck a deck no formato do app (sem campos vazios)
-      nv.decks=nv.decks.map(d=>{const o={prod:d.prod||'',kg:d.kg};if(d.cam)o.cam=d.cam;return o;});
-      linhas.push({h,nv});}});
+        while(k<novos.length)decks.push(novos[k++]);decks.splice(3);
+        const hc=w.caminhao||(decks[0]&&decks[0].cam)||cam;const tmp=normCams({caminhao:hc,decks});w.decks=tmp.decks;w.caminhao=tmp.caminhao;}
+      else{const nd=kgs.map((kg,j)=>kg?Object.assign({},dk[j]||{},{prod:(dk[j]&&dk[j].prod)||prodApp,kg}):null).filter(Boolean);
+        const tmp=normCams({caminhao:w.caminhao,decks:nd});w.decks=tmp.decks;w.caminhao=tmp.caminhao;}
+    }});
+  const linhas=[];
+  work.forEach((w,h)=>{const nv=w.nv;nv.decks=w.decks.map(d=>{const o={prod:d.prod||'',kg:d.kg};if(d.cam&&d.cam!==w.caminhao)o.cam=d.cam;return o;});
+    if((w.caminhao||'')!==(h.caminhao||''))nv.caminhao=w.caminhao;linhas.push({h,nv});});
   return {info,linhas,naoAchou};
 }
-
 // lê a planilha e devolve, por furo, os valores dela (nv) — usado na importação manual e no acompanhamento automático
 function planLer(p,X,wb){
   if(MOD_ABAS.some(n=>wb.Sheets[n]))return planLerModelo(p,X,wb);
