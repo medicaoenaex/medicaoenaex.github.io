@@ -2126,6 +2126,8 @@ function xSheet(doc){
   };
 }
 const ehCarreg=n=>/^CARREG\.\d+$/.test(n);
+// assinatura de uma linha (furo) da aba CARREG: serve para saber, na volta, se a linha foi mexida no Excel
+const modSig=(prof,kgs,tamp,obs)=>[prof,...kgs,tamp].map(v=>{v=num(v);return v==null?'':String(Math.round(v*1000)/1000);}).join('|')+'|'+String(obs==null?'':obs).trim();
 const ordCarreg=(a,b)=>+a.split('.')[1]-+b.split('.')[1];
 async function preencherModelo(m,cfg){
   const JSZip=await loadZip();const zip=await JSZip.loadAsync(m.buf);
@@ -2154,7 +2156,7 @@ async function preencherModelo(m,cfg){
   if(outroDia){const de=await sh('Densidade');if(de)[3,6,9,12].forEach(r=>['B','C','D','G','H','I','L','M','N'].forEach(c=>de.clear(c+r)));
     const df=await sh('DF e UF');if(df)for(let r=4;r<=23;r++)['D','E','F','G','I'].forEach(c=>df.clear(c+r));}
   const fila=[];cfg.blocos.forEach(b=>{if(b.furos.length||b.sempre)fila.push({...b,furos:b.furos.slice()});});
-  const usadas={},camAbas={};let sobrou=0;
+  const usadas={},camAbas={},snapAbas={};let sobrou=0;
   for(const n of abas.filter(a=>ehCarreg(a.nome)).map(a=>a.nome).sort(ordCarreg)){const x=await sh(n);if(!x)continue;const fim=10+capDe[n];
     const preenche=fila.length>0;
     if(preenche||outroDia){Object.values(MOD_HDR).forEach(r=>x.clear(r));for(let r=11;r<=fim;r++)Object.values(MOD_COL).forEach(c=>x.clear(c+r));}
@@ -2167,7 +2169,9 @@ async function preencherModelo(m,cfg){
     if(cfg.todos)x.set(MOD_UMB,b.cam||'');
     // tampão programado na 1ª linha (como no modelo); em aba ainda sem furo fica vazio para a fórmula da carga programada não mostrar número negativo
     const tp=projDe(q).tampao;if(tp!=null&&parte.length)x.set(MOD_COL.tampProj+'11',tp);
+    snapAbas[n]={};
     parte.forEach((h,i)=>{const r=11+i;const kg=modKgs(h,b.cam);const id=/^\d+$/.test(String(h.id))?+h.id:String(h.id);
+      snapAbas[n][String(h.id).toUpperCase()]=modSig(num(h.profMed)??num(h.profProj),[kg[0],kg[1],kg[2]],h.tampao,h.obs||'');
       x.set(MOD_COL.id+r,id);x.set(MOD_COL.prof+r,num(h.profMed)??num(h.profProj));
       ['k1','k2','k3'].forEach((k,j)=>x.set(MOD_COL[k]+r,kg[j]??null));
       x.set(MOD_COL.tampao+r,num(h.tampao));x.set(MOD_COL.obs+r,h.obs||'');});
@@ -2181,7 +2185,7 @@ async function preencherModelo(m,cfg){
   gravar('xl/workbook.xml',wbDoc);
   for(const r of wbRels)if(/pivotCacheDefinition$/.test(r.type)&&zip.file(r.target)){const d=await ler(r.target);d.documentElement.setAttribute('refreshOnLoad','1');gravar(r.target,d);}
   for(const a of abas){if(!a.arq||!zip.file(a.arq)||!docs[a.arq])continue;const d=docs[a.arq].doc;for(const v of d.getElementsByTagNameNS(XNS,'sheetView')){if(a.nome==='CARREG.1')v.setAttribute('tabSelected','1');else v.removeAttribute('tabSelected');}gravar(a.arq,d);}
-  await marcaInfo(zip,ler,gravar,{app:'carregamento-campo',v:2,cam:cfg.cam||'',todos:!!cfg.todos,abas:usadas,cams:camAbas,exportado:new Date().toISOString()});
+  await marcaInfo(zip,ler,gravar,{app:'carregamento-campo',v:2,cam:cfg.cam||'',todos:!!cfg.todos,abas:usadas,cams:camAbas,snap:snapAbas,exportado:new Date().toISOString()});
   const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6},mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   return {blob,sobrou,usadas};
 }
@@ -2273,7 +2277,10 @@ function planLerModelo(p,X,wb){
   const work=new Map();// furo -> {nv, decks, caminhao}
   minhas.forEach(n=>{const s=wb.Sheets[n];const cam=camDe(n);const prodH=tx(cel(s,MOD_HDR.expl));const prodApp=prodH?modCasa(PRODUTOS,prodH.split(/\s/)[0]):'';
     const rg=X.utils.decode_range(s['!ref']||'A1:K11');
+    const sn=mi.snap&&mi.snap[n];
     for(let r=11;r<=rg.e.r+1;r++){const id=tx(cel(s,MOD_COL.id+r));if(!id)continue;const h=byId.get(id.toUpperCase());if(!h){if(!naoAchou.includes(id))naoAchou.push(id);continue;}
+      // linha que ninguém mexeu desde que o app gerou a planilha: não volta (assim uma cópia velha não desfaz o que outro caminhão lançou depois)
+      if(sn&&sn[id.toUpperCase()]!=null&&sn[id.toUpperCase()]===modSig(cel(s,MOD_COL.prof+r),['k1','k2','k3'].map(k=>cel(s,MOD_COL[k]+r)),cel(s,MOD_COL.tampao+r),cel(s,MOD_COL.obs+r)))continue;
       let w=work.get(h);if(!w){w={nv:{},decks:(h.decks||[]).map(d=>Object.assign({},d)),caminhao:h.caminhao,vezes:0};work.set(h,w);}
       const prim=!w.vezes++;
       const pf=num(cel(s,MOD_COL.prof+r));if(pf!=null||prim){if(!(h.profMed==null&&(pf==null||pf===num(h.profProj))))w.nv.profMed=pf;}
