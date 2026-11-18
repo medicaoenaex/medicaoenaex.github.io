@@ -89,6 +89,7 @@ tr.click{cursor:pointer}
   #print .pb{page-break-before:always}#print img{max-width:100%}
   #print .sig{display:flex;gap:30px;margin-top:40px}#print .sig div{flex:1;border-top:1px solid #000;padding-top:4px;text-align:center}
 }
+@keyframes pfl{0%{opacity:1}50%{opacity:.15}100%{opacity:1}}.pfl{animation:pfl .9s ease-in-out 5;animation-fill-mode:forwards}
 </style>
 </head>
 <body>
@@ -430,7 +431,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-18.1';
+const APP_VER='2026-11-18.2';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -805,6 +806,7 @@ const EXTRA_COR=['#5c940d','#862e9c','#d9480f','#364fc7','#a61e4d','#087f5b'];
 function camCor(c){if(!c)return'#b8c0c8';if(CAM_COR[c])return CAM_COR[c];let h=0;for(const ch of c)h=(h*31+ch.charCodeAt(0))>>>0;return EXTRA_COR[h%EXTRA_COR.length];}
 const camCurto=c=>(c||'').replace(/^UM[TB]\s*/,'');
 let corPor=(S.ui&&S.ui.corPor)||'caminhao',pincel=null,rotulos=true;
+let planFlash=null; // furos que acabaram de chegar da planilha (anel pulsando no croqui)
 function setCorPor(v){corPor=v;S.ui=Object.assign(S.ui||{},{corPor:v});save();}
 const nf=n=>n===1?'1 furo':n+' furos';
 function rotuloFuro(h){const kg=holeKg(h);return[camsTxt(h),kg?fmt(kg)+' kg':''].filter(Boolean);} // pincel = caminhão sendo marcado no mapa
@@ -843,7 +845,8 @@ function tabMapa(p){
   const semFoto=g.useBg&&p.bg.semFoto?new Set(p.bg.semFoto):null; // furo do croqui sem furo visível na foto do drone
   p.holes.forEach((h,i)=>{const cx=g.X(h.x),cy=g.Y(h.y),c=corFuro(h);
     const lbl=h.n!=null?h.n:h.id;const agua=h.agua!=='seca';const sl=selMode&&selSet.has(i);
-    s+=`<g data-i="${i}">${semFoto&&semFoto.has(h.id)?`<circle cx="${cx}" cy="${cy}" r="${r*1.7}" fill="none" stroke="#f76707" stroke-width="${r*0.22}" stroke-dasharray="${r*0.5} ${r*0.3}" pointer-events="none"/>`:''}${sl?`<circle cx="${cx}" cy="${cy}" r="${r*1.45}" fill="none" stroke="#fab005" stroke-width="${r*0.35}" pointer-events="none"/>`:''}${(h.cond||[]).length?`<circle cx="${cx+r*0.8}" cy="${cy-r*0.8}" r="${r*0.32}" fill="#7a4b00" stroke="#fff" stroke-width="${r*0.08}" pointer-events="none"/>`:''}<circle data-i="${i}" cx="${cx}" cy="${cy}" r="${r}" fill="${c}" fill-opacity="${g.useBg?0.85:1}" stroke="${agua?'#1971c2':'#fff'}" stroke-width="${agua?r*0.32:r*0.12}"/>${meiaLua(h,cx,cy,r)}`+
+    const fl=planFlash&&Date.now()<planFlash.ate&&planFlash.ids.has(String(h.id));
+    s+=`<g data-i="${i}">${fl?`<circle class="pfl" cx="${cx}" cy="${cy}" r="${r*1.6}" fill="none" stroke="${camCor(camsDoFuro(h)[0]||'')}" stroke-width="${r*0.3}" pointer-events="none"/>`:''}${semFoto&&semFoto.has(h.id)?`<circle cx="${cx}" cy="${cy}" r="${r*1.7}" fill="none" stroke="#f76707" stroke-width="${r*0.22}" stroke-dasharray="${r*0.5} ${r*0.3}" pointer-events="none"/>`:''}${sl?`<circle cx="${cx}" cy="${cy}" r="${r*1.45}" fill="none" stroke="#fab005" stroke-width="${r*0.35}" pointer-events="none"/>`:''}${(h.cond||[]).length?`<circle cx="${cx+r*0.8}" cy="${cy-r*0.8}" r="${r*0.32}" fill="#7a4b00" stroke="#fff" stroke-width="${r*0.08}" pointer-events="none"/>`:''}<circle data-i="${i}" cx="${cx}" cy="${cy}" r="${r}" fill="${c}" fill-opacity="${g.useBg?0.85:1}" stroke="${agua?'#1971c2':'#fff'}" stroke-width="${agua?r*0.32:r*0.12}"/>${meiaLua(h,cx,cy,r)}`+
     `<text data-i="${i}" x="${cx}" y="${cy+r*0.3}" text-anchor="middle" font-size="${r*0.8}" fill="#fff" font-weight="700" pointer-events="none">${esc(String(lbl).slice(-4))}</text>`+
     (rotulos?(corPor==='tempo'?(temTempo(h)?[(h.tempos&&h.tempos.length>1?h.tempos.map(v=>fmt(v)).join('/'):fmt(h.tempo))+' ms']:[]):rotuloFuro(h)).map((t,k)=>`<text x="${cx}" y="${cy+r*(1.5+k*0.56)}" text-anchor="middle" font-size="${r*0.5}" fill="${corPor!=='tempo'&&k===0&&h.caminhao?camCor(h.caminhao):'#14202b'}" font-weight="700" stroke="#fff" stroke-width="${r*0.15}" paint-order="stroke" pointer-events="none">${esc(t)}</text>`).join(''):'')+`</g>`;});
   const lines={};p.holes.forEach(h=>{if(h.line&&lines[h.line]==null)lines[h.line]=h.y;});
@@ -2045,7 +2048,8 @@ async function exportarPlanilha(p){
     <div class="row" id="mdPBox"><div><label>CARREG.2 (outro polígono do dia)</label><select id="mdP2">${optsP(E.p2)}</select></div><div><label>CARREG.3</label><select id="mdP3">${optsP(E.p3)}</select></div></div>
     <p class="mut" id="mdTxt"></p>
     <div class="hint" id="mdSim" style="margin-top:8px">👥 <b>Várias pessoas preenchendo ao mesmo tempo:</b> salve a planilha no OneDrive/SharePoint e abra no Excel (todos editam juntos). Num computador com Chrome ou Edge, abra o app e use ⋯ → <b>Acompanhar planilha</b> no arquivo da pasta do OneDrive: o que cada um digitar entra no app e vai para os celulares da equipe pela base online.</div>
-    <div class="btns"><button class="btn" id="mdOld">Planilha simples do app</button><button class="btn pri" id="mdGo">Gerar planilha</button></div>`);
+    <div class="btns"><button class="btn" id="mdOld">Planilha simples do app</button>${planWPode()&&window.showSaveFilePicker?`<button class="btn" id="mdGo">Só gerar</button><button class="btn pri" id="mdGoW">📗 Gerar e acompanhar ao vivo</button>`:`<button class="btn pri" id="mdGo">Gerar planilha</button>`}</div>
+    ${planWPode()&&window.showSaveFilePicker?`<p class="mut"><b>Gerar e acompanhar ao vivo:</b> salve a planilha na pasta do OneDrive/SharePoint e abra no Excel com o Salvamento Automático ligado. Cada furo digitado aparece no croqui na cor do caminhão em poucos segundos, aqui e nos celulares da equipe. Deixe esta aba do app aberta.</p>`:''}`);
   const ckd=()=>[...document.querySelectorAll('.mdCk')].filter(x=>x.checked).map(x=>x.value);
   const atualiza=()=>{const c=$('#mdCam').value;const todos=c==='*';
     $('#mdCamsBox').style.display=todos?'':'none';$('#mdPBox').style.display=todos?'none':'';
@@ -2057,7 +2061,9 @@ async function exportarPlanilha(p){
   $('#mdCam').onchange=()=>{const v2=$('#mdP2').value,v3=$('#mdP3').value;$('#mdP2').innerHTML=optsP(v2);$('#mdP3').innerHTML=optsP(v3);atualiza();};
   $('#mdX').onclick=closeSheet;$('#mdOld').onclick=()=>{closeSheet();exportarPlanilhaSimples(p);};
   $('#mdTroca').onclick=async()=>{const v=await modeloEscolher();if(v){closeSheet();exportarPlanilha(p);}};
-  $('#mdGo').onclick=async()=>{
+  const gerar=async aoVivo=>{
+    // ao vivo: pergunta onde salvar ANTES de montar (o navegador só deixa abrir essa janela logo após o toque)
+    let fh=null;if(aoVivo){try{fh=await window.showSaveFilePicker({suggestedName:`PC_US-VGR_${$('#mdCam').value==='*'?'todas-UMB':($('#mdCam').value||'todos').replace(/\s+/g,'')}_POL${p.pol}_${$('#mdData').value||today()}.xlsx`,types:[{description:'Planilha Excel',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]});}catch(e){return;}}
     const g=id=>$(id).value.trim();const nn=id=>num(g(id));const diamV=(()=>{const v=g('#mdDiam');const o=L.diam.find(x=>String(x)===v);return o!==undefined?o:(num(v)??v);})();
     const tec={lito:g('#mdLito'),expl:g('#mdExpl'),diam:diamV,alt:nn('#mdAlt'),dens:nn('#mdDens'),afast:nn('#mdAf'),espac:nn('#mdEs')};
     const sel=g('#mdCam'),todos=sel==='*',data=g('#mdData')||today(),operador=g('#mdOp'),auxiliar=g('#mdAux');
@@ -2074,9 +2080,23 @@ async function exportarPlanilha(p){
     closeSheet();busy('Montando a planilha no modelo…');
     try{const r=await preencherModelo(m,{cam,todos,data,operador,auxiliar,blocos,dataModelo:L.dataModelo});busy();
       if(r.sobrou)toast(`⚠️ ${r.sobrou} furo(s) não couberam nas abas CARREG do modelo`,5000);
+      if(fh){busy('Salvando e ligando o acompanhamento…');try{await planSalvarEAcompanhar(p,fh,r.blob);busy();}catch(e){busy();console.error(e);toast('Não consegui salvar nesse lugar. Feche o arquivo no Excel e tente de novo.',4500);}return;}
       await entregarArquivo(r.blob,`PC_US-VGR_${todos?'todas-UMB':(cam||'todos').replace(/\s+/g,'')}_POL${p.pol}_${data}.xlsx`,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     }catch(e){busy();console.error(e);toast(e.message&&/internet/.test(e.message)?e.message:'Não consegui gerar a planilha no modelo');}
   };
+  $('#mdGo').onclick=()=>gerar(false);if($('#mdGoW'))$('#mdGoW').onclick=()=>gerar(true);
+}
+// grava a planilha no arquivo escolhido e já começa a acompanhar (mesmo mecanismo do ⋯ → Acompanhar planilha)
+async function planSalvarEAcompanhar(p,fh,blob){
+  const wr=await fh.createWritable();await wr.write(blob);await wr.close();
+  const w={fh,nome:fh.name,last:0,snap:{}};const r=await planWLer(w,p);
+  w.last=r.f.lastModified;w.snap=planSnap(r.linhas);w.lido=Date.now();planWStart(p.id,w);
+  setCorPor('caminhao');tab='mapa';renderPoly();
+  openSheet(`<h3>📗 Acompanhando ao vivo<button class="btn sm" id="awOk">Ok</button></h3>
+    <p>A planilha <b>${esc(fh.name)}</b> foi salva e o app está de olho nela.</p>
+    <p>Abra o arquivo no <b>Excel</b> (se estiver no OneDrive/SharePoint, ligue o <b>Salvamento Automático</b>; a equipe pode editar junto pelo Excel Online). Cada furo que alguém lançar numa aba CARREG aparece no croqui na cor daquele caminhão em poucos segundos, e vai para os celulares pela base online.</p>
+    <p class="mut">Deixe esta aba do app aberta neste computador. Para parar, use o botão Parar na faixa verde.</p>`);
+  $('#awOk').onclick=closeSheet;
 }
 
 /* edição direta do XML do .xlsx (mantém tudo o que o modelo tem) */
@@ -2372,6 +2392,7 @@ async function planWTick(pid,forcar){const w=planW[pid];if(!w||w.lendo)return;if
     r.linhas.forEach(({h,nv})=>{const ant=w.snap[String(h.id).toUpperCase()]||{};const ks=Object.keys(nv).filter(k=>ant[k]!==planCmp(k,nv[k]));if(!ks.length)return;const m=planMud(h,nv,ks);if(m)mud.push(m);});
     w.last=f.lastModified;w.snap=planSnap(r.linhas);w.lido=Date.now();
     if(mud.length){planAplicar(p,mud,'planilha acompanhada');w.ult={n:mud.length,ids:mud.map(m=>m.h.id),t:Date.now()};
+      planFlash={ids:new Set(mud.map(m=>String(m.h.id))),ate:Date.now()+9000};if(corPor!=='caminhao')setCorPor('caminhao');
       const ids=mud.slice(0,5).map(m=>m.h.id).join(', ')+(mud.length>5?'…':'');toast(`📗 Planilha: ${mud.length} furo(s) atualizados (${ids})`,3500);
       if(S.cur===pid&&view==='poly'&&$('#sheet').classList.contains('hidden'))renderPoly();else planWBarra();}
     else planWBarra();
