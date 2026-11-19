@@ -187,9 +187,19 @@ const readBuf=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>r
 const readTxt=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result));r.onerror=rej;r.readAsText(f);});
 
 /* ===== Ler arquivo de coordenadas (Excel, CSV, TXT ou PDF) ===== */
+// a 1ª aba tem cara de coordenadas (norte/leste)?
+function rowsToHolesOk(X,wb){try{rowsToHoles(X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''}).map(r=>r.map(v=>typeof v==='number'?String(v):String(v??'').trim())));return true;}catch(e){return false;}}
+function avisoPlanCarreg(nome,pols){const ps=pols.length?pols.map(v=>'POL '+esc(v)).join(' e '):'';
+  return `⚠️ <b>${esc(nome)}</b> é a <b>planilha de carregamento</b>${ps?` (${ps})`:''}, não o arquivo de coordenadas. Ela não cria polígono porque não tem a posição dos furos.<br><br>
+  Para lançar o que foi carregado: abra ${ps?`o <b>${ps.split(' e ')[0]}</b>`:'o polígono'} no app → <b>⋯</b> → <b>Importar planilha preenchida</b>${pols.length>1?` (depois repita no ${ps.split(' e ').slice(1).join(' e ')})`:''}.<br>
+  Para criar o polígono, use aqui o arquivo de coordenadas do topógrafo (furo, norte, leste).`;}
 async function fileToRows(file){
   const nm=file.name.toLowerCase();
-  if(/\.xlsx?$/.test(nm)){busy('Lendo planilha…');const X=await loadXlsx();const wb=X.read(await readBuf(file),{type:'array'});busy();return X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''}).map(r=>r.map(v=>typeof v==='number'?String(v):String(v??'').trim()));}
+  if(/\.xlsx?$/.test(nm)){busy('Lendo planilha…');const X=await loadXlsx();const wb=X.read(await readBuf(file),{type:'array'});busy();
+    const ab=wb.SheetNames.filter(n=>/^CARREG/i.test(n));
+    if(ab.length&&!rowsToHolesOk(X,wb)){const pols=[...new Set(ab.map(n=>{const c=wb.Sheets[n][MOD_HDR.pol];return c&&c.v!=null?String(c.v).trim():'';}).filter(Boolean))];
+      const e=new Error('Esta é a planilha de carregamento, não o arquivo de coordenadas');e.carreg=pols;throw e;}
+    return X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''}).map(r=>r.map(v=>typeof v==='number'?String(v):String(v??'').trim()));}
   if(/\.pdf$/.test(nm)){busy('Lendo PDF…');const lib=await loadPdf();const doc=await lib.getDocument({data:new Uint8Array(await readBuf(file)),isEvalSupported:false}).promise;const rows=[];
     for(let p=1;p<=doc.numPages;p++){const tc=await (await doc.getPage(p)).getTextContent();const lines=[];
       tc.items.filter(i=>i.str.trim()).forEach(i=>{const y=i.transform[5],x=i.transform[4];let L=lines.find(l=>Math.abs(l.y-y)<2.5);if(!L){L={y,it:[]};lines.push(L);}L.it.push({x,s:i.str.trim()});});
@@ -416,7 +426,7 @@ function renderNovo(p){
       <p class="mut">Afastamento e espaçamento servem só para desenhar o mapa.</p>`
       :novoModo==='medicao'?`<p class="mut" style="margin:10px 0 6px">No app Medição Enaex, exporte o <b>Backup (.json)</b> do polígono (traz a posição dos furos igual ao croqui) ou o <b>CSV</b>. Depois escolha o arquivo aqui.</p><button class="btn pri" id="mLoc" style="width:100%">Buscar no Medição Enaex deste celular</button><button class="btn" id="mFile" style="width:100%;margin-top:8px">Escolher arquivo do Medição Enaex</button><button class="btn" id="mPdf" style="width:100%;margin-top:8px">Ler PDF da temporização (desenho com os tempos)</button><div id="mInfo" class="hint" style="display:none"></div>`
       :`<label>Uma linha por furo: <b>ID;PROF</b> ou <b>ID;X;Y;PROF</b></label><textarea id="gList" placeholder="L1-F1;15&#10;L1-F2;15&#10;ou&#10;1;612345,2;7765432,8;15"></textarea><button class="btn" id="lFile" style="width:100%;margin-top:8px">Ler arquivo de coordenadas (Excel, CSV, TXT ou PDF)</button><div class="hint">Funciona com coordenadas do topógrafo (X = leste, Y = norte) ou só a lista de furos. Separador pode ser ponto e vírgula ou tab (direto do Excel).</div>`;};
-    const bindMed=()=>{const lf=$('#lFile');if(lf)lf.onclick=async()=>{const file=await pickFile('.xlsx,.xls,.csv,.txt,.pdf');if(!file)return;try{const hs=rowsToHoles(await fileToRows(file));$('#gList').value=hs.map(h=>[h.id,fmtC(h.x),fmtC(h.y),h.p!=null?fmtC(h.p):''].join(';').replace(/;$/,'')).join('\n');toast(hs.length+' furos lidos — confira a lista');}catch(e){busy();toast(e.message);}};
+    const bindMed=()=>{const lf=$('#lFile');if(lf)lf.onclick=async()=>{const file=await pickFile('.xlsx,.xls,.csv,.txt,.pdf');if(!file)return;try{const hs=rowsToHoles(await fileToRows(file));$('#gList').value=hs.map(h=>[h.id,fmtC(h.x),fmtC(h.y),h.p!=null?fmtC(h.p):''].join(';').replace(/;$/,'')).join('\n');toast(hs.length+' furos lidos — confira a lista');}catch(e){busy();if(e.carreg){const hn=lf.nextElementSibling;if(hn)hn.innerHTML=avisoPlanCarreg(file.name,e.carreg);toast(e.message,5000);}else toast(e.message);}};
     const mostra=(r,nome)=>{medImport=r;const i=$('#mInfo');i.style.display='';i.innerHTML=`✅ <b>${esc(nome)}</b><br>${r.holes.length} furos · ${r.resumo}`;if(r.nome&&!$('#fPol').value){const m=r.nome.match(/POL[\s_\-]*(\d+)/i)||r.nome.match(/(\d+)(?:[_\-\/]\d+)?[A-Za-z]?\s*$/)||r.nome.match(/(\d+[A-Za-z]?)/);if(m)$('#fPol').value=m[1];}};
     if($('#mLoc'))$('#mLoc').onclick=()=>escolherMedicao(r=>mostra(r,r.nome||'Medição Enaex'));
     if($('#mPdf'))$('#mPdf').onclick=async()=>{const r=await pdfTemposFluxo(null);if(r)mostra(r,r.nome);};
@@ -456,7 +466,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-19.1';
+const APP_VER='2026-11-19.2';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -2297,7 +2307,8 @@ function planLerModelo(p,X,wb){
   abas.forEach(n=>{if(!minhas.includes(n)&&mi.abas&&!(n in mi.abas)&&normPol(cel(wb.Sheets[n],MOD_HDR.pol))===normPol(p.pol))minhas.push(n);});
   const info={poly_id:p.id,pol:p.pol,mina:p.mina};
   if(!minhas.length){const n1=abas.find(temFuro)||abas[0];minhas=n1?[n1]:[];
-    const pid=mi.abas&&n1&&mi.abas[n1];const q=pid&&S.polys.find(x=>x.id===pid);info.poly_id=pid||'?';info.pol=q?q.pol:tx(cel(wb.Sheets[n1]||{},MOD_HDR.pol))||'?';info.mina=q?q.mina:'';}
+    const pid=mi.abas&&n1&&mi.abas[n1];const q=pid&&S.polys.find(x=>x.id===pid);info.poly_id=pid||'?';info.pol=q?q.pol:tx(cel(wb.Sheets[n1]||{},MOD_HDR.pol))||'?';info.mina=q?q.mina:'';
+    info.pols=[...new Set(abas.filter(temFuro).map(n=>tx(cel(wb.Sheets[n],MOD_HDR.pol))).filter(Boolean))];}
   const byId=new Map(p.holes.map(h=>[String(h.id).toUpperCase(),h]));const naoAchou=[];
   const work=new Map();// furo -> {nv, decks, caminhao}
   minhas.forEach(n=>{const s=wb.Sheets[n];const cam=camDe(n);const prodH=tx(cel(s,MOD_HDR.expl));const prodApp=prodH?modCasa(PRODUTOS,prodH.split(/\s/)[0]):'';
@@ -2379,7 +2390,7 @@ async function importarPlanilha(p){
     const {info,linhas,naoAchou}=lido;const mud=linhas.map(l=>planMud(l.h,l.nv)).filter(Boolean);
     const outroPol=info.poly_id&&info.poly_id!==p.id;
     openSheet(`<h3>Importar planilha<button class="btn sm" id="ipClose">Cancelar</button></h3>
-      ${outroPol?`<div class="hint">⚠️ Esta planilha foi gerada para o <b>POL ${esc(info.pol)} (${esc(info.mina)})</b>, e você está no POL ${esc(p.pol)}. Confira antes de aplicar.</div>`:''}
+      ${outroPol?(info.pols&&info.pols.length>1?`<div class="hint">⚠️ Esta planilha tem o <b>${info.pols.map(v=>'POL '+esc(v)).join('</b> e o <b>')}</b>, e você está no POL ${esc(p.pol)}. Abra no app o polígono de cada aba e importe lá. Abaixo está só a aba do POL ${esc(info.pol)}.</div>`:`<div class="hint">⚠️ Esta planilha foi gerada para o <b>POL ${esc(info.pol)}${info.mina?' ('+esc(info.mina)+')':''}</b>, e você está no POL ${esc(p.pol)}. Confira antes de aplicar.</div>`):''}
       <p><b>${mud.length}</b> furo(s) com alteração${naoAchou.length?` · ${naoAchou.length} furo(s) da planilha não existem neste polígono (${esc(naoAchou.slice(0,6).join(', '))}${naoAchou.length>6?'…':''})`:''}.</p>
       ${mud.length?planTabela(mud):'<p class="mut">Nada diferente do que já está no app.</p>'}
       <div class="btns"><button class="btn pri" id="ipOk" ${mud.length?'':'disabled style="opacity:.5"'}>Aplicar no app</button></div>`);
