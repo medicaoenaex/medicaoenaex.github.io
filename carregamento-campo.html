@@ -158,6 +158,58 @@ input:focus,select:focus,textarea:focus{border-color:#ff6a13;box-shadow:0 0 0 3p
 .hero .st div{background:linear-gradient(160deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,170,90,.28);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
 .hero .st span{text-transform:uppercase;letter-spacing:.06em;font-size:10px}
 @media (prefers-reduced-motion:reduce){.hero::before,.hero .k i{animation:none}}
+
+/* ===== tema escuro "central de controle" (app inteiro) ===== */
+:root{--bg:#070b12;--card:rgba(255,255,255,.045);--ink:#e9eef5;--mut:#93a1b3;--line:rgba(255,255,255,.09);--pri2:rgba(255,106,19,.12);--glass:rgba(255,255,255,.05)}
+html,body{background:#070b12;color:var(--ink)}
+body{background:radial-gradient(900px 500px at 110% -10%,rgba(255,106,19,.16),transparent 60%),radial-gradient(700px 500px at -20% 30%,rgba(10,99,201,.14),transparent 60%),#070b12;background-attachment:fixed;min-height:100vh}
+header{background:rgba(7,11,18,.82);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:0 1px 0 rgba(255,106,19,.55),0 10px 30px rgba(0,0,0,.45)}
+.card{background:linear-gradient(160deg,rgba(255,255,255,.065),rgba(255,255,255,.025));border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.05);backdrop-filter:blur(8px)}
+.card h2{color:#fff}
+b,strong{color:#fff}
+.mut{color:var(--mut)}
+label{color:var(--mut)}
+input,select,textarea{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#fff}
+input::placeholder,textarea::placeholder{color:#6b7a8c}
+select option{background:#121925;color:#fff}
+input:focus,select:focus,textarea:focus{background:rgba(255,255,255,.08)}
+input[type=date],input[type=datetime-local]{color-scheme:dark}
+.btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.btn:hover{background:rgba(255,255,255,.1)}
+.btn.bad{color:#ff8a8a;border-color:rgba(255,100,100,.35);background:rgba(255,80,80,.06)}
+.btn.pri{color:#fff;border:0}
+.seg{background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.seg button{color:#c7d1dd}
+.seg button.on{background:linear-gradient(135deg,rgba(255,177,31,.22),rgba(232,52,28,.22));color:#ffb27a;box-shadow:inset 0 0 0 1px rgba(255,140,60,.45),0 0 18px rgba(255,106,19,.18)}
+.tabs button{background:rgba(255,255,255,.05);color:#c7d1dd;box-shadow:none;border:1px solid var(--line)}
+.tabs button.on{background:linear-gradient(135deg,#ffb11f,#ff6a13 50%,#e8341c);color:#fff;border-color:transparent;box-shadow:0 0 18px rgba(255,106,19,.45)}
+.kpi{background:linear-gradient(160deg,rgba(255,138,31,.14),rgba(255,138,31,.04));border:1px solid rgba(255,140,60,.22)}
+.kpi b{color:#ffb27a;font-family:"Orbitron",ui-monospace,monospace;text-shadow:0 0 10px rgba(255,140,60,.4)}
+.kpi span{color:var(--mut)}
+th,td{border-bottom:1px solid var(--line)}
+th{color:var(--mut)}
+.hint{background:rgba(255,177,31,.09);border:1px solid rgba(255,177,31,.3);color:#ffe3b8}
+.chk{border-bottom:1px solid var(--line)}
+.chk input{accent-color:#ff6a13}
+.panel{background:linear-gradient(180deg,#121a27,#0b111b);color:var(--ink);border-top:1px solid rgba(255,140,60,.35)}
+.panel h3{color:#fff}
+.sheet{background:rgba(2,5,10,.6)}
+.stbtns button{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12);color:#e9eef5}
+.conds button{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12);color:#e9eef5}
+.mapwrap{background:radial-gradient(circle at 50% 40%,#122033,#0a111c);background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:24px 24px;background-color:#0b1320;border:1px solid var(--line)}
+.mapz button{background:rgba(18,26,39,.9);color:#fff;border:1px solid rgba(255,255,255,.14)}
+.bar{background:rgba(255,255,255,.08)}
+.bar i{background:linear-gradient(90deg,#ff8a1f,#ffb11f);box-shadow:0 0 10px rgba(255,160,40,.6)}
+#toast{background:#121a27;border:1px solid rgba(255,140,60,.4)}
+.thumbs img{border-color:var(--line)}
+.hist{border-left-color:rgba(255,140,60,.4)}
+a{color:#ffb27a}
+.empty{color:var(--mut)}
+/* anel de progresso nos polígonos */
+.ring{flex:0 0 auto;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(#ff8a1f calc(var(--p)*1%),rgba(255,255,255,.08) 0);box-shadow:0 0 16px rgba(255,106,19,.25)}
+.ring span{width:46px;height:46px;border-radius:50%;background:#0d141f;display:grid;place-items:center;font:700 13px "Orbitron",ui-monospace,monospace;color:#fff}
+.card.poly .bar{display:none}
+.card.poly b{font-size:17px}
 @keyframes pfl{0%{opacity:1}50%{opacity:.15}100%{opacity:1}}.pfl{animation:pfl .9s ease-in-out 5;animation-fill-mode:forwards}
 </style>
 </head>
@@ -457,7 +509,7 @@ function renderHome(){
   if(S.polys.length&&!ps.length)h+=`<div class="card empty">Nenhum polígono neste filtro.</div>`;
   if(!S.polys.length)h+=`<div class="card empty">Nenhum polígono ainda.<br>Toque em <b>+ Novo polígono</b> para gerar a malha de furos ou colar a lista do croqui.</div>`;
   ps.forEach(p=>{const t=p.holes.length,c=p.holes.filter(x=>x.status==='carregado').length;
-    h+=`<div class="card poly" data-id="${p.id}"><div style="flex:1"><b>POL ${esc(p.pol)}</b> · ${esc(p.mina)}${p.cava?' / '+esc(p.cava):''}${p.banco?' · Banco '+esc(p.banco):''}<div class="mut">${brDate(p.data)} · ${c}/${t} carregados${p.resp?' · '+esc(p.resp):''} <span class="chip" style="background:${SITU[situDe(p)].c}">${SITU[situDe(p)].n}</span></div><div class="bar"><i style="width:${t?c/t*100:0}%"></i></div></div><span style="font-size:22px;color:var(--mut)">›</span></div>`;});
+    h+=`<div class="card poly" data-id="${p.id}"><div style="flex:1"><b>POL ${esc(p.pol)}</b> · ${esc(p.mina)}${p.cava?' / '+esc(p.cava):''}${p.banco?' · Banco '+esc(p.banco):''}<div class="mut">${brDate(p.data)} · ${c}/${t} carregados${p.resp?' · '+esc(p.resp):''} <span class="chip" style="background:${SITU[situDe(p)].c}">${SITU[situDe(p)].n}</span></div><div class="bar"><i style="width:${t?c/t*100:0}%"></i></div></div><div class="ring" style="--p:${t?Math.round(c/t*100):0}"><span>${t?Math.round(c/t*100):0}%</span></div></div>`;});
   if(S.polys.length)h+=`<div class="card" id="painel">${painelHTML()}</div>`;
   h+=`<div class="card" id="syncBox">${syncBoxHTML()}</div>`;
   h+=`<div class="card" id="vozCard">${vozCardHTML()}</div>`;
@@ -540,7 +592,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-19.10';
+const APP_VER='2026-11-19.11';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
