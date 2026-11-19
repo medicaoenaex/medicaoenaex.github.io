@@ -466,7 +466,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-19.2';
+const APP_VER='2026-11-19.3';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -2293,7 +2293,11 @@ async function marcaInfo(zip,ler,gravar,info){
 }
 // volta: lê todas as abas CARREG.n do modelo (preenchido no Excel, por uma ou várias pessoas) e devolve o que cada furo tem lá.
 // Cada aba vale para o caminhão do seu cabeçalho (UMB); o deck de outro caminhão no mesmo furo não é apagado.
-function planLerModelo(p,X,wb){
+// acha o furo do app pelo nº da planilha: igual, ou só o número (123 = C123 = M0123), se só um furo tiver esse número
+function furoMap(holes){const ex=new Map(),nu=new Map();
+  holes.forEach(h=>{const id=String(h.id).toUpperCase();ex.set(id,h);const m=id.match(/^[A-Z]*0*(\d+)$/);if(m){const k=m[1];nu.set(k,nu.has(k)?null:h);}});
+  return id=>{id=String(id).trim().toUpperCase();if(ex.has(id))return ex.get(id);const m=id.match(/^0*(\d+)(?:\.0+)?$/);return m?nu.get(m[1])||null:null;};}
+function planLerModelo(p,X,wb,forcar){
   let mi={};try{const cp=wb.Custprops||{};if(cp.carreg_info)mi=JSON.parse(cp.carreg_info);}catch(e){}
   const tx=v=>v==null?'':String(v).trim();const normPol=v=>tx(v).toUpperCase().replace(/^POL\.?\s*/,'');
   const ck=wb.Sheets['CHECK LIST'];const camCk=tx(ck&&ck[MOD_CHK.umb]&&ck[MOD_CHK.umb].v);
@@ -2302,6 +2306,8 @@ function planLerModelo(p,X,wb){
   // caminhão de cada aba: o que está escrito na UMB do cabeçalho; senão o que o app gravou; senão o do CHECK LIST
   const camDe=n=>{const v=tx(cel(wb.Sheets[n],MOD_UMB));if(v)return v;if(mi.cams&&n in mi.cams)return mi.cams[n]||'';if(mi.app)return mi.cam||'';return camCk;};
   const temFuro=n=>{const s=wb.Sheets[n];for(let r=11;r<=60;r++)if(cel(s,MOD_COL.id+r)!=null)return true;return false;};
+  const polDe=n=>tx(cel(wb.Sheets[n],MOD_HDR.pol));
+  const nFur=n=>{const s=wb.Sheets[n];let k=0;const rg=X.utils.decode_range(s['!ref']||'A1:K11');for(let r=11;r<=rg.e.r+1;r++){const v=cel(s,MOD_COL.id+r);if(v!=null&&tx(v)!==''&&tx(v)!=='0')k++;}return k;};
   let minhas=abas.filter(n=>mi.abas&&n in mi.abas?mi.abas[n]===p.id:normPol(cel(wb.Sheets[n],MOD_HDR.pol))===normPol(p.pol));
   // aba que o app não criou (ex.: alguém usou uma aba vazia): vale se o polígono do cabeçalho for este
   abas.forEach(n=>{if(!minhas.includes(n)&&mi.abas&&!(n in mi.abas)&&normPol(cel(wb.Sheets[n],MOD_HDR.pol))===normPol(p.pol))minhas.push(n);});
@@ -2309,7 +2315,9 @@ function planLerModelo(p,X,wb){
   if(!minhas.length){const n1=abas.find(temFuro)||abas[0];minhas=n1?[n1]:[];
     const pid=mi.abas&&n1&&mi.abas[n1];const q=pid&&S.polys.find(x=>x.id===pid);info.poly_id=pid||'?';info.pol=q?q.pol:tx(cel(wb.Sheets[n1]||{},MOD_HDR.pol))||'?';info.mina=q?q.mina:'';
     info.pols=[...new Set(abas.filter(temFuro).map(n=>tx(cel(wb.Sheets[n],MOD_HDR.pol))).filter(Boolean))];}
-  const byId=new Map(p.holes.map(h=>[String(h.id).toUpperCase(),h]));const naoAchou=[];
+  info.opc=abas.map(n=>({n,pol:polDe(n),k:nFur(n)})).filter(o=>o.k);info.abasAuto=minhas.slice();
+  if(forcar&&forcar.length){minhas=forcar.filter(n=>abas.includes(n));info.forcar=minhas;}
+  const byIdF=furoMap(p.holes),byId={get:byIdF};const naoAchou=[];
   const work=new Map();// furo -> {nv, decks, caminhao}
   minhas.forEach(n=>{const s=wb.Sheets[n];const cam=camDe(n);const prodH=tx(cel(s,MOD_HDR.expl));const prodApp=prodH?modCasa(PRODUTOS,prodH.split(/\s/)[0]):'';
     const rg=X.utils.decode_range(s['!ref']||'A1:K11');
@@ -2339,13 +2347,13 @@ function planLerModelo(p,X,wb){
   return {info,linhas,naoAchou};
 }
 // lê a planilha e devolve, por furo, os valores dela (nv) — usado na importação manual e no acompanhamento automático
-function planLer(p,X,wb){
-  if(MOD_ABAS.some(n=>wb.Sheets[n]))return planLerModelo(p,X,wb);
+function planLer(p,X,wb,forcar){
+  if(MOD_ABAS.some(n=>wb.Sheets[n]))return planLerModelo(p,X,wb,forcar);
   const info={};if(wb.Sheets.Info)X.utils.sheet_to_json(wb.Sheets.Info,{header:1}).forEach(r=>info[r[0]]=r[1]);
   const sh=wb.Sheets.Carregamento||wb.Sheets[wb.SheetNames[0]];const rows=X.utils.sheet_to_json(sh,{header:1,raw:true,defval:null});
   const hi=rows.findIndex(r=>r&&r.some(v=>String(v||'').trim().toLowerCase()==='furo'));if(hi<0)throw new Error('Não achei a coluna "Furo" na planilha');
   const head=rows[hi].map(v=>String(v||'').trim().toLowerCase());const ci={};PL_COLS.forEach(([t,k])=>{const i=head.indexOf(t.toLowerCase());if(i>=0)ci[k]=i;});
-  const byId=new Map(p.holes.map(h=>[String(h.id).toUpperCase(),h]));const linhas=[],naoAchou=[];
+  const byId={get:furoMap(p.holes)};const linhas=[],naoAchou=[];
   const tx=v=>v==null?'':String(v).trim();
   rows.slice(hi+1).forEach(r=>{if(!r)return;const id=tx(r[ci.id]);if(!id)return;const h=byId.get(id.toUpperCase());if(!h){naoAchou.push(id);return;}
     const g=k=>ci[k]!=null?r[ci[k]]:undefined;const nv={};
@@ -2387,15 +2395,21 @@ async function importarPlanilha(p){
         <p>Ele serve para <b>criar o polígono</b>: na tela inicial, toque em <b>Novo polígono</b> → <b>Ler arquivo de coordenadas</b> e escolha este arquivo.</p>
         <p class="mut">A planilha de carregamento é a que o app gera em ⋯ → Gerar planilha de carregamento (modelo Enaex), com as abas CARREG.</p>`);$('#ipX').onclick=closeSheet;return;}
       throw e;}
+    const mostra=lido=>{
     const {info,linhas,naoAchou}=lido;const mud=linhas.map(l=>planMud(l.h,l.nv)).filter(Boolean);
     const outroPol=info.poly_id&&info.poly_id!==p.id;
+    const opc=info.opc||[];const escolha=outroPol||info.forcar;const sel=(info.forcar||info.abasAuto||[]).join('|');
+    const selHtml=escolha&&opc.length?`<label>Aba da planilha que entra no POL ${esc(p.pol)}</label><select id="ipAba">${opc.map(o=>`<option value="${esc(o.n)}" ${sel===o.n?'selected':''}>${esc(o.n)}${o.pol?' · POL '+esc(o.pol):''} · ${o.k} furos</option>`).join('')}${opc.length>1?`<option value="${esc(opc.map(o=>o.n).join('|'))}" ${sel===opc.map(o=>o.n).join('|')?'selected':''}>Todas as abas</option>`:''}</select>`:'';
     openSheet(`<h3>Importar planilha<button class="btn sm" id="ipClose">Cancelar</button></h3>
-      ${outroPol?(info.pols&&info.pols.length>1?`<div class="hint">⚠️ Esta planilha tem o <b>${info.pols.map(v=>'POL '+esc(v)).join('</b> e o <b>')}</b>, e você está no POL ${esc(p.pol)}. Abra no app o polígono de cada aba e importe lá. Abaixo está só a aba do POL ${esc(info.pol)}.</div>`:`<div class="hint">⚠️ Esta planilha foi gerada para o <b>POL ${esc(info.pol)}${info.mina?' ('+esc(info.mina)+')':''}</b>, e você está no POL ${esc(p.pol)}. Confira antes de aplicar.</div>`):''}
+      ${outroPol&&!info.forcar?(info.pols&&info.pols.length>1?`<div class="hint">⚠️ Esta planilha tem o <b>${info.pols.map(v=>'POL '+esc(v)).join('</b> e o <b>')}</b>, e você está no POL ${esc(p.pol)}. Se for o mesmo polígono com outro número, escolha abaixo qual aba entra aqui.</div>`:`<div class="hint">⚠️ Esta planilha foi gerada para o <b>POL ${esc(info.pol)}${info.mina?' ('+esc(info.mina)+')':''}</b>, e você está no POL ${esc(p.pol)}. Confira antes de aplicar.</div>`):''}
+      ${selHtml}
       <p><b>${mud.length}</b> furo(s) com alteração${naoAchou.length?` · ${naoAchou.length} furo(s) da planilha não existem neste polígono (${esc(naoAchou.slice(0,6).join(', '))}${naoAchou.length>6?'…':''})`:''}.</p>
       ${mud.length?planTabela(mud):'<p class="mut">Nada diferente do que já está no app.</p>'}
       <div class="btns"><button class="btn pri" id="ipOk" ${mud.length?'':'disabled style="opacity:.5"'}>Aplicar no app</button></div>`);
     $('#ipClose').onclick=closeSheet;
+    if($('#ipAba'))$('#ipAba').onchange=e=>{try{mostra(planLer(p,X,wb,e.target.value.split('|')));}catch(er){toast(er.message);}};
     if(mud.length)$('#ipOk').onclick=()=>{planAplicar(p,mud);closeSheet();corPor='caminhao';tab='mapa';renderPoly();toast(`${mud.length} furo(s) atualizados pela planilha`);};
+    };mostra(lido);
   }catch(e){busy();toast(e.message||'Não consegui ler a planilha');}
 }
 
