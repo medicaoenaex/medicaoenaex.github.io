@@ -466,7 +466,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-19.4';
+const APP_VER='2026-11-19.5';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1191,6 +1191,23 @@ function gpsDraw(){
 
 /* ===== Liberação: situação do polígono e checklists ===== */
 const situDe=p=>p.situ||'aberto';
+/* ===== Fechamento: o que falta antes de liberar ===== */
+function faltas(p){
+  const idx=new Map(p.holes.map((h,i)=>[h,i]));const carr=p.holes.filter(h=>h.status==='carregado');
+  const temCam=h=>(h.decks||[]).filter(d=>num(d.kg)>0).every(d=>deckCam(h,d));
+  return [
+    ['Pendentes (não carregados)',p.holes.filter(h=>h.status==='pendente')],
+    ['Em repasse',p.holes.filter(h=>h.status==='repasse')],
+    ['Carregados sem carga lançada',carr.filter(h=>!holeKg(h))],
+    ['Carregados sem caminhão',carr.filter(h=>holeKg(h)&&!temCam(h))],
+    ['Carregados sem tampão',carr.filter(h=>h.tampao==null)],
+    ['Carregados sem detonador',carr.filter(h=>!h.detTipo&&!num(h.detQtd))],
+    ['Fora da tolerância do projeto',carr.filter(h=>alertasFuro(p,h).length)],
+  ].map(([t,hs])=>({t,hs:hs.map(h=>({h,i:idx.get(h)}))})).filter(g=>g.hs.length);}
+function faltasHtml(p){const G=faltas(p);const tot=G.reduce((s,g)=>s+g.hs.length,0);
+  if(!G.length)return `<div class="card"><h2>Fechamento do polígono</h2><div class="hint" style="background:#eaf7ef;border-color:#b5e0c4">✔ Nada faltando: todos os furos estão lançados, com caminhão, tampão e detonador.</div></div>`;
+  return `<div class="card"><h2>Fechamento do polígono <span class="mut">(${tot} ${tot>1?'itens':'item'})</span></h2><p class="mut" style="margin:0 0 6px">Toque no furo para abrir e corrigir.</p>
+  ${G.map(g=>`<div style="margin:8px 0"><b>${esc(g.t)}: ${g.hs.length}</b><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${g.hs.slice(0,40).map(x=>`<button class="btn sm" data-fi="${x.i}" style="flex:0 0 auto;min-width:44px">${esc(x.h.id)}</button>`).join('')}${g.hs.length>40?`<span class="mut" style="align-self:center">+${g.hs.length-40}</span>`:''}</div></div>`).join('')}</div>`;}
 function tabLiber(p){
   p.check=p.check||{};
   const bloco=(k,tit,itens)=>{const c=p.check[k]||{it:{}};const nOk=itens.filter((_,i)=>c.it&&c.it[i]).length;
@@ -1198,7 +1215,7 @@ function tabLiber(p){
     <div class="row" style="margin-top:6px"><div><label>Liberado por</label><input id="nm_${k}" value="${esc(c.nome||meuNome()||p.resp||'')}"></div><div style="align-self:end"><button class="btn ${c.ts?'':'pri'}" data-lib="${k}" style="width:100%">${c.ts?'Registrar de novo':'Registrar liberação'}</button></div></div>
     ${c.ts?`<div class="hint" style="background:#eaf7ef;border-color:#b5e0c4">✔ Registrado por <b>${esc(c.nome)}</b> em ${new Date(c.ts).toLocaleString('pt-BR')}${nOk<itens.length?` · <b style="color:var(--bad)">${itens.length-nOk} item(ns) não marcado(s)</b>`:''}</div>`:''}</div>`;};
   const si=situDe(p);
-  $('#tabBox').innerHTML=`<div class="card"><h2>Situação do polígono</h2><div class="seg" id="situ">${Object.entries(SITU).map(([k,v])=>`<button data-s="${k}" class="${si===k?'on':''}">${v.n}</button>`).join('')}</div>
+  $('#tabBox').innerHTML=faltasHtml(p)+`<div class="card"><h2>Situação do polígono</h2><div class="seg" id="situ">${Object.entries(SITU).map(([k,v])=>`<button data-s="${k}" class="${si===k?'on':''}">${v.n}</button>`).join('')}</div>
   ${si==='detonado'?`<div class="row"><div><label>Data e hora da detonação</label><input id="detAt" type="datetime-local" value="${esc(p.detAt||'')}"></div></div>`:''}</div>
   ${bloco('pre','Antes do carregamento',CHK_PRE)}${bloco('fim','Fechamento do carregamento',CHK_FIM)}
   <p class="mut">O checklist é registro do que foi conferido em campo. Ele não substitui os procedimentos e liberações da mina.</p>`;
@@ -1207,9 +1224,13 @@ function tabLiber(p){
     const ap=()=>{p.situ=v;markP(p.id);save();tabLiber(p);toast('Situação: '+SITU[v].n);};
     if(v!=='aberto'&&pend)confirmBox(`Ainda há ${nf(pend)} pendente(s). Marcar como "${SITU[v].n}" mesmo assim?`,ap,'Marcar');else ap();});
   if($('#detAt'))$('#detAt').onchange=e=>{p.detAt=e.target.value;markP(p.id);save();};
+  document.querySelectorAll('#tabBox [data-fi]').forEach(b=>b.onclick=()=>editHole(+b.dataset.fi));
   document.querySelectorAll('#tabBox input[data-k]').forEach(c=>c.onchange=()=>{const k=c.dataset.k;p.check[k]=p.check[k]||{it:{}};p.check[k].it=p.check[k].it||{};p.check[k].it[c.dataset.i]=c.checked;markP(p.id);save();});
-  document.querySelectorAll('[data-lib]').forEach(b=>b.onclick=()=>{const k=b.dataset.lib;const nm=$('#nm_'+k).value.trim();if(!nm){toast('Informe quem liberou');return;}p.check[k]=p.check[k]||{it:{}};p.check[k].nome=nm;p.check[k].ts=Date.now();
-    if(k==='fim'&&situDe(p)==='aberto'&&!p.holes.some(h=>h.status==='pendente'))p.situ='carregado';markP(p.id);save();tabLiber(p);toast('Liberação registrada');});
+  document.querySelectorAll('[data-lib]').forEach(b=>b.onclick=()=>{const k=b.dataset.lib;const nm=$('#nm_'+k).value.trim();if(!nm){toast('Informe quem liberou');return;}
+    const reg=()=>{p.check[k]=p.check[k]||{it:{}};p.check[k].nome=nm;p.check[k].ts=Date.now();
+      if(k==='fim'&&situDe(p)==='aberto'&&!p.holes.some(h=>h.status==='pendente'))p.situ='carregado';markP(p.id);save();tabLiber(p);toast('Liberação registrada');};
+    const tot=k==='fim'?faltas(p).reduce((s,g)=>s+g.hs.length,0):0;
+    if(tot)confirmBox(`O fechamento ainda mostra ${tot} item(ns) faltando (veja no topo desta aba). Registrar a liberação mesmo assim?`,reg,'Registrar');else reg();});
 }
 
 /* ===== Relatório completo para imprimir / salvar em PDF ===== */
