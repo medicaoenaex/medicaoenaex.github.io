@@ -255,7 +255,7 @@ function markAll(p){markP(p.id);p.holes.forEach(h=>markF(p.id,h.id));}
 function markDel(p){const y=SY();y.del=y.del||{};y.del[p.id]=polyDoc(p);y.dp[p.id]=Date.now();Object.keys(y.df).forEach(k=>{if(k.startsWith(p.id+'\u0001'))delete y.df[k];});syncLogo();}
 const GEO=['id','x','y','line','n','profProj','obsCroqui','cargaProj','tempo','tempos'];
 const DYN=['status','profMed','agua','aguaM','decks','booster','brinel','detTipo','detQtd','tampao','caminhao','obs','cond','lotes','hist','ts','por'];
-const PK=['lotes','cams','acess','check','situ','geo','pos','detAt','bg'];
+const PK=['lotes','cams','acess','check','situ','geo','pos','detAt','bg','wpp'];
 function polyDoc(p){const ex={};PK.forEach(k=>{if(p[k]!=null)ex[k]=p[k];});if(ex.bg){ex.bg={...ex.bg};delete ex.bg.on;} /* mostrar/ocultar croqui é de cada celular */return{...ex,dvtProg:p.dvtProg??null,proj:p.proj||null,mina:p.mina,cava:p.cava,pol:p.pol,banco:p.banco,data:p.data,resp:p.resp,nfs:p.nfs||{},esp:p.esp||null,criado:p.criado||null,holes:p.holes.map(h=>{const o={};GEO.forEach(k=>{if(h[k]!=null)o[k]=h[k];});return o;})};}
 function furoDoc(h){const o={};DYN.forEach(k=>o[k]=h[k]??null);return o;}
 // cada parte do polígono vira um "caminho"; o celular manda só os caminhos que mudou desde a última sincronização
@@ -424,12 +424,13 @@ function renderNovo(p){
       <div class="row"><div><label>Profundidade de projeto (m)</label><input id="gP" inputmode="decimal" value="15"></div><div><label>Arranjo</label><select id="gS"><option value="0">Retangular</option><option value="1" selected>Estagiado (pé de galinha)</option></select></div></div>
       <label>Numeração</label><select id="gN"><option value="lf">Linha-Furo (L1-F1, L1-F2…)</option><option value="seq">Sequencial (1, 2, 3…)</option></select>
       <p class="mut">Afastamento e espaçamento servem só para desenhar o mapa.</p>`
-      :novoModo==='medicao'?`<p class="mut" style="margin:10px 0 6px">No app Medição Enaex, exporte o <b>Backup (.json)</b> do polígono (traz a posição dos furos igual ao croqui) ou o <b>CSV</b>. Depois escolha o arquivo aqui.</p><button class="btn pri" id="mLoc" style="width:100%">Buscar no Medição Enaex deste celular</button><button class="btn" id="mFile" style="width:100%;margin-top:8px">Escolher arquivo do Medição Enaex</button><button class="btn" id="mPdf" style="width:100%;margin-top:8px">Ler PDF da temporização (desenho com os tempos)</button><div id="mInfo" class="hint" style="display:none"></div>`
+      :novoModo==='medicao'?`<p class="mut" style="margin:10px 0 6px">No app Medição Enaex, exporte o <b>Backup (.json)</b> do polígono (traz a posição dos furos igual ao croqui) ou o <b>CSV</b>. Depois escolha o arquivo aqui.</p><button class="btn pri" id="mLoc" style="width:100%">Buscar no Medição Enaex deste celular</button><button class="btn" id="mFile" style="width:100%;margin-top:8px">Escolher arquivo do Medição Enaex</button><button class="btn" id="mPdf" style="width:100%;margin-top:8px">Ler PDF da temporização (desenho com os tempos)</button><button class="btn" id="mDrone" style="width:100%;margin-top:8px">📷 Achar os furos na foto do drone</button><div id="mInfo" class="hint" style="display:none"></div>`
       :`<label>Uma linha por furo: <b>ID;PROF</b> ou <b>ID;X;Y;PROF</b></label><textarea id="gList" placeholder="L1-F1;15&#10;L1-F2;15&#10;ou&#10;1;612345,2;7765432,8;15"></textarea><button class="btn" id="lFile" style="width:100%;margin-top:8px">Ler arquivo de coordenadas (Excel, CSV, TXT ou PDF)</button><div class="hint">Funciona com coordenadas do topógrafo (X = leste, Y = norte) ou só a lista de furos. Separador pode ser ponto e vírgula ou tab (direto do Excel).</div>`;};
     const bindMed=()=>{const lf=$('#lFile');if(lf)lf.onclick=async()=>{const file=await pickFile('.xlsx,.xls,.csv,.txt,.pdf');if(!file)return;try{const hs=rowsToHoles(await fileToRows(file));$('#gList').value=hs.map(h=>[h.id,fmtC(h.x),fmtC(h.y),h.p!=null?fmtC(h.p):''].join(';').replace(/;$/,'')).join('\n');toast(hs.length+' furos lidos — confira a lista');}catch(e){busy();if(e.carreg){const hn=lf.nextElementSibling;if(hn)hn.innerHTML=avisoPlanCarreg(file.name,e.carreg);toast(e.message,5000);}else toast(e.message);}};
     const mostra=(r,nome)=>{medImport=r;const i=$('#mInfo');i.style.display='';i.innerHTML=`✅ <b>${esc(nome)}</b><br>${r.holes.length} furos · ${r.resumo}`;if(r.nome&&!$('#fPol').value){const m=r.nome.match(/POL[\s_\-]*(\d+)/i)||r.nome.match(/(\d+)(?:[_\-\/]\d+)?[A-Za-z]?\s*$/)||r.nome.match(/(\d+[A-Za-z]?)/);if(m)$('#fPol').value=m[1];}};
     if($('#mLoc'))$('#mLoc').onclick=()=>escolherMedicao(r=>mostra(r,r.nome||'Medição Enaex'));
     if($('#mPdf'))$('#mPdf').onclick=async()=>{const r=await pdfTemposFluxo(null);if(r)mostra(r,r.nome);};
+    if($('#mDrone'))$('#mDrone').onclick=async()=>{const r=await fotoDroneFluxo();if(r)mostra(r,r.nome);};
     const b=$('#mFile');if(!b)return;b.onclick=()=>{const fi=$('#fileIn');fi.accept='.json,.csv,.txt';fi.value='';fi.onchange=()=>{const file=fi.files[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{medImport=lerMedicao(String(r.result),file.name);const i=$('#mInfo');i.style.display='';i.innerHTML=`✅ <b>${esc(file.name)}</b><br>${medImport.holes.length} furos · ${medImport.resumo}`;if(medImport.nome&&!$('#fPol').value){const m=medImport.nome.match(/(\d+[A-Za-z]?)\s*$/);if(m)$('#fPol').value=m[1];}}catch(e){medImport=null;toast(e.message);}};r.readAsText(file);};fi.click();};};
     const draw0=draw;draw=()=>{draw0();bindMed();};
     draw();document.querySelectorAll('#modo button').forEach(b=>b.onclick=()=>{novoModo=b.dataset.m;document.querySelectorAll('#modo button').forEach(x=>x.classList.toggle('on',x===b));draw();});}
@@ -466,7 +467,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-19.3';
+const APP_VER='2026-11-19.8';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -701,7 +702,7 @@ function lerMedicao(txt,nome){
 }
 
 /* ===== Polígono ===== */
-function renderPoly(){
+function renderPoly(){setTimeout(()=>{try{raioChecar(cur());}catch(e){}},0);
   const p=cur();if(!p){go('home');return;}
   $('#ttl').textContent=`POL ${p.pol} · ${p.mina}`;if(tab!=='mapa'&&gpsOn)gpsStop();
   const h=$('#hdrBtn');h.style.display='';h.textContent='⋯';h.onclick=polyMenu;
@@ -713,12 +714,12 @@ function renderPoly(){
 }
 const p0=()=>cur();
 function polyMenu(){
-  openSheet(`<h3>Polígono<button class="btn sm" id="mClose">Fechar</button></h3><div class="btns" style="flex-direction:column"><button class="btn" id="mPlE">Gerar planilha de carregamento (modelo Enaex)</button><button class="btn" id="mPlW">📗 Acompanhar planilha (preenche o app sozinho)</button><button class="btn" id="mPlI">Importar planilha preenchida</button><button class="btn" id="mTz">Importar tempos de detonação</button><button class="btn" id="mMed">Atualizar com a medição (Medição Enaex)</button><button class="btn pri" id="mProj">Projeto de carregamento (carga, tampão, tolerância)</button><button class="btn" id="mPrint">Relatório completo (imprimir / PDF)</button><button class="btn" id="mCpdf">Croqui em PDF (A4 / A3)</button><button class="btn" id="mLote">Lotes em uso (produto, booster, detonador)</button><button class="btn" id="mEdit">Editar dados (mina, POL, data…)</button><button class="btn" id="mAdd">Adicionar furo extra</button><button class="btn" id="mBg">${p0().bg?'Trocar / reposicionar croqui de fundo':'Colocar croqui de fundo (PDF ou foto)'}</button>${p0().bg?'<button class="btn" id="mBgDel">Remover croqui de fundo</button>':''}<button class="btn" id="mCsv">Exportar furos (CSV / Excel)</button><button class="btn bad" id="mDel">Excluir polígono</button></div>`);
+  openSheet(`<h3>Polígono<button class="btn sm" id="mClose">Fechar</button></h3><div class="btns" style="flex-direction:column"><button class="btn pri" id="mWpp">📲 Resumo para o WhatsApp</button><button class="btn" id="mPlE">Gerar planilha de carregamento (modelo Enaex)</button><button class="btn" id="mPlW">📗 Acompanhar planilha (preenche o app sozinho)</button><button class="btn" id="mPlI">Importar planilha preenchida</button><button class="btn" id="mTz">Importar tempos de detonação</button><button class="btn" id="mMed">Atualizar com a medição (Medição Enaex)</button><button class="btn pri" id="mProj">Projeto de carregamento (carga, tampão, tolerância)</button><button class="btn" id="mPrint">Relatório completo (imprimir / PDF)</button><button class="btn" id="mCpdf">Croqui em PDF (A4 / A3)</button><button class="btn" id="mLote">Lotes em uso (produto, booster, detonador)</button><button class="btn" id="mEdit">Editar dados (mina, POL, data…)</button><button class="btn" id="mAdd">Adicionar furo extra</button><button class="btn" id="mBg">${p0().bg?'Trocar / reposicionar croqui de fundo':'Colocar croqui de fundo (PDF ou foto)'}</button>${p0().bg?'<button class="btn" id="mBgDel">Remover croqui de fundo</button>':''}<button class="btn" id="mRaio">${S.raioOff?'⚡ Ligar alerta de raio':'⚡ Desligar alerta de raio'}</button><button class="btn" id="mCsv">Exportar furos (CSV / Excel)</button><button class="btn bad" id="mDel">Excluir polígono</button></div>`);
   const p=cur();
   $('#mClose').onclick=closeSheet;
   $('#mEdit').onclick=()=>{closeSheet();go('editpoly');};
   $('#mProj').onclick=()=>editProjeto(p);
-  $('#mPrint').onclick=()=>{closeSheet();imprimir(p);};$('#mCpdf').onclick=()=>{closeSheet();croquiPdfMenu(p);};
+  $('#mPrint').onclick=()=>{closeSheet();imprimir(p);};$('#mWpp').onclick=()=>{closeSheet();resumoWpp(p);};$('#mCpdf').onclick=()=>{closeSheet();croquiPdfMenu(p);};
   $('#mLote').onclick=()=>editLotes(p);
   $('#mTz').onclick=()=>tzMenu(p);
   $('#mMed').onclick=()=>atualizarMedicao(p);
@@ -728,6 +729,7 @@ function polyMenu(){
   $('#mAdd').onclick=()=>{closeSheet();addExtra(p);};
   $('#mBg').onclick=()=>{closeSheet();bgMenu(p);};
   if($('#mBgDel'))$('#mBgDel').onclick=()=>confirmBox('Remover o croqui de fundo deste polígono?',()=>{delete p.bg;bgDel(p.id);const y=SY();if(y.bq)delete y.bq[p.id];markP(p.id);save();renderPoly();},'Remover');
+  $('#mRaio').onclick=()=>{S.raioOff=!S.raioOff;save();closeSheet();toast(S.raioOff?'Alerta de raio desligado':'Alerta de raio ligado');if(!S.raioOff)raioChecar(p,true);else raioPinta();};
   $('#mCsv').onclick=()=>exportBox('Furos (CSV)',`POL${p.pol}-${p.data}.csv`,csv(p),'text/csv');
   $('#mDel').onclick=()=>confirmBox(`Excluir POL ${p.pol} e todos os lançamentos? Isso não pode ser desfeito.`,()=>{markDel(p);S.polys=S.polys.filter(x=>x.id!==p.id);S.cur=null;save();go('home');},'Excluir');
 }
@@ -758,6 +760,91 @@ function ajusteAf(S,D){const n=S.length;if(n<6)return null;let M=[[0,0,0],[0,0,0
   S.forEach(([x,y],i)=>{const v=[x,y,1];for(let a=0;a<3;a++){for(let b=0;b<3;b++)M[a][b]+=v[a]*v[b];vx[a]+=v[a]*D[i][0];vy[a]+=v[a]*D[i][1];}});
   const sol=v=>{const A=M.map((r,i)=>[...r,v[i]]);for(let i=0;i<3;i++){let p=i;for(let k=i+1;k<3;k++)if(Math.abs(A[k][i])>Math.abs(A[p][i]))p=k;[A[i],A[p]]=[A[p],A[i]];if(Math.abs(A[i][i])<1e-9)return null;for(let k=0;k<3;k++)if(k!==i){const f=A[k][i]/A[i][i];for(let j=i;j<4;j++)A[k][j]-=f*A[i][j];}}return A.map((r,i)=>r[3]/r[i]);};
   const X=sol(vx),Y=sol(vy);return X&&Y?[X[0],Y[0],X[1],Y[1],X[2],Y[2]]:null;}
+/* ===== Achar os furos numa foto de drone: manchas cinza-azuladas redondas (com miolo escuro) em malha ===== */
+const noPoli=(x,y,P)=>{let d=false;for(let i=0,j=P.length-1;i<P.length;j=i++){const [xi,yi]=P[i],[xj,yj]=P[j];if(((yi>y)!==(yj>y))&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)d=!d;}return d;};
+const nnDist=P=>P.map((a,i)=>{let m=Infinity;P.forEach((b,j)=>{if(i!==j){const d=Math.hypot(a.x-b.x,a.y-b.y);if(d<m)m=d;}});return m;});
+function picosFuros(s,W,H,rad,T,dentro){const out=[];
+  for(let y=rad;y<H-rad;y++)for(let x=rad;x<W-rad;x++){const v=s[y*W+x];if(v<=T||(dentro&&!dentro(x,y)))continue;let mx=true;
+    for(let yy=y-rad;yy<=y+rad&&mx;yy++)for(let xx=x-rad;xx<=x+rad;xx++){if((xx-x)**2+(yy-y)**2>rad*rad)continue;const z=s[yy*W+xx];if(z>v||(z===v&&(yy<y||(yy===y&&xx<x)))){mx=false;break;}}
+    if(mx)out.push({x,y,v});}
+  return out;}
+function notaFuros(d,W,H,R){const n=W*H,q=new Float32Array(n),dk=new Float32Array(n);
+  for(let i=0;i<n;i++){const r=d[i*4],g=d[i*4+1],b=d[i*4+2],l=(r+g+b)/3;dk[i]=255-l;q[i]=(b-r)+0.5*(255-l);}
+  const a=borrar(q,W,H,0.6*R),b=borrar(q,W,H,1.8*R),c=borrar(dk,W,H,0.25*R),e=borrar(dk,W,H,0.8*R),s=new Float32Array(n);
+  for(let i=0;i<n;i++)s[i]=(a[i]-b[i])+0.5*(c[i]-e[i]);return s;}
+// im: Image; area: [[x,y],...] em px da foto (opcional). Devolve furos em px da foto.
+function furosNaFoto(im,area){
+  const IW=im.naturalWidth,IH=im.naturalHeight;
+  let bx0=0,by0=0,bx1=IW,by1=IH;if(area&&area.length>=3){bx0=Math.max(0,Math.min(...area.map(p=>p[0]))-10);by0=Math.max(0,Math.min(...area.map(p=>p[1]))-10);bx1=Math.min(IW,Math.max(...area.map(p=>p[0]))+10);by1=Math.min(IH,Math.max(...area.map(p=>p[1]))+10);}
+  const aw=bx1-bx0,ah=by1-by0;const R0=6.5;let best=null;
+  for(const Rf of [2.5,3.5,5,6.5,9,12,16,22,30]){ // raio do furo suposto, em px da foto
+    const k=R0/Rf;if(aw*k>2600||ah*k>2600||aw*k<40||ah*k<40)continue;
+    const W=Math.round(aw*k),H=Math.round(ah*k);const c=document.createElement('canvas');c.width=W;c.height=H;const cx=c.getContext('2d');cx.drawImage(im,bx0,by0,aw,ah,0,0,W,H);
+    const s=notaFuros(cx.getImageData(0,0,W,H).data,W,H,R0);
+    const dentro=area&&area.length>=3?(x,y)=>noPoli(x/k+bx0,y/k+by0,area):null;
+    const vals=[];for(let y=0;y<H;y+=2)for(let x=0;x<W;x+=2)if(!dentro||dentro(x,y))vals.push(s[y*W+x]);vals.sort((a,b)=>a-b);if(vals.length<50)continue;
+    const T=0.35*vals[Math.floor(vals.length*0.99)];
+    let P=picosFuros(s,W,H,Math.round(1.3*R0),T,dentro);if(P.length<6)continue;
+    const nn=nnDist(P);const so=[...nn].sort((a,b)=>a-b),med=so[so.length>>1];
+    const reg=nn.filter(v=>v>0.75*med&&v<1.35*med).length/nn.length; // malha regular
+    const raz=med/R0; // espaçamento / raio do furo (furo de verdade: ~2,5 a 6)
+    const forca=P.reduce((a,q)=>a+q.v,0)/P.length/(T/0.35);
+    if(raz<3||raz>8)continue; // pico colado no outro = textura, não furo
+    const nota=reg*reg*forca*Math.sqrt(P.length);
+    if(!best||nota>best.nota)best={nota,k,P:P.map(q=>({x:q.x/k+bx0,y:q.y/k+by0,v:q.v})),d0:med/k};}
+  if(!best)return{furos:[],sp:0};
+  let P=best.P;const d0=best.d0;
+  for(let it=0;it<3;it++){const nn=nnDist(P);P=P.filter((q,i)=>nn[i]<1.8*d0&&P.filter(o=>o!==q&&Math.hypot(o.x-q.x,o.y-q.y)<2.2*d0).length>=2);}
+  return{furos:P.map(q=>({x:q.x,y:q.y})),sp:d0};}
+// numera pela posição: faixas ao longo do lado maior do polígono (da esquerda para a direita), dentro da faixa de cima para baixo
+function numerarFuros(P,sp){if(!P.length)return P;
+  const mx=P.reduce((a,q)=>a+q.x,0)/P.length,my=P.reduce((a,q)=>a+q.y,0)/P.length;
+  let sxx=0,syy=0,sxy=0;P.forEach(q=>{const dx=q.x-mx,dy=q.y-my;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;});
+  const ang=0.5*Math.atan2(2*sxy,sxx-syy);let ux=Math.cos(ang),uy=Math.sin(ang);if(ux<0){ux=-ux;uy=-uy;}
+  const w=0.7*(sp||20);const L=P.map(q=>({q,a:(q.x-mx)*ux+(q.y-my)*uy,b:-(q.x-mx)*uy+(q.y-my)*ux}));const a0=Math.min(...L.map(o=>o.a));
+  L.forEach(o=>o.f=Math.floor((o.a-a0)/w));L.sort((p,r)=>(p.f-r.f)||(p.b-r.b));L.forEach((o,i)=>o.q.n=i+1);return P;}
+// tela: marca a área na foto, o app acha os furos, a pessoa tira/põe e confirma. Devolve dados para o polígono novo.
+async function fotoDroneFluxo(){
+  const file=await pickFile('image/*');if(!file)return null;
+  let img;try{busy('Abrindo a foto…');img=await imageFileToImage(file,2400);busy();}catch(e){busy();toast('Não consegui abrir a foto');return null;}
+  const im=await new Promise((ok,er)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=er;i.src=img.url;});
+  const IW=im.naturalWidth,IH=im.naturalHeight;
+  return new Promise(fim=>{
+    let passo='area',area=[],F=[],sp=0,z=0;
+    openSheet(`<h3>Furos da foto do drone<button class="btn sm" id="fdX">Cancelar</button></h3>
+      <p id="fdTx" style="margin:0 0 6px"></p>
+      <div style="display:flex;gap:6px;margin-bottom:6px"><button class="btn sm" id="fdM">−</button><button class="btn sm" id="fdP">+</button><span class="mut" id="fdN" style="align-self:center;flex:1;text-align:right"></span></div>
+      <div id="fdBox" style="overflow:auto;max-height:62vh;border-radius:8px;background:#000;touch-action:pan-x pan-y"><canvas id="fdC" style="display:block"></canvas></div>
+      <div class="btns" id="fdB"></div>`);
+    const box=$('#fdBox'),c=$('#fdC'),g=c.getContext('2d');
+    z=Math.max(0.2,Math.min(3,(box.clientWidth||360)/IW));
+    const desenha=()=>{c.width=Math.round(IW*z);c.height=Math.round(IH*z);g.drawImage(im,0,0,c.width,c.height);
+      if(area.length){g.strokeStyle='#22d3ee';g.lineWidth=2;g.beginPath();area.forEach(([x,y],i)=>i?g.lineTo(x*z,y*z):g.moveTo(x*z,y*z));if(passo!=='area'||area.length>2)g.closePath();g.stroke();
+        if(passo==='area')area.forEach(([x,y])=>{g.fillStyle='#22d3ee';g.beginPath();g.arc(x*z,y*z,5,0,7);g.fill();});}
+      const r=Math.max(4,(sp||16)*0.28*z);g.font=`bold ${Math.max(10,Math.round(r*1.3))}px system-ui,sans-serif`;
+      F.forEach(q=>{g.lineWidth=2;g.strokeStyle='#fde047';g.beginPath();g.arc(q.x*z,q.y*z,r,0,7);g.stroke();g.fillStyle='#000';g.fillText(q.n,q.x*z+r+1,q.y*z-r+1);g.fillStyle='#fff';g.fillText(q.n,q.x*z+r,q.y*z-r);});
+      $('#fdN').textContent=passo==='area'?`${area.length} ponto(s)`:`${F.length} furos`;};
+    const botoes=()=>{
+      if(passo==='area'){$('#fdTx').innerHTML='1) Toque nos <b>cantos da área dos furos</b>, contornando o polígono. Depois toque em <b>Procurar furos</b>.';
+        $('#fdB').innerHTML=`<button class="btn" id="fdU">Desfazer ponto</button><button class="btn pri" id="fdGo">Procurar furos</button>`;
+        $('#fdU').onclick=()=>{area.pop();desenha();};
+        $('#fdGo').onclick=()=>{if(area.length<3){toast('Toque em pelo menos 3 cantos da área');return;}busy('Procurando os furos…');
+          setTimeout(()=>{try{const R=furosNaFoto(im,area);F=R.furos;sp=R.sp;numerarFuros(F,sp);}catch(e){console.error(e);F=[];}busy();
+            if(!F.length)toast('Não achei furos nessa área. Tente contornar de novo.',4000);passo='edit';botoes();desenha();},30);};}
+      else{$('#fdTx').innerHTML='2) Confira. <b>Toque num círculo</b> para tirar um furo errado, ou <b>toque onde falta</b> para pôr um furo. A numeração é refeita sozinha.';
+        $('#fdB').innerHTML=`<button class="btn" id="fdA">Refazer a área</button><button class="btn pri" id="fdOk">Usar estes furos</button>`;
+        $('#fdA').onclick=()=>{passo='area';area=[];F=[];botoes();desenha();};
+        $('#fdOk').onclick=()=>{if(!F.length){toast('Nenhum furo marcado');return;}closeSheet();
+          fim({holes:F.map(q=>novoFuro(String(q.n),q.x,q.y,null)),bg:{url:img.url,w:IW,h:IH},nome:file.name.replace(/\.[^.]+$/,''),resumo:`furos achados na foto do drone (${F.length}, conferidos)`});};}};
+    c.onclick=e=>{const rc=c.getBoundingClientRect(),x=(e.clientX-rc.left)/z,y=(e.clientY-rc.top)/z;
+      if(passo==='area'){area.push([x,y]);desenha();return;}
+      const lim=Math.max(6,(sp||16)*0.45);let bi=-1,bd=Infinity;F.forEach((q,i)=>{const d=Math.hypot(q.x-x,q.y-y);if(d<bd){bd=d;bi=i;}});
+      if(bi>=0&&bd<lim)F.splice(bi,1);else F.push({x,y});numerarFuros(F,sp);desenha();};
+    $('#fdM').onclick=()=>{z=Math.max(0.1,z/1.4);desenha();};$('#fdP').onclick=()=>{z=Math.min(6,z*1.4);desenha();};
+    $('#fdX').onclick=()=>{closeSheet();fim(null);};
+    botoes();desenha();});
+}
+
 async function afinarPelaFoto(p,img,m){ // m: foto -> mapa (dos 2 toques). Devolve m afinado e quais furos apareceram na foto
   const hs=p.holes.filter(h=>h.status!=='nao');if(hs.length<8)return null;
   const im=await new Promise((ok,err)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=err;i.src=img.url;});
@@ -1153,7 +1240,7 @@ async function fotosFuro(p,h){
     b.querySelectorAll('img[data-r]').forEach(im=>im.onclick=()=>verFoto(R[+im.dataset.r].url,async()=>{try{await api({acao:'foto_apagar',token:SY().token,poly_id:p.id,furo_id:h.id,ts:R[+im.dataset.r].ts});delete fotosRem[p.id];im.remove();toast('Foto apagada da equipe');}catch(e){toast(e.message);}}));};
   rem();
   const bt=$('#hFoto');if(bt)bt.onclick=async()=>{const file=await pickFile('image/*');if(!file)return;
-    try{const im=await imageFileToImage(file,1280);arr=await fotoGet(k);const ts=Date.now();arr.push({ts,url:im.url});const ok=await fotoPut(k,arr);pinta(arr);
+    try{const im=await imageFileToImage(file,1280);const ts=Date.now();const url=await carimbar(im.url,carimboTxt(p,h,ts));arr=await fotoGet(k);arr.push({ts,url});const ok=await fotoPut(k,arr);pinta(arr);
       if(ok)filaFoto(p.id,h.id,ts);
       if(ok&&SY().token&&!SY().fotoOff){enviarFotos();toast('Foto guardada e enviada para a equipe');}else toast(ok?'Foto guardada neste celular (sobe para a nuvem quando você entrar na conta da equipe)':'Aparelho sem espaço para a foto');}catch(e){toast('Não consegui abrir a foto');}};
 }
@@ -1176,6 +1263,50 @@ function gpsStart(){
     e=>{gpsErr=e.code===1?'Permissão do GPS negada. Libere a localização para este site.':'Sem sinal do GPS.';gpsDraw();},{enableHighAccuracy:true,maximumAge:3000,timeout:20000});
 }
 function gpsStop(){gpsOn=false;if(gpsId!=null)navigator.geolocation.clearWatch(gpsId);gpsId=null;gpsPos=null;}
+/* ===== UTM → lat/lon (para o alerta de raio; Brasil = hemisfério sul) ===== */
+function utm2ll(E,N,zone,sul=true){
+  const a=6378137,f=1/298.257223563,k0=0.9996,e2=f*(2-f),ep2=e2/(1-e2),e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));
+  const x=E-500000,y=sul?N-10000000:N,M=y/k0,mu=M/(a*(1-e2/4-3*e2*e2/64-5*e2**3/256));
+  const p1=mu+(3*e1/2-27*e1**3/32)*Math.sin(2*mu)+(21*e1*e1/16-55*e1**4/32)*Math.sin(4*mu)+(151*e1**3/96)*Math.sin(6*mu);
+  const C1=ep2*Math.cos(p1)**2,T1=Math.tan(p1)**2,N1=a/Math.sqrt(1-e2*Math.sin(p1)**2),R1=a*(1-e2)/Math.pow(1-e2*Math.sin(p1)**2,1.5),D=x/(N1*k0);
+  const lat=p1-(N1*Math.tan(p1)/R1)*(D*D/2-(5+3*T1+10*C1-4*C1*C1-9*ep2)*D**4/24+(61+90*T1+298*C1+45*T1*T1-252*ep2-3*C1*C1)*D**6/720);
+  const lon=(D-(1+2*T1+C1)*D**3/6+(5-2*C1+28*T1-3*C1*C1+8*ep2+24*T1*T1)*D**5/120)/Math.cos(p1);
+  return {lat:lat*180/Math.PI,lon:((zone-1)*6-177)+lon*180/Math.PI};}
+// coordenada UTM do furo (polígono importado com coordenadas)
+const furoUTM=(p,h)=>p&&p.geo&&geoUTM(p.geo)?{E:h.x+p.geo.mx,N:-(h.y+p.geo.my)}:null;
+
+/* ===== Carimbo na foto do furo (data, hora, furo, coordenada) ===== */
+function carimbar(url,linhas){return new Promise(res=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;const g=c.getContext('2d');g.drawImage(im,0,0);
+  const fs=Math.max(14,Math.round(c.width/42)),pad=Math.round(fs*.5),lh=Math.round(fs*1.3),hh=pad*2+lh*linhas.length;
+  g.fillStyle='rgba(0,0,0,.6)';g.fillRect(0,c.height-hh,c.width,hh);g.fillStyle='#fff';g.font=`600 ${fs}px system-ui,Arial,sans-serif`;g.textBaseline='top';
+  linhas.forEach((t,i)=>{let s=t;while(g.measureText(s).width>c.width-pad*2&&s.length>4)s=s.slice(0,-2);g.fillText(s,pad,c.height-hh+pad+i*lh);});
+  res(c.toDataURL('image/jpeg',.82));};im.onerror=()=>res(url);im.src=url;});}
+function carimboTxt(p,h,ts){const d=new Date(ts);const u=furoUTM(p,h)||(gpsPos?ll2utm(gpsPos.lat,gpsPos.lon):null);
+  return [`POL ${p.pol||''} · Furo ${h.id} · ${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`,
+    [u?`E ${Math.round(u.E)}  N ${Math.round(u.N)}`:'',[p.mina,p.cava].filter(Boolean).join(' / '),p.banco?'Banco '+p.banco:''].filter(Boolean).join(' · ')].filter(Boolean);}
+
+/* ===== Alerta de raio (previsão de tempestade na cava; precisa de internet) ===== */
+const RAIO_MS=15*60*1000;let raio={st:'',t:0,pid:null,avisado:''};
+function raioLocal(p){if(gpsPos)return {lat:gpsPos.lat,lon:gpsPos.lon};
+  if(p&&p.geo&&geoUTM(p.geo)&&p.holes.length){const xs=p.holes.map(h=>h.x),ys=p.holes.map(h=>h.y);const E=(Math.min(...xs)+Math.max(...xs))/2+p.geo.mx,N=-((Math.min(...ys)+Math.max(...ys))/2+p.geo.my);return utm2ll(E,N,num(S.utmZona)||23,true);}
+  return null;}
+async function raioChecar(p,forcar){
+  if(S.raioOff||!p)return;if(!forcar&&raio.pid===p.id&&Date.now()-raio.t<RAIO_MS)return;
+  raio.pid=p.id;raio.t=Date.now();const L=raioLocal(p);
+  if(!L){raio.st='sem local (polígono sem coordenadas UTM e GPS desligado)';raioPinta();return;}
+  if(!navigator.onLine){raio.st='desligado: sem internet';raioPinta();return;}
+  try{const u=`https://api.open-meteo.com/v1/forecast?latitude=${L.lat.toFixed(3)}&longitude=${L.lon.toFixed(3)}&hourly=weather_code&forecast_hours=4&timezone=auto`;
+    const r=await fetch(u);if(!r.ok)throw new Error();const j=await r.json();const hs=(j.hourly&&j.hourly.time)||[],wc=(j.hourly&&j.hourly.weather_code)||[];
+    const i=wc.findIndex((c,k)=>k<4&&c>=95);const hora=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    if(i>=0){const h=String(hs[i]||'').slice(11,13);raio.st=`previsão de tempestade com raio ${i===0?'agora':'por volta das '+h+'h'} (consultado ${hora})`;raio.grave=true;
+      const ch=p.id+'|'+hs[i];if(raio.avisado!==ch){raio.avisado=ch;aviso(`⚡ <b>Previsão de tempestade com raio</b> ${i===0?'agora':'por volta das '+h+'h'} na cava do POL ${esc(p.pol)}.<br>Avalie parar o carregamento e siga o procedimento da mina.`);}}
+    else{raio.st=`sem previsão de tempestade nas próximas 3 h (consultado ${hora})`;raio.grave=false;}
+  }catch(e){raio.st='desligado: sem internet';raio.grave=false;}
+  raioPinta();}
+function raioPinta(){const b=$('#raioSt');if(!b)return;b.innerHTML=S.raioOff?'⚡ Alerta de raio desligado':`⚡ Alerta de raio: ${esc(raio.st||'consultando…')}`;b.style.color=raio.grave&&!S.raioOff?'var(--bad)':'';b.style.fontWeight=raio.grave&&!S.raioOff?'700':'';}
+setInterval(()=>{const p=cur();if(p&&document.visibilityState==='visible')raioChecar(p);},60*1000);
+window.addEventListener('online',()=>{const p=cur();if(p)raioChecar(p,true);});
+
 function gpsDraw(){
   const gG=$('#gpsG'),info=$('#gpsInfo'),p=cur();if(!gG||!p||!p.geo||!lastGeom)return;
   if(!gpsOn){gG.innerHTML='';return;}
@@ -1191,6 +1322,23 @@ function gpsDraw(){
 
 /* ===== Liberação: situação do polígono e checklists ===== */
 const situDe=p=>p.situ||'aberto';
+/* ===== Fechamento: o que falta antes de liberar ===== */
+function faltas(p){
+  const idx=new Map(p.holes.map((h,i)=>[h,i]));const carr=p.holes.filter(h=>h.status==='carregado');
+  const temCam=h=>(h.decks||[]).filter(d=>num(d.kg)>0).every(d=>deckCam(h,d));
+  return [
+    ['Pendentes (não carregados)',p.holes.filter(h=>h.status==='pendente')],
+    ['Em repasse',p.holes.filter(h=>h.status==='repasse')],
+    ['Carregados sem carga lançada',carr.filter(h=>!holeKg(h))],
+    ['Carregados sem caminhão',carr.filter(h=>holeKg(h)&&!temCam(h))],
+    ['Carregados sem tampão',carr.filter(h=>h.tampao==null)],
+    ['Carregados sem detonador',carr.filter(h=>!h.detTipo&&!num(h.detQtd))],
+    ['Fora da tolerância do projeto',carr.filter(h=>alertasFuro(p,h).length)],
+  ].map(([t,hs])=>({t,hs:hs.map(h=>({h,i:idx.get(h)}))})).filter(g=>g.hs.length);}
+function faltasHtml(p){const G=faltas(p);const tot=G.reduce((s,g)=>s+g.hs.length,0);
+  if(!G.length)return `<div class="card"><h2>Fechamento do polígono</h2><div class="hint" style="background:#eaf7ef;border-color:#b5e0c4">✔ Nada faltando: todos os furos estão lançados, com caminhão, tampão e detonador.</div></div>`;
+  return `<div class="card"><h2>Fechamento do polígono <span class="mut">(${tot} ${tot>1?'itens':'item'})</span></h2><p class="mut" style="margin:0 0 6px">Toque no furo para abrir e corrigir.</p>
+  ${G.map(g=>`<div style="margin:8px 0"><b>${esc(g.t)}: ${g.hs.length}</b><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${g.hs.slice(0,40).map(x=>`<button class="btn sm" data-fi="${x.i}" style="flex:0 0 auto;min-width:44px">${esc(x.h.id)}</button>`).join('')}${g.hs.length>40?`<span class="mut" style="align-self:center">+${g.hs.length-40}</span>`:''}</div></div>`).join('')}</div>`;}
 function tabLiber(p){
   p.check=p.check||{};
   const bloco=(k,tit,itens)=>{const c=p.check[k]||{it:{}};const nOk=itens.filter((_,i)=>c.it&&c.it[i]).length;
@@ -1198,7 +1346,7 @@ function tabLiber(p){
     <div class="row" style="margin-top:6px"><div><label>Liberado por</label><input id="nm_${k}" value="${esc(c.nome||meuNome()||p.resp||'')}"></div><div style="align-self:end"><button class="btn ${c.ts?'':'pri'}" data-lib="${k}" style="width:100%">${c.ts?'Registrar de novo':'Registrar liberação'}</button></div></div>
     ${c.ts?`<div class="hint" style="background:#eaf7ef;border-color:#b5e0c4">✔ Registrado por <b>${esc(c.nome)}</b> em ${new Date(c.ts).toLocaleString('pt-BR')}${nOk<itens.length?` · <b style="color:var(--bad)">${itens.length-nOk} item(ns) não marcado(s)</b>`:''}</div>`:''}</div>`;};
   const si=situDe(p);
-  $('#tabBox').innerHTML=`<div class="card"><h2>Situação do polígono</h2><div class="seg" id="situ">${Object.entries(SITU).map(([k,v])=>`<button data-s="${k}" class="${si===k?'on':''}">${v.n}</button>`).join('')}</div>
+  $('#tabBox').innerHTML=faltasHtml(p)+`<div class="card"><h2>Situação do polígono</h2><div id="raioSt" class="mut" style="margin:0 0 8px;font-size:14px"></div><div class="seg" id="situ">${Object.entries(SITU).map(([k,v])=>`<button data-s="${k}" class="${si===k?'on':''}">${v.n}</button>`).join('')}</div>
   ${si==='detonado'?`<div class="row"><div><label>Data e hora da detonação</label><input id="detAt" type="datetime-local" value="${esc(p.detAt||'')}"></div></div>`:''}</div>
   ${bloco('pre','Antes do carregamento',CHK_PRE)}${bloco('fim','Fechamento do carregamento',CHK_FIM)}
   <p class="mut">O checklist é registro do que foi conferido em campo. Ele não substitui os procedimentos e liberações da mina.</p>`;
@@ -1207,9 +1355,13 @@ function tabLiber(p){
     const ap=()=>{p.situ=v;markP(p.id);save();tabLiber(p);toast('Situação: '+SITU[v].n);};
     if(v!=='aberto'&&pend)confirmBox(`Ainda há ${nf(pend)} pendente(s). Marcar como "${SITU[v].n}" mesmo assim?`,ap,'Marcar');else ap();});
   if($('#detAt'))$('#detAt').onchange=e=>{p.detAt=e.target.value;markP(p.id);save();};
+  document.querySelectorAll('#tabBox [data-fi]').forEach(b=>b.onclick=()=>editHole(+b.dataset.fi));raioPinta();
   document.querySelectorAll('#tabBox input[data-k]').forEach(c=>c.onchange=()=>{const k=c.dataset.k;p.check[k]=p.check[k]||{it:{}};p.check[k].it=p.check[k].it||{};p.check[k].it[c.dataset.i]=c.checked;markP(p.id);save();});
-  document.querySelectorAll('[data-lib]').forEach(b=>b.onclick=()=>{const k=b.dataset.lib;const nm=$('#nm_'+k).value.trim();if(!nm){toast('Informe quem liberou');return;}p.check[k]=p.check[k]||{it:{}};p.check[k].nome=nm;p.check[k].ts=Date.now();
-    if(k==='fim'&&situDe(p)==='aberto'&&!p.holes.some(h=>h.status==='pendente'))p.situ='carregado';markP(p.id);save();tabLiber(p);toast('Liberação registrada');});
+  document.querySelectorAll('[data-lib]').forEach(b=>b.onclick=()=>{const k=b.dataset.lib;const nm=$('#nm_'+k).value.trim();if(!nm){toast('Informe quem liberou');return;}
+    const reg=()=>{p.check[k]=p.check[k]||{it:{}};p.check[k].nome=nm;p.check[k].ts=Date.now();
+      if(k==='fim'&&situDe(p)==='aberto'&&!p.holes.some(h=>h.status==='pendente'))p.situ='carregado';markP(p.id);save();tabLiber(p);toast('Liberação registrada');};
+    const tot=k==='fim'?faltas(p).reduce((s,g)=>s+g.hs.length,0):0;
+    if(tot)confirmBox(`O fechamento ainda mostra ${tot} item(ns) faltando (veja no topo desta aba). Registrar a liberação mesmo assim?`,reg,'Registrar');else reg();});
 }
 
 /* ===== Relatório completo para imprimir / salvar em PDF ===== */
@@ -1242,6 +1394,58 @@ async function imprimir(p){
     setTimeout(()=>{try{window.print();}catch(e){toast('Este navegador não deixou imprimir');}},300);
   }catch(e){busy();console.error(e);toast('Não consegui montar o relatório');}
 }
+
+/* ===== Resumo do carregamento para o WhatsApp (modelo do Rodrigo) ===== */
+const diaDe=ts=>{if(!ts)return '';const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+const maisDia=(s,n)=>{const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return diaDe(d.getTime());};
+const camWpp=c=>String(c||'').replace(/^\s*(UMB|UMT|UBT|CAM\.?|CAMINH[AÃ]O)\s*/i,'').trim()||'sem caminhão';
+const detNome=t=>{const m=String(t||'').match(/(\d+)\s*m\b/i);return 'Detonadores '+(/DT5|ELETR/i.test(t)?'Eletrônicos':String(t).replace(/\s*\d+\s*m\b/i,'').trim())+(m?' '+m[1]+' mts':'');};
+function wppDados(p,o){
+  const carr=p.holes.filter(h=>h.status==='carregado'&&(o.escopo==='tudo'||diaDe(h.ts)===o.data));
+  const nd=h=>(h.decks||[]).filter(d=>num(d.kg)>0).length;
+  const decks={};carr.forEach(h=>{const n=Math.max(1,nd(h));decks[n]=(decks[n]||0)+1;});
+  const det={};let booster=0,bags=0;const frota={};
+  carr.forEach(h=>{booster+=num(h.booster)||0;if(h.detTipo&&num(h.detQtd))det[h.detTipo]=(det[h.detTipo]||0)+num(h.detQtd);bags+=Math.max(0,nd(h)-1);
+    (h.decks||[]).forEach(d=>{const kg=num(d.kg);if(!kg)return;const c=camWpp(deckCam(h,d));frota[c]=frota[c]||{};const pr=d.prod||'';frota[c][pr]=(frota[c][pr]||0)+kg;});});
+  return {carr,decks,det,booster,bags,frota};}
+function wppTexto(p,o,D){
+  const hr=new Date().getHours();const L=[];
+  L.push((hr<12?'Bom dia':hr<18?'Boa tarde':'Boa noite')+' a todos!','','*Informações do carregamento*','');
+  L.push('Data: '+brDate(o.data),'Mina: '+(p.mina||''),'Cava: '+(p.cava||''),'Polígono: '+(p.pol||''),'Banco: '+(p.banco||''),'Status: '+o.status,'Coordenadas: '+(o.coord||''),'Perfuratriz: '+(o.perf||''),'');
+  const mx=Math.max(2,...Object.keys(D.decks).map(Number));
+  for(let n=1;n<=mx;n++)L.push(`• *Furos de ${n} Deck${n>1?'s':''} ${D.decks[n]||0}*`);
+  L.push(`• *Total de furos carregados ${o.escopo==='tudo'?'no polígono':'hoje'} ${D.carr.length}*`,'','*Consumo:*','');
+  if(D.booster)L.push(`• ${fmt(D.booster)} ${o.boosterNome||'Booster'}`);
+  Object.entries(D.det).forEach(([t,q])=>L.push(`• ${fmt(q)} ${(o.detNomes&&o.detNomes[t])||detNome(t)}`));
+  const bg=num(o.bags);if(bg)L.push(`• ${fmt(bg)} Blastbags`);
+  L.push('','*Frota utilizada:*','');
+  Object.entries(D.frota).forEach(([c,ps])=>Object.entries(ps).forEach(([pr,kg])=>L.push(`• ${c} - ${fmt(kg)}kg ${pr}`.trim())));
+  L.push('','Mina: '+(p.mina||''),'Operação: '+D.carr.length+' Furos','Impacto: '+(o.impacto||'Não'),'','*D+1:*','Data: '+brDate(o.d1data),'Mina: '+(o.d1mina||p.mina||''),'Operação: '+(o.d1op||''));
+  return L.join('\n');}
+function resumoWpp(p){
+  const sv=p.wpp||{};const g=S.wppG||{};
+  const o={data:today(),escopo:'dia',status:situDe(p)==='aberto'?'Carregando':situDe(p)==='carregado'?'Carregado':'Detonado',coord:sv.coord||'',perf:sv.perf||'',impacto:sv.impacto||'Não',
+    boosterNome:g.boosterNome||'Booster de 450gr',detNomes:Object.assign({},g.detNomes||{}),bags:null,bagsAuto:true,d1data:maisDia(today(),1),d1mina:p.mina||'',d1op:sv.d1op||''};
+  const inp=(id,l,v,ph)=>`<div><label>${l}</label><input id="${id}" value="${esc(v??'')}" placeholder="${esc(ph||'')}"></div>`;
+  const draw=()=>{const D=wppDados(p,o);if(o.bagsAuto)o.bags=D.bags;const dets=Object.keys(D.det);
+    openSheet(`<h3>Resumo para o WhatsApp<button class="btn sm" id="wpX">Fechar</button></h3>
+    <div class="row"><div><label>Data</label><input id="wpD" type="date" value="${o.data}"></div><div><label>Contar furos</label><select id="wpE"><option value="dia" ${o.escopo==='dia'?'selected':''}>Carregados nesse dia</option><option value="tudo" ${o.escopo==='tudo'?'selected':''}>Polígono inteiro</option></select></div></div>
+    <div class="row"><div><label>Status</label><select id="wpS">${opts(['Carregando','Carregado','Liberado','Detonado'],o.status)}</select></div>${inp('wpP','Perfuratriz',o.perf,'ex.: 1132-1131')}</div>
+    <div class="row">${inp('wpC','Coordenadas',o.coord)}${inp('wpI','Impacto',o.impacto)}</div>
+    <div class="row">${inp('wpB','Nome do booster',o.boosterNome)}${inp('wpG','Blastbags (un)',o.bags)}</div>
+    ${dets.map((t,i)=>`<div class="row">${inp('wpT'+i,'Nome do '+esc(t),o.detNomes[t]||detNome(t))}</div>`).join('')}
+    <div class="row"><div><label>D+1 data</label><input id="wp1d" type="date" value="${o.d1data}"></div>${inp('wp1m','D+1 mina',o.d1mina)}</div>
+    <div class="row">${inp('wp1o','D+1 operação',o.d1op,'ex.: 125 Furos')}</div>
+    <label>Texto (pode ajustar antes de mandar)</label><textarea id="wpTx" style="min-height:260px;font-family:inherit">${esc(wppTexto(p,o,D))}</textarea>
+    <div class="btns"><button class="btn pri" id="wpW">Mandar no WhatsApp</button><button class="btn" id="wpCp">Copiar</button></div>`);
+    const ler=()=>{o.data=$('#wpD').value||today();o.escopo=$('#wpE').value;o.status=$('#wpS').value;o.perf=$('#wpP').value.trim();o.coord=$('#wpC').value.trim();o.impacto=$('#wpI').value.trim();o.boosterNome=$('#wpB').value.trim();
+      const b=$('#wpG').value.trim();if(String(o.bags??'')!==b){o.bags=num(b);o.bagsAuto=false;}dets.forEach((t,i)=>o.detNomes[t]=$('#wpT'+i).value.trim());o.d1data=$('#wp1d').value;o.d1mina=$('#wp1m').value.trim();o.d1op=$('#wp1o').value.trim();};
+    const guarda=()=>{p.wpp={coord:o.coord,perf:o.perf,impacto:o.impacto,d1op:o.d1op};S.wppG={boosterNome:o.boosterNome,detNomes:o.detNomes};markP(p.id);save();};
+    document.querySelectorAll('#sheet input,#sheet select').forEach(e=>e.onchange=()=>{ler();guarda();if(e.id==='wpD'||e.id==='wpE'){o.bagsAuto=true;draw();return;}$('#wpTx').value=wppTexto(p,o,wppDados(p,o));});
+    $('#wpX').onclick=closeSheet;
+    $('#wpCp').onclick=async()=>{const t=$('#wpTx').value;try{await navigator.clipboard.writeText(t);toast('Texto copiado — cole no grupo');}catch(e){$('#wpTx').select();document.execCommand('copy');toast('Texto copiado');}};
+    $('#wpW').onclick=()=>{guarda();window.open('https://wa.me/?text='+encodeURIComponent($('#wpTx').value),'_blank');};};
+  draw();}
 
 /* ===== Caminhões (NF x lançado) e acessórios ===== */
 function camDif(p,c,kl){const d=(p.cams||{})[c]||{};const kn=num(d.kgNF);if(kn==null)return null;const sai=kn-(num(d.kgRet)||0);if(sai<=0)return null;const dif=kl-sai,pc=dif/sai*100,tol=projDe(p).tolCam;
@@ -1431,6 +1635,8 @@ async function pdfTemposFluxo(destino){ // destino: polígono existente (encaixa
       const T=F.map(f=>({id:f.t,x:f.x-x0,y:f.y-y0,tempo:+f.t,tempos:f.t2?[+f.t,+f.t2]:null}));
       if(destino){tzEncaixar(destino,T);ok(true);return;}
       const cc=document.createElement('canvas');cc.width=Math.round(x1-x0);cc.height=Math.round(y1-y0);cc.getContext('2d').drawImage(res.fundo,x0,y0,cc.width,cc.height,0,0,cc.width,cc.height);
+      // furo novo: número 1, 2, 3… pela ordem de detonação (menor tempo primeiro; empate pela posição). O tempo fica guardado no furo.
+      T.sort((a,b)=>(a.tempo-b.tempo)||(a.y-b.y)||(a.x-b.x)).forEach((t,i)=>t.id=String(i+1));
       ok({holes:T.map(t=>{const h=novoFuro(t.id,t.x,t.y,null);h.tempo=t.tempo;if(t.tempos)h.tempos=t.tempos;return h;}),bg:{url:cc.toDataURL('image/jpeg',.8),w:cc.width,h:cc.height},nome:file.name.replace(/\.pdf$/i,''),resumo:`tempos lidos do PDF (${T.length} furos, conferidos)`});}));
   }catch(e){busy();console.error(e);toast(e.message&&e.message.length<160?e.message:'Não consegui ler o PDF');return null;}
 }
