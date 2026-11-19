@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Carregamento de Campo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#f3f5f7;--card:#fff;--ink:#14202b;--mut:#5d6b78;--line:#d6dde3;--pri:#0b5cad;--pri2:#e6f0fa;--ok:#1f9d55;--warn:#f08c00;--bad:#d64545;--r:12px}
 *{box-sizing:border-box}
@@ -124,6 +125,39 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:#0a63c9;box-shado
 .selbar{background:linear-gradient(135deg,#0b1f33,#0f3460);box-shadow:0 6px 20px rgba(8,25,45,.3)}
 .bar{background:#e3e9ef}.bar i{background:linear-gradient(90deg,#22b061,#2fd27a)}
 .card.poly:active{transform:scale(.99)}
+
+/* ===== visual "fogo": mais forte ===== */
+:root{--pri:#ff5a1f;--pri2:#fff1ea;--bg:#f2f3f6;--fogo:linear-gradient(135deg,#ffb11f 0%,#ff6a13 45%,#e8341c 100%)}
+header{background:#0b0f17;box-shadow:0 2px 0 0 #ff6a13,0 6px 18px rgba(0,0,0,.35)}
+header h1 .logo{background:var(--fogo);box-shadow:0 0 0 2px rgba(255,255,255,.08),0 4px 14px rgba(255,90,31,.55)}
+header h1 .tt small{color:#ffb38a;opacity:1}
+.btn.pri{background:var(--fogo);box-shadow:0 6px 16px rgba(255,90,31,.38);text-shadow:0 1px 1px rgba(0,0,0,.15)}
+.tabs button.on{background:#0b0f17;color:#fff;box-shadow:inset 0 -3px 0 #ff6a13,0 2px 8px rgba(0,0,0,.25)}
+.seg button.on{color:#e8471c}
+input:focus,select:focus,textarea:focus{border-color:#ff6a13;box-shadow:0 0 0 3px rgba(255,106,19,.18)}
+.kpi{background:linear-gradient(160deg,#fff6f0,#ffe9dc)}
+.kpi b{color:#c2410c}
+.card.poly{position:relative;overflow:hidden}
+.card.poly::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--fogo)}
+.hero{position:relative;overflow:hidden;border-radius:22px;padding:20px 18px 18px;margin-bottom:14px;color:#fff;background:radial-gradient(120% 140% at 100% 0%,#ff8a1f 0%,rgba(255,138,31,0) 55%),radial-gradient(90% 120% at 0% 100%,#d6261a 0%,rgba(214,38,26,0) 60%),#141a26;box-shadow:0 10px 30px rgba(20,26,38,.35)}
+.hero::after{content:"";position:absolute;right:-40px;top:-40px;width:180px;height:180px;border-radius:50%;border:22px solid rgba(255,255,255,.06)}
+.hero .k{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#ffc9a6;font-weight:700}
+.hero h2{font-size:26px;line-height:1.1;margin:6px 0 4px;font-weight:800;letter-spacing:-.02em}
+.hero p{margin:0;color:rgba(255,255,255,.8);font-size:14px}
+.hero .st{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.hero .st div{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:10px;backdrop-filter:blur(4px)}
+.hero .st b{display:block;font-size:22px;font-weight:800;letter-spacing:-.02em}
+.hero .st span{font-size:11px;color:rgba(255,255,255,.75)}
+.hero{background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px),radial-gradient(120% 140% at 100% 0%,#ff8a1f 0%,rgba(255,138,31,0) 55%),radial-gradient(90% 120% at 0% 100%,#d6261a 0%,rgba(214,38,26,0) 60%);background-size:22px 22px,22px 22px,auto,auto;background-color:#0d121c;border:1px solid rgba(255,140,60,.35)}
+.hero::before{content:"";position:absolute;left:0;right:0;height:2px;top:0;background:linear-gradient(90deg,transparent,#ffb11f,transparent);animation:scan 3.5s linear infinite;opacity:.8}
+@keyframes scan{0%{transform:translateY(0)}100%{transform:translateY(330px)}}
+.hero .k{display:flex;align-items:center;gap:8px}
+.hero .k i{width:8px;height:8px;border-radius:50%;background:#3dff8f;box-shadow:0 0 8px #3dff8f;animation:pulso 1.6s ease-in-out infinite}
+@keyframes pulso{50%{opacity:.25}}
+.hero .st b{font-family:"Orbitron",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;font-size:24px;color:#fff;text-shadow:0 0 12px rgba(255,150,60,.65)}
+.hero .st div{background:linear-gradient(160deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,170,90,.28);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.hero .st span{text-transform:uppercase;letter-spacing:.06em;font-size:10px}
+@media (prefers-reduced-motion:reduce){.hero::before,.hero .k i{animation:none}}
 @keyframes pfl{0%{opacity:1}50%{opacity:.15}100%{opacity:1}}.pfl{animation:pfl .9s ease-in-out 5;animation-fill-mode:forwards}
 </style>
 </head>
@@ -415,7 +449,10 @@ function renderHome(){
   $('#ttl').innerHTML=`<span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2" fill="#fff" stroke="none"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></span><span class="tt">Carregamento de Campo<small>${esc(SLOGAN)}</small></span>`;
   const q=homeQ.trim().toLowerCase();
   const ps=[...S.polys].filter(p=>(!homeSitu||situDe(p)===homeSitu)&&(!q||[p.pol,p.mina,p.cava,p.banco,p.resp,brDate(p.data)].join(' ').toLowerCase().includes(q))).sort((a,b)=>(b.data||'').localeCompare(a.data||'')||(b.criado||0)-(a.criado||0));
-  let h=`<div class="btns" style="margin:0 0 12px"><button class="btn pri" id="novo">+ Novo polígono</button><button class="btn" id="goCam">🚛 Modo caminhão</button><button class="btn" id="goInd">📊 Indicadores</button></div>`;
+  const hj=today(),abertos=S.polys.filter(p=>situDe(p)==='aberto').length;let fh=0,kh=0,fok=0;S.polys.forEach(p=>p.holes.forEach(x=>{if(x.status==='carregado'&&diaDe(x.ts)===hj){fh++;kh+=holeKg(x);if(!alertasFuro(p,x).length)fok++;}}));
+  let h=`<div class="hero"><div class="k"><i></i>Painel do dia · ao vivo</div><h2>${esc(SLOGAN)}</h2><p>${new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})}</p>
+    <div class="st"><div><b>${abertos}</b><span>polígonos em carregamento</span></div><div><b>${fmt(fh)}</b><span>furos carregados hoje</span></div><div><b>${kh>=1000?fmt(kh/1000,1)+' t':fmt(kh)+' kg'}</b><span>explosivo aplicado hoje</span></div><div><b>${fh?Math.round(fok/fh*100)+'%':'–'}</b><span>furos dentro do projeto</span></div></div></div>
+  <div class="btns" style="margin:0 0 12px"><button class="btn pri" id="novo">+ Novo polígono</button><button class="btn" id="goCam">🚛 Modo caminhão</button><button class="btn" id="goInd">📊 Indicadores</button></div>`;
   if(S.polys.length>1)h+=`<div class="row" style="margin-bottom:10px;gap:6px"><input id="hq" placeholder="Buscar POL, mina, banco…" value="${esc(homeQ)}"><select id="hs">${[['','Todas as situações'],...Object.entries(SITU).map(([k,v])=>[k,v.n])].map(([k,t])=>`<option value="${k}" ${homeSitu===k?'selected':''}>${t}</option>`).join('')}</select></div>`;
   if(S.polys.length&&!ps.length)h+=`<div class="card empty">Nenhum polígono neste filtro.</div>`;
   if(!S.polys.length)h+=`<div class="card empty">Nenhum polígono ainda.<br>Toque em <b>+ Novo polígono</b> para gerar a malha de furos ou colar a lista do croqui.</div>`;
@@ -503,7 +540,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-19.9';
+const APP_VER='2026-11-19.10';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
