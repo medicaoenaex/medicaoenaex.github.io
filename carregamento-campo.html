@@ -189,7 +189,7 @@ const readTxt=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>r
 /* ===== Ler arquivo de coordenadas (Excel, CSV, TXT ou PDF) ===== */
 async function fileToRows(file){
   const nm=file.name.toLowerCase();
-  if(/\.xlsx?$/.test(nm)){busy('Lendo planilha…');const X=await loadXlsx();const wb=X.read(await readBuf(file),{type:'array'});busy();return X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false}).map(r=>r.map(v=>String(v??'').trim()));}
+  if(/\.xlsx?$/.test(nm)){busy('Lendo planilha…');const X=await loadXlsx();const wb=X.read(await readBuf(file),{type:'array'});busy();return X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''}).map(r=>r.map(v=>typeof v==='number'?String(v):String(v??'').trim()));}
   if(/\.pdf$/.test(nm)){busy('Lendo PDF…');const lib=await loadPdf();const doc=await lib.getDocument({data:new Uint8Array(await readBuf(file)),isEvalSupported:false}).promise;const rows=[];
     for(let p=1;p<=doc.numPages;p++){const tc=await (await doc.getPage(p)).getTextContent();const lines=[];
       tc.items.filter(i=>i.str.trim()).forEach(i=>{const y=i.transform[5],x=i.transform[4];let L=lines.find(l=>Math.abs(l.y-y)<2.5);if(!L){L={y,it:[]};lines.push(L);}L.it.push({x,s:i.str.trim()});});
@@ -216,6 +216,19 @@ function rowsToHoles(rows){
     out.push({id,x:nums[ix],y:nums[iy],p:after.length?after[0]:null});
   });
   if(!out.length)throw new Error('Não achei coordenadas nesse arquivo. Me mande um exemplo para ajustar o leitor.');
+  coordEscala(out);
+  return out;
+}
+// planilha que perdeu a vírgula das coordenadas (ex.: 7774646,585 virou 7774646585): volta cada valor para o tamanho certo.
+// Usa os valores que ainda têm casas decimais como referência; sem nenhum, usa o tamanho de UTM (norte 7 dígitos, leste 6).
+function coordEscala(out){
+  const dig=n=>Math.floor(Math.log10(Math.abs(n)))+1;
+  [['x',6],['y',7]].forEach(([k,utm])=>{const v=out.map(o=>o[k]).filter(n=>n);if(!v.length)return;
+    const dec=v.filter(n=>!Number.isInteger(n));let alvo=null;
+    if(dec.length){const c={};dec.forEach(n=>{const d=dig(n);c[d]=(c[d]||0)+1;});alvo=+Object.keys(c).sort((a,b)=>c[b]-c[a])[0];}
+    else if(v.every(n=>dig(n)>utm+1))alvo=utm;
+    if(alvo==null)return;
+    out.forEach(o=>{const n=o[k];if(!n)return;const d=dig(n);if(d>alvo&&Number.isInteger(n))o[k]=Math.round(n/10**(d-alvo)*1e4)/1e4;});});
   return out;
 }
 
@@ -443,7 +456,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-18.3';
+const APP_VER='2026-11-19.1';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -2355,7 +2368,15 @@ async function importarPlanilha(p){
   const file=await pickFile('.xlsx,.xls,.csv');if(!file)return;
   try{
     busy('Lendo planilha…');const X=await loadXlsx();const wb=X.read(await readBuf(file),{type:'array',cellDates:true});busy();
-    const {info,linhas,naoAchou}=planLer(p,X,wb);const mud=linhas.map(l=>planMud(l.h,l.nv)).filter(Boolean);
+    let lido;try{lido=planLer(p,X,wb);}catch(e){
+      // não é planilha de carregamento: pode ser o arquivo de coordenadas do polígono
+      const rows=X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false});const h=(rows.slice(0,40).find(r=>r&&r.length>1)||[]).map(v=>String(v||'').toLowerCase());
+      if(h.some(v=>/north|norte|^y$/.test(v))&&h.some(v=>/east|este|leste|^x$/.test(v))){busy();openSheet(`<h3>Arquivo de coordenadas<button class="btn sm" id="ipX">Fechar</button></h3>
+        <p><b>${esc(file.name)}</b> é a lista de <b>coordenadas dos furos</b> (furo, norte, leste), não a planilha de carregamento.</p>
+        <p>Ele serve para <b>criar o polígono</b>: na tela inicial, toque em <b>Novo polígono</b> → <b>Ler arquivo de coordenadas</b> e escolha este arquivo.</p>
+        <p class="mut">A planilha de carregamento é a que o app gera em ⋯ → Gerar planilha de carregamento (modelo Enaex), com as abas CARREG.</p>`);$('#ipX').onclick=closeSheet;return;}
+      throw e;}
+    const {info,linhas,naoAchou}=lido;const mud=linhas.map(l=>planMud(l.h,l.nv)).filter(Boolean);
     const outroPol=info.poly_id&&info.poly_id!==p.id;
     openSheet(`<h3>Importar planilha<button class="btn sm" id="ipClose">Cancelar</button></h3>
       ${outroPol?`<div class="hint">⚠️ Esta planilha foi gerada para o <b>POL ${esc(info.pol)} (${esc(info.mina)})</b>, e você está no POL ${esc(p.pol)}. Confira antes de aplicar.</div>`:''}
