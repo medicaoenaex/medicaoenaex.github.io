@@ -466,7 +466,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-19.6';
+const APP_VER='2026-11-19.7';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1549,6 +1549,8 @@ async function pdfTemposFluxo(destino){ // destino: polígono existente (encaixa
       const T=F.map(f=>({id:f.t,x:f.x-x0,y:f.y-y0,tempo:+f.t,tempos:f.t2?[+f.t,+f.t2]:null}));
       if(destino){tzEncaixar(destino,T);ok(true);return;}
       const cc=document.createElement('canvas');cc.width=Math.round(x1-x0);cc.height=Math.round(y1-y0);cc.getContext('2d').drawImage(res.fundo,x0,y0,cc.width,cc.height,0,0,cc.width,cc.height);
+      // furo novo: número 1, 2, 3… pela ordem de detonação (menor tempo primeiro; empate pela posição). O tempo fica guardado no furo.
+      T.sort((a,b)=>(a.tempo-b.tempo)||(a.y-b.y)||(a.x-b.x)).forEach((t,i)=>t.id=String(i+1));
       ok({holes:T.map(t=>{const h=novoFuro(t.id,t.x,t.y,null);h.tempo=t.tempo;if(t.tempos)h.tempos=t.tempos;return h;}),bg:{url:cc.toDataURL('image/jpeg',.8),w:cc.width,h:cc.height},nome:file.name.replace(/\.pdf$/i,''),resumo:`tempos lidos do PDF (${T.length} furos, conferidos)`});}));
   }catch(e){busy();console.error(e);toast(e.message&&e.message.length<160?e.message:'Não consegui ler o PDF');return null;}
 }
