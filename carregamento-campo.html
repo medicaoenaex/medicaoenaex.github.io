@@ -255,7 +255,7 @@ function markAll(p){markP(p.id);p.holes.forEach(h=>markF(p.id,h.id));}
 function markDel(p){const y=SY();y.del=y.del||{};y.del[p.id]=polyDoc(p);y.dp[p.id]=Date.now();Object.keys(y.df).forEach(k=>{if(k.startsWith(p.id+'\u0001'))delete y.df[k];});syncLogo();}
 const GEO=['id','x','y','line','n','profProj','obsCroqui','cargaProj','tempo','tempos'];
 const DYN=['status','profMed','agua','aguaM','decks','booster','brinel','detTipo','detQtd','tampao','caminhao','obs','cond','lotes','hist','ts','por'];
-const PK=['lotes','cams','acess','check','situ','geo','pos','detAt','bg'];
+const PK=['lotes','cams','acess','check','situ','geo','pos','detAt','bg','wpp'];
 function polyDoc(p){const ex={};PK.forEach(k=>{if(p[k]!=null)ex[k]=p[k];});if(ex.bg){ex.bg={...ex.bg};delete ex.bg.on;} /* mostrar/ocultar croqui é de cada celular */return{...ex,dvtProg:p.dvtProg??null,proj:p.proj||null,mina:p.mina,cava:p.cava,pol:p.pol,banco:p.banco,data:p.data,resp:p.resp,nfs:p.nfs||{},esp:p.esp||null,criado:p.criado||null,holes:p.holes.map(h=>{const o={};GEO.forEach(k=>{if(h[k]!=null)o[k]=h[k];});return o;})};}
 function furoDoc(h){const o={};DYN.forEach(k=>o[k]=h[k]??null);return o;}
 // cada parte do polígono vira um "caminho"; o celular manda só os caminhos que mudou desde a última sincronização
@@ -466,7 +466,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-19.3';
+const APP_VER='2026-11-19.4';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -713,12 +713,12 @@ function renderPoly(){
 }
 const p0=()=>cur();
 function polyMenu(){
-  openSheet(`<h3>Polígono<button class="btn sm" id="mClose">Fechar</button></h3><div class="btns" style="flex-direction:column"><button class="btn" id="mPlE">Gerar planilha de carregamento (modelo Enaex)</button><button class="btn" id="mPlW">📗 Acompanhar planilha (preenche o app sozinho)</button><button class="btn" id="mPlI">Importar planilha preenchida</button><button class="btn" id="mTz">Importar tempos de detonação</button><button class="btn" id="mMed">Atualizar com a medição (Medição Enaex)</button><button class="btn pri" id="mProj">Projeto de carregamento (carga, tampão, tolerância)</button><button class="btn" id="mPrint">Relatório completo (imprimir / PDF)</button><button class="btn" id="mCpdf">Croqui em PDF (A4 / A3)</button><button class="btn" id="mLote">Lotes em uso (produto, booster, detonador)</button><button class="btn" id="mEdit">Editar dados (mina, POL, data…)</button><button class="btn" id="mAdd">Adicionar furo extra</button><button class="btn" id="mBg">${p0().bg?'Trocar / reposicionar croqui de fundo':'Colocar croqui de fundo (PDF ou foto)'}</button>${p0().bg?'<button class="btn" id="mBgDel">Remover croqui de fundo</button>':''}<button class="btn" id="mCsv">Exportar furos (CSV / Excel)</button><button class="btn bad" id="mDel">Excluir polígono</button></div>`);
+  openSheet(`<h3>Polígono<button class="btn sm" id="mClose">Fechar</button></h3><div class="btns" style="flex-direction:column"><button class="btn pri" id="mWpp">📲 Resumo para o WhatsApp</button><button class="btn" id="mPlE">Gerar planilha de carregamento (modelo Enaex)</button><button class="btn" id="mPlW">📗 Acompanhar planilha (preenche o app sozinho)</button><button class="btn" id="mPlI">Importar planilha preenchida</button><button class="btn" id="mTz">Importar tempos de detonação</button><button class="btn" id="mMed">Atualizar com a medição (Medição Enaex)</button><button class="btn pri" id="mProj">Projeto de carregamento (carga, tampão, tolerância)</button><button class="btn" id="mPrint">Relatório completo (imprimir / PDF)</button><button class="btn" id="mCpdf">Croqui em PDF (A4 / A3)</button><button class="btn" id="mLote">Lotes em uso (produto, booster, detonador)</button><button class="btn" id="mEdit">Editar dados (mina, POL, data…)</button><button class="btn" id="mAdd">Adicionar furo extra</button><button class="btn" id="mBg">${p0().bg?'Trocar / reposicionar croqui de fundo':'Colocar croqui de fundo (PDF ou foto)'}</button>${p0().bg?'<button class="btn" id="mBgDel">Remover croqui de fundo</button>':''}<button class="btn" id="mCsv">Exportar furos (CSV / Excel)</button><button class="btn bad" id="mDel">Excluir polígono</button></div>`);
   const p=cur();
   $('#mClose').onclick=closeSheet;
   $('#mEdit').onclick=()=>{closeSheet();go('editpoly');};
   $('#mProj').onclick=()=>editProjeto(p);
-  $('#mPrint').onclick=()=>{closeSheet();imprimir(p);};$('#mCpdf').onclick=()=>{closeSheet();croquiPdfMenu(p);};
+  $('#mPrint').onclick=()=>{closeSheet();imprimir(p);};$('#mWpp').onclick=()=>{closeSheet();resumoWpp(p);};$('#mCpdf').onclick=()=>{closeSheet();croquiPdfMenu(p);};
   $('#mLote').onclick=()=>editLotes(p);
   $('#mTz').onclick=()=>tzMenu(p);
   $('#mMed').onclick=()=>atualizarMedicao(p);
@@ -1242,6 +1242,58 @@ async function imprimir(p){
     setTimeout(()=>{try{window.print();}catch(e){toast('Este navegador não deixou imprimir');}},300);
   }catch(e){busy();console.error(e);toast('Não consegui montar o relatório');}
 }
+
+/* ===== Resumo do carregamento para o WhatsApp (modelo do Rodrigo) ===== */
+const diaDe=ts=>{if(!ts)return '';const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+const maisDia=(s,n)=>{const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return diaDe(d.getTime());};
+const camWpp=c=>String(c||'').replace(/^\s*(UMB|UMT|UBT|CAM\.?|CAMINH[AÃ]O)\s*/i,'').trim()||'sem caminhão';
+const detNome=t=>{const m=String(t||'').match(/(\d+)\s*m\b/i);return 'Detonadores '+(/DT5|ELETR/i.test(t)?'Eletrônicos':String(t).replace(/\s*\d+\s*m\b/i,'').trim())+(m?' '+m[1]+' mts':'');};
+function wppDados(p,o){
+  const carr=p.holes.filter(h=>h.status==='carregado'&&(o.escopo==='tudo'||diaDe(h.ts)===o.data));
+  const nd=h=>(h.decks||[]).filter(d=>num(d.kg)>0).length;
+  const decks={};carr.forEach(h=>{const n=Math.max(1,nd(h));decks[n]=(decks[n]||0)+1;});
+  const det={};let booster=0,bags=0;const frota={};
+  carr.forEach(h=>{booster+=num(h.booster)||0;if(h.detTipo&&num(h.detQtd))det[h.detTipo]=(det[h.detTipo]||0)+num(h.detQtd);bags+=Math.max(0,nd(h)-1);
+    (h.decks||[]).forEach(d=>{const kg=num(d.kg);if(!kg)return;const c=camWpp(deckCam(h,d));frota[c]=frota[c]||{};const pr=d.prod||'';frota[c][pr]=(frota[c][pr]||0)+kg;});});
+  return {carr,decks,det,booster,bags,frota};}
+function wppTexto(p,o,D){
+  const hr=new Date().getHours();const L=[];
+  L.push((hr<12?'Bom dia':hr<18?'Boa tarde':'Boa noite')+' a todos!','','*Informações do carregamento*','');
+  L.push('Data: '+brDate(o.data),'Mina: '+(p.mina||''),'Cava: '+(p.cava||''),'Polígono: '+(p.pol||''),'Banco: '+(p.banco||''),'Status: '+o.status,'Coordenadas: '+(o.coord||''),'Perfuratriz: '+(o.perf||''),'');
+  const mx=Math.max(2,...Object.keys(D.decks).map(Number));
+  for(let n=1;n<=mx;n++)L.push(`• *Furos de ${n} Deck${n>1?'s':''} ${D.decks[n]||0}*`);
+  L.push(`• *Total de furos carregados ${o.escopo==='tudo'?'no polígono':'hoje'} ${D.carr.length}*`,'','*Consumo:*','');
+  if(D.booster)L.push(`• ${fmt(D.booster)} ${o.boosterNome||'Booster'}`);
+  Object.entries(D.det).forEach(([t,q])=>L.push(`• ${fmt(q)} ${(o.detNomes&&o.detNomes[t])||detNome(t)}`));
+  const bg=num(o.bags);if(bg)L.push(`• ${fmt(bg)} Blastbags`);
+  L.push('','*Frota utilizada:*','');
+  Object.entries(D.frota).forEach(([c,ps])=>Object.entries(ps).forEach(([pr,kg])=>L.push(`• ${c} - ${fmt(kg)}kg ${pr}`.trim())));
+  L.push('','Mina: '+(p.mina||''),'Operação: '+D.carr.length+' Furos','Impacto: '+(o.impacto||'Não'),'','*D+1:*','Data: '+brDate(o.d1data),'Mina: '+(o.d1mina||p.mina||''),'Operação: '+(o.d1op||''));
+  return L.join('\n');}
+function resumoWpp(p){
+  const sv=p.wpp||{};const g=S.wppG||{};
+  const o={data:today(),escopo:'dia',status:situDe(p)==='aberto'?'Carregando':situDe(p)==='carregado'?'Carregado':'Detonado',coord:sv.coord||'',perf:sv.perf||'',impacto:sv.impacto||'Não',
+    boosterNome:g.boosterNome||'Booster de 450gr',detNomes:Object.assign({},g.detNomes||{}),bags:null,bagsAuto:true,d1data:maisDia(today(),1),d1mina:p.mina||'',d1op:sv.d1op||''};
+  const inp=(id,l,v,ph)=>`<div><label>${l}</label><input id="${id}" value="${esc(v??'')}" placeholder="${esc(ph||'')}"></div>`;
+  const draw=()=>{const D=wppDados(p,o);if(o.bagsAuto)o.bags=D.bags;const dets=Object.keys(D.det);
+    openSheet(`<h3>Resumo para o WhatsApp<button class="btn sm" id="wpX">Fechar</button></h3>
+    <div class="row"><div><label>Data</label><input id="wpD" type="date" value="${o.data}"></div><div><label>Contar furos</label><select id="wpE"><option value="dia" ${o.escopo==='dia'?'selected':''}>Carregados nesse dia</option><option value="tudo" ${o.escopo==='tudo'?'selected':''}>Polígono inteiro</option></select></div></div>
+    <div class="row"><div><label>Status</label><select id="wpS">${opts(['Carregando','Carregado','Liberado','Detonado'],o.status)}</select></div>${inp('wpP','Perfuratriz',o.perf,'ex.: 1132-1131')}</div>
+    <div class="row">${inp('wpC','Coordenadas',o.coord)}${inp('wpI','Impacto',o.impacto)}</div>
+    <div class="row">${inp('wpB','Nome do booster',o.boosterNome)}${inp('wpG','Blastbags (un)',o.bags)}</div>
+    ${dets.map((t,i)=>`<div class="row">${inp('wpT'+i,'Nome do '+esc(t),o.detNomes[t]||detNome(t))}</div>`).join('')}
+    <div class="row"><div><label>D+1 data</label><input id="wp1d" type="date" value="${o.d1data}"></div>${inp('wp1m','D+1 mina',o.d1mina)}</div>
+    <div class="row">${inp('wp1o','D+1 operação',o.d1op,'ex.: 125 Furos')}</div>
+    <label>Texto (pode ajustar antes de mandar)</label><textarea id="wpTx" style="min-height:260px;font-family:inherit">${esc(wppTexto(p,o,D))}</textarea>
+    <div class="btns"><button class="btn pri" id="wpW">Mandar no WhatsApp</button><button class="btn" id="wpCp">Copiar</button></div>`);
+    const ler=()=>{o.data=$('#wpD').value||today();o.escopo=$('#wpE').value;o.status=$('#wpS').value;o.perf=$('#wpP').value.trim();o.coord=$('#wpC').value.trim();o.impacto=$('#wpI').value.trim();o.boosterNome=$('#wpB').value.trim();
+      const b=$('#wpG').value.trim();if(String(o.bags??'')!==b){o.bags=num(b);o.bagsAuto=false;}dets.forEach((t,i)=>o.detNomes[t]=$('#wpT'+i).value.trim());o.d1data=$('#wp1d').value;o.d1mina=$('#wp1m').value.trim();o.d1op=$('#wp1o').value.trim();};
+    const guarda=()=>{p.wpp={coord:o.coord,perf:o.perf,impacto:o.impacto,d1op:o.d1op};S.wppG={boosterNome:o.boosterNome,detNomes:o.detNomes};markP(p.id);save();};
+    document.querySelectorAll('#sheet input,#sheet select').forEach(e=>e.onchange=()=>{ler();guarda();if(e.id==='wpD'||e.id==='wpE'){o.bagsAuto=true;draw();return;}$('#wpTx').value=wppTexto(p,o,wppDados(p,o));});
+    $('#wpX').onclick=closeSheet;
+    $('#wpCp').onclick=async()=>{const t=$('#wpTx').value;try{await navigator.clipboard.writeText(t);toast('Texto copiado — cole no grupo');}catch(e){$('#wpTx').select();document.execCommand('copy');toast('Texto copiado');}};
+    $('#wpW').onclick=()=>{guarda();window.open('https://wa.me/?text='+encodeURIComponent($('#wpTx').value),'_blank');};};
+  draw();}
 
 /* ===== Caminhões (NF x lançado) e acessórios ===== */
 function camDif(p,c,kl){const d=(p.cams||{})[c]||{};const kn=num(d.kgNF);if(kn==null)return null;const sai=kn-(num(d.kgRet)||0);if(sai<=0)return null;const dif=kl-sai,pc=dif/sai*100,tol=projDe(p).tolCam;
