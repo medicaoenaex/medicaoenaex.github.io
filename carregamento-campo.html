@@ -89,6 +89,41 @@ tr.click{cursor:pointer}
   #print .pb{page-break-before:always}#print img{max-width:100%}
   #print .sig{display:flex;gap:30px;margin-top:40px}#print .sig div{flex:1;border-top:1px solid #000;padding-top:4px;text-align:center}
 }
+
+/* ===== visual moderno ===== */
+:root{--bg:#eef2f6;--line:#dfe5eb;--pri:#0a63c9;--pri2:#e8f1fc;--r:16px;--sh:0 1px 2px rgba(16,42,67,.06),0 4px 14px rgba(16,42,67,.07)}
+html,body{-webkit-font-smoothing:antialiased;letter-spacing:-.005em}
+header{background:linear-gradient(120deg,#0b1f33 0%,#0f3460 55%,#0a63c9 120%);box-shadow:0 2px 12px rgba(8,25,45,.25);min-height:60px;padding:10px 14px}
+header h1{font-size:18px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+header h1 .logo{flex:0 0 auto;width:34px;height:34px;border-radius:10px;background:linear-gradient(140deg,#ffb020,#ff6a00);display:grid;place-items:center;box-shadow:0 2px 8px rgba(255,120,0,.35)}
+header h1 .logo svg{width:20px;height:20px}
+header h1 .tt{display:flex;flex-direction:column;line-height:1.15;min-width:0}
+header h1 .tt small{font-size:12px;font-weight:500;opacity:.78;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header button{border-radius:12px;background:rgba(255,255,255,.12);backdrop-filter:blur(6px)}
+.card{border:0;box-shadow:var(--sh);border-radius:var(--r);padding:16px}
+.card h2{font-size:16px;font-weight:700;letter-spacing:-.01em}
+.btn{border-radius:12px;border-color:var(--line);box-shadow:0 1px 2px rgba(16,42,67,.06);font-weight:600;transition:transform .08s,box-shadow .15s}
+.btn:active{transform:scale(.98)}
+.btn.pri{background:linear-gradient(135deg,#0a63c9,#0b4fa3);border-color:transparent;box-shadow:0 4px 12px rgba(10,99,201,.28)}
+.btn.ok{background:linear-gradient(135deg,#22b061,#178a4a);border-color:transparent;box-shadow:0 4px 12px rgba(31,157,85,.28)}
+input,select,textarea{border-radius:12px;border-color:var(--line);background:#fbfcfe;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:0;border-color:#0a63c9;box-shadow:0 0 0 3px rgba(10,99,201,.15);background:#fff}
+.seg{border-radius:12px;border-color:var(--line);background:#f4f7fa;padding:3px;gap:3px}
+.seg button{border:0!important;border-radius:9px;font-weight:600}
+.seg button.on{background:#fff;color:#0a63c9;box-shadow:0 1px 4px rgba(16,42,67,.15)}
+.tabs button{border:0;background:#fff;box-shadow:0 1px 3px rgba(16,42,67,.08);font-weight:600}
+.tabs button.on{background:linear-gradient(135deg,#0f3460,#0a63c9);color:#fff}
+.kpi{background:linear-gradient(160deg,#f1f7ff,#e3eefb);border-radius:14px;padding:12px}
+.kpi b{font-size:22px;letter-spacing:-.02em}
+.mapwrap{border:0;box-shadow:var(--sh)}
+.panel{border-radius:22px 22px 0 0;box-shadow:0 -8px 30px rgba(8,25,45,.18)}
+.panel h3{font-weight:700;letter-spacing:-.01em}
+.sheet{backdrop-filter:blur(2px)}
+.hint{border-radius:12px}
+#toast{box-shadow:0 6px 20px rgba(8,25,45,.3)}
+.selbar{background:linear-gradient(135deg,#0b1f33,#0f3460);box-shadow:0 6px 20px rgba(8,25,45,.3)}
+.bar{background:#e3e9ef}.bar i{background:linear-gradient(90deg,#22b061,#2fd27a)}
+.card.poly:active{transform:scale(.99)}
 @keyframes pfl{0%{opacity:1}50%{opacity:.15}100%{opacity:1}}.pfl{animation:pfl .9s ease-in-out 5;animation-fill-mode:forwards}
 </style>
 </head>
@@ -375,8 +410,9 @@ function render(){
 }
 
 /* ===== Tela inicial ===== */
+const SLOGAN='Do furo ao fogo, tudo no controle';
 function renderHome(){
-  $('#ttl').textContent='Carregamento de Campo';
+  $('#ttl').innerHTML=`<span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2" fill="#fff" stroke="none"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></span><span class="tt">Carregamento de Campo<small>${esc(SLOGAN)}</small></span>`;
   const q=homeQ.trim().toLowerCase();
   const ps=[...S.polys].filter(p=>(!homeSitu||situDe(p)===homeSitu)&&(!q||[p.pol,p.mina,p.cava,p.banco,p.resp,brDate(p.data)].join(' ').toLowerCase().includes(q))).sort((a,b)=>(b.data||'').localeCompare(a.data||'')||(b.criado||0)-(a.criado||0));
   let h=`<div class="btns" style="margin:0 0 12px"><button class="btn pri" id="novo">+ Novo polígono</button><button class="btn" id="goCam">🚛 Modo caminhão</button><button class="btn" id="goInd">📊 Indicadores</button></div>`;
@@ -467,7 +503,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-19.8';
+const APP_VER='2026-11-19.9';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
