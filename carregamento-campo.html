@@ -424,12 +424,13 @@ function renderNovo(p){
       <div class="row"><div><label>Profundidade de projeto (m)</label><input id="gP" inputmode="decimal" value="15"></div><div><label>Arranjo</label><select id="gS"><option value="0">Retangular</option><option value="1" selected>Estagiado (pé de galinha)</option></select></div></div>
       <label>Numeração</label><select id="gN"><option value="lf">Linha-Furo (L1-F1, L1-F2…)</option><option value="seq">Sequencial (1, 2, 3…)</option></select>
       <p class="mut">Afastamento e espaçamento servem só para desenhar o mapa.</p>`
-      :novoModo==='medicao'?`<p class="mut" style="margin:10px 0 6px">No app Medição Enaex, exporte o <b>Backup (.json)</b> do polígono (traz a posição dos furos igual ao croqui) ou o <b>CSV</b>. Depois escolha o arquivo aqui.</p><button class="btn pri" id="mLoc" style="width:100%">Buscar no Medição Enaex deste celular</button><button class="btn" id="mFile" style="width:100%;margin-top:8px">Escolher arquivo do Medição Enaex</button><button class="btn" id="mPdf" style="width:100%;margin-top:8px">Ler PDF da temporização (desenho com os tempos)</button><div id="mInfo" class="hint" style="display:none"></div>`
+      :novoModo==='medicao'?`<p class="mut" style="margin:10px 0 6px">No app Medição Enaex, exporte o <b>Backup (.json)</b> do polígono (traz a posição dos furos igual ao croqui) ou o <b>CSV</b>. Depois escolha o arquivo aqui.</p><button class="btn pri" id="mLoc" style="width:100%">Buscar no Medição Enaex deste celular</button><button class="btn" id="mFile" style="width:100%;margin-top:8px">Escolher arquivo do Medição Enaex</button><button class="btn" id="mPdf" style="width:100%;margin-top:8px">Ler PDF da temporização (desenho com os tempos)</button><button class="btn" id="mDrone" style="width:100%;margin-top:8px">📷 Achar os furos na foto do drone</button><div id="mInfo" class="hint" style="display:none"></div>`
       :`<label>Uma linha por furo: <b>ID;PROF</b> ou <b>ID;X;Y;PROF</b></label><textarea id="gList" placeholder="L1-F1;15&#10;L1-F2;15&#10;ou&#10;1;612345,2;7765432,8;15"></textarea><button class="btn" id="lFile" style="width:100%;margin-top:8px">Ler arquivo de coordenadas (Excel, CSV, TXT ou PDF)</button><div class="hint">Funciona com coordenadas do topógrafo (X = leste, Y = norte) ou só a lista de furos. Separador pode ser ponto e vírgula ou tab (direto do Excel).</div>`;};
     const bindMed=()=>{const lf=$('#lFile');if(lf)lf.onclick=async()=>{const file=await pickFile('.xlsx,.xls,.csv,.txt,.pdf');if(!file)return;try{const hs=rowsToHoles(await fileToRows(file));$('#gList').value=hs.map(h=>[h.id,fmtC(h.x),fmtC(h.y),h.p!=null?fmtC(h.p):''].join(';').replace(/;$/,'')).join('\n');toast(hs.length+' furos lidos — confira a lista');}catch(e){busy();if(e.carreg){const hn=lf.nextElementSibling;if(hn)hn.innerHTML=avisoPlanCarreg(file.name,e.carreg);toast(e.message,5000);}else toast(e.message);}};
     const mostra=(r,nome)=>{medImport=r;const i=$('#mInfo');i.style.display='';i.innerHTML=`✅ <b>${esc(nome)}</b><br>${r.holes.length} furos · ${r.resumo}`;if(r.nome&&!$('#fPol').value){const m=r.nome.match(/POL[\s_\-]*(\d+)/i)||r.nome.match(/(\d+)(?:[_\-\/]\d+)?[A-Za-z]?\s*$/)||r.nome.match(/(\d+[A-Za-z]?)/);if(m)$('#fPol').value=m[1];}};
     if($('#mLoc'))$('#mLoc').onclick=()=>escolherMedicao(r=>mostra(r,r.nome||'Medição Enaex'));
     if($('#mPdf'))$('#mPdf').onclick=async()=>{const r=await pdfTemposFluxo(null);if(r)mostra(r,r.nome);};
+    if($('#mDrone'))$('#mDrone').onclick=async()=>{const r=await fotoDroneFluxo();if(r)mostra(r,r.nome);};
     const b=$('#mFile');if(!b)return;b.onclick=()=>{const fi=$('#fileIn');fi.accept='.json,.csv,.txt';fi.value='';fi.onchange=()=>{const file=fi.files[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{medImport=lerMedicao(String(r.result),file.name);const i=$('#mInfo');i.style.display='';i.innerHTML=`✅ <b>${esc(file.name)}</b><br>${medImport.holes.length} furos · ${medImport.resumo}`;if(medImport.nome&&!$('#fPol').value){const m=medImport.nome.match(/(\d+[A-Za-z]?)\s*$/);if(m)$('#fPol').value=m[1];}}catch(e){medImport=null;toast(e.message);}};r.readAsText(file);};fi.click();};};
     const draw0=draw;draw=()=>{draw0();bindMed();};
     draw();document.querySelectorAll('#modo button').forEach(b=>b.onclick=()=>{novoModo=b.dataset.m;document.querySelectorAll('#modo button').forEach(x=>x.classList.toggle('on',x===b));draw();});}
@@ -466,7 +467,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-19.7';
+const APP_VER='2026-11-19.8';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -759,6 +760,91 @@ function ajusteAf(S,D){const n=S.length;if(n<6)return null;let M=[[0,0,0],[0,0,0
   S.forEach(([x,y],i)=>{const v=[x,y,1];for(let a=0;a<3;a++){for(let b=0;b<3;b++)M[a][b]+=v[a]*v[b];vx[a]+=v[a]*D[i][0];vy[a]+=v[a]*D[i][1];}});
   const sol=v=>{const A=M.map((r,i)=>[...r,v[i]]);for(let i=0;i<3;i++){let p=i;for(let k=i+1;k<3;k++)if(Math.abs(A[k][i])>Math.abs(A[p][i]))p=k;[A[i],A[p]]=[A[p],A[i]];if(Math.abs(A[i][i])<1e-9)return null;for(let k=0;k<3;k++)if(k!==i){const f=A[k][i]/A[i][i];for(let j=i;j<4;j++)A[k][j]-=f*A[i][j];}}return A.map((r,i)=>r[3]/r[i]);};
   const X=sol(vx),Y=sol(vy);return X&&Y?[X[0],Y[0],X[1],Y[1],X[2],Y[2]]:null;}
+/* ===== Achar os furos numa foto de drone: manchas cinza-azuladas redondas (com miolo escuro) em malha ===== */
+const noPoli=(x,y,P)=>{let d=false;for(let i=0,j=P.length-1;i<P.length;j=i++){const [xi,yi]=P[i],[xj,yj]=P[j];if(((yi>y)!==(yj>y))&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)d=!d;}return d;};
+const nnDist=P=>P.map((a,i)=>{let m=Infinity;P.forEach((b,j)=>{if(i!==j){const d=Math.hypot(a.x-b.x,a.y-b.y);if(d<m)m=d;}});return m;});
+function picosFuros(s,W,H,rad,T,dentro){const out=[];
+  for(let y=rad;y<H-rad;y++)for(let x=rad;x<W-rad;x++){const v=s[y*W+x];if(v<=T||(dentro&&!dentro(x,y)))continue;let mx=true;
+    for(let yy=y-rad;yy<=y+rad&&mx;yy++)for(let xx=x-rad;xx<=x+rad;xx++){if((xx-x)**2+(yy-y)**2>rad*rad)continue;const z=s[yy*W+xx];if(z>v||(z===v&&(yy<y||(yy===y&&xx<x)))){mx=false;break;}}
+    if(mx)out.push({x,y,v});}
+  return out;}
+function notaFuros(d,W,H,R){const n=W*H,q=new Float32Array(n),dk=new Float32Array(n);
+  for(let i=0;i<n;i++){const r=d[i*4],g=d[i*4+1],b=d[i*4+2],l=(r+g+b)/3;dk[i]=255-l;q[i]=(b-r)+0.5*(255-l);}
+  const a=borrar(q,W,H,0.6*R),b=borrar(q,W,H,1.8*R),c=borrar(dk,W,H,0.25*R),e=borrar(dk,W,H,0.8*R),s=new Float32Array(n);
+  for(let i=0;i<n;i++)s[i]=(a[i]-b[i])+0.5*(c[i]-e[i]);return s;}
+// im: Image; area: [[x,y],...] em px da foto (opcional). Devolve furos em px da foto.
+function furosNaFoto(im,area){
+  const IW=im.naturalWidth,IH=im.naturalHeight;
+  let bx0=0,by0=0,bx1=IW,by1=IH;if(area&&area.length>=3){bx0=Math.max(0,Math.min(...area.map(p=>p[0]))-10);by0=Math.max(0,Math.min(...area.map(p=>p[1]))-10);bx1=Math.min(IW,Math.max(...area.map(p=>p[0]))+10);by1=Math.min(IH,Math.max(...area.map(p=>p[1]))+10);}
+  const aw=bx1-bx0,ah=by1-by0;const R0=6.5;let best=null;
+  for(const Rf of [2.5,3.5,5,6.5,9,12,16,22,30]){ // raio do furo suposto, em px da foto
+    const k=R0/Rf;if(aw*k>2600||ah*k>2600||aw*k<40||ah*k<40)continue;
+    const W=Math.round(aw*k),H=Math.round(ah*k);const c=document.createElement('canvas');c.width=W;c.height=H;const cx=c.getContext('2d');cx.drawImage(im,bx0,by0,aw,ah,0,0,W,H);
+    const s=notaFuros(cx.getImageData(0,0,W,H).data,W,H,R0);
+    const dentro=area&&area.length>=3?(x,y)=>noPoli(x/k+bx0,y/k+by0,area):null;
+    const vals=[];for(let y=0;y<H;y+=2)for(let x=0;x<W;x+=2)if(!dentro||dentro(x,y))vals.push(s[y*W+x]);vals.sort((a,b)=>a-b);if(vals.length<50)continue;
+    const T=0.35*vals[Math.floor(vals.length*0.99)];
+    let P=picosFuros(s,W,H,Math.round(1.3*R0),T,dentro);if(P.length<6)continue;
+    const nn=nnDist(P);const so=[...nn].sort((a,b)=>a-b),med=so[so.length>>1];
+    const reg=nn.filter(v=>v>0.75*med&&v<1.35*med).length/nn.length; // malha regular
+    const raz=med/R0; // espaçamento / raio do furo (furo de verdade: ~2,5 a 6)
+    const forca=P.reduce((a,q)=>a+q.v,0)/P.length/(T/0.35);
+    if(raz<3||raz>8)continue; // pico colado no outro = textura, não furo
+    const nota=reg*reg*forca*Math.sqrt(P.length);
+    if(!best||nota>best.nota)best={nota,k,P:P.map(q=>({x:q.x/k+bx0,y:q.y/k+by0,v:q.v})),d0:med/k};}
+  if(!best)return{furos:[],sp:0};
+  let P=best.P;const d0=best.d0;
+  for(let it=0;it<3;it++){const nn=nnDist(P);P=P.filter((q,i)=>nn[i]<1.8*d0&&P.filter(o=>o!==q&&Math.hypot(o.x-q.x,o.y-q.y)<2.2*d0).length>=2);}
+  return{furos:P.map(q=>({x:q.x,y:q.y})),sp:d0};}
+// numera pela posição: faixas ao longo do lado maior do polígono (da esquerda para a direita), dentro da faixa de cima para baixo
+function numerarFuros(P,sp){if(!P.length)return P;
+  const mx=P.reduce((a,q)=>a+q.x,0)/P.length,my=P.reduce((a,q)=>a+q.y,0)/P.length;
+  let sxx=0,syy=0,sxy=0;P.forEach(q=>{const dx=q.x-mx,dy=q.y-my;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;});
+  const ang=0.5*Math.atan2(2*sxy,sxx-syy);let ux=Math.cos(ang),uy=Math.sin(ang);if(ux<0){ux=-ux;uy=-uy;}
+  const w=0.7*(sp||20);const L=P.map(q=>({q,a:(q.x-mx)*ux+(q.y-my)*uy,b:-(q.x-mx)*uy+(q.y-my)*ux}));const a0=Math.min(...L.map(o=>o.a));
+  L.forEach(o=>o.f=Math.floor((o.a-a0)/w));L.sort((p,r)=>(p.f-r.f)||(p.b-r.b));L.forEach((o,i)=>o.q.n=i+1);return P;}
+// tela: marca a área na foto, o app acha os furos, a pessoa tira/põe e confirma. Devolve dados para o polígono novo.
+async function fotoDroneFluxo(){
+  const file=await pickFile('image/*');if(!file)return null;
+  let img;try{busy('Abrindo a foto…');img=await imageFileToImage(file,2400);busy();}catch(e){busy();toast('Não consegui abrir a foto');return null;}
+  const im=await new Promise((ok,er)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=er;i.src=img.url;});
+  const IW=im.naturalWidth,IH=im.naturalHeight;
+  return new Promise(fim=>{
+    let passo='area',area=[],F=[],sp=0,z=0;
+    openSheet(`<h3>Furos da foto do drone<button class="btn sm" id="fdX">Cancelar</button></h3>
+      <p id="fdTx" style="margin:0 0 6px"></p>
+      <div style="display:flex;gap:6px;margin-bottom:6px"><button class="btn sm" id="fdM">−</button><button class="btn sm" id="fdP">+</button><span class="mut" id="fdN" style="align-self:center;flex:1;text-align:right"></span></div>
+      <div id="fdBox" style="overflow:auto;max-height:62vh;border-radius:8px;background:#000;touch-action:pan-x pan-y"><canvas id="fdC" style="display:block"></canvas></div>
+      <div class="btns" id="fdB"></div>`);
+    const box=$('#fdBox'),c=$('#fdC'),g=c.getContext('2d');
+    z=Math.max(0.2,Math.min(3,(box.clientWidth||360)/IW));
+    const desenha=()=>{c.width=Math.round(IW*z);c.height=Math.round(IH*z);g.drawImage(im,0,0,c.width,c.height);
+      if(area.length){g.strokeStyle='#22d3ee';g.lineWidth=2;g.beginPath();area.forEach(([x,y],i)=>i?g.lineTo(x*z,y*z):g.moveTo(x*z,y*z));if(passo!=='area'||area.length>2)g.closePath();g.stroke();
+        if(passo==='area')area.forEach(([x,y])=>{g.fillStyle='#22d3ee';g.beginPath();g.arc(x*z,y*z,5,0,7);g.fill();});}
+      const r=Math.max(4,(sp||16)*0.28*z);g.font=`bold ${Math.max(10,Math.round(r*1.3))}px system-ui,sans-serif`;
+      F.forEach(q=>{g.lineWidth=2;g.strokeStyle='#fde047';g.beginPath();g.arc(q.x*z,q.y*z,r,0,7);g.stroke();g.fillStyle='#000';g.fillText(q.n,q.x*z+r+1,q.y*z-r+1);g.fillStyle='#fff';g.fillText(q.n,q.x*z+r,q.y*z-r);});
+      $('#fdN').textContent=passo==='area'?`${area.length} ponto(s)`:`${F.length} furos`;};
+    const botoes=()=>{
+      if(passo==='area'){$('#fdTx').innerHTML='1) Toque nos <b>cantos da área dos furos</b>, contornando o polígono. Depois toque em <b>Procurar furos</b>.';
+        $('#fdB').innerHTML=`<button class="btn" id="fdU">Desfazer ponto</button><button class="btn pri" id="fdGo">Procurar furos</button>`;
+        $('#fdU').onclick=()=>{area.pop();desenha();};
+        $('#fdGo').onclick=()=>{if(area.length<3){toast('Toque em pelo menos 3 cantos da área');return;}busy('Procurando os furos…');
+          setTimeout(()=>{try{const R=furosNaFoto(im,area);F=R.furos;sp=R.sp;numerarFuros(F,sp);}catch(e){console.error(e);F=[];}busy();
+            if(!F.length)toast('Não achei furos nessa área. Tente contornar de novo.',4000);passo='edit';botoes();desenha();},30);};}
+      else{$('#fdTx').innerHTML='2) Confira. <b>Toque num círculo</b> para tirar um furo errado, ou <b>toque onde falta</b> para pôr um furo. A numeração é refeita sozinha.';
+        $('#fdB').innerHTML=`<button class="btn" id="fdA">Refazer a área</button><button class="btn pri" id="fdOk">Usar estes furos</button>`;
+        $('#fdA').onclick=()=>{passo='area';area=[];F=[];botoes();desenha();};
+        $('#fdOk').onclick=()=>{if(!F.length){toast('Nenhum furo marcado');return;}closeSheet();
+          fim({holes:F.map(q=>novoFuro(String(q.n),q.x,q.y,null)),bg:{url:img.url,w:IW,h:IH},nome:file.name.replace(/\.[^.]+$/,''),resumo:`furos achados na foto do drone (${F.length}, conferidos)`});};}};
+    c.onclick=e=>{const rc=c.getBoundingClientRect(),x=(e.clientX-rc.left)/z,y=(e.clientY-rc.top)/z;
+      if(passo==='area'){area.push([x,y]);desenha();return;}
+      const lim=Math.max(6,(sp||16)*0.45);let bi=-1,bd=Infinity;F.forEach((q,i)=>{const d=Math.hypot(q.x-x,q.y-y);if(d<bd){bd=d;bi=i;}});
+      if(bi>=0&&bd<lim)F.splice(bi,1);else F.push({x,y});numerarFuros(F,sp);desenha();};
+    $('#fdM').onclick=()=>{z=Math.max(0.1,z/1.4);desenha();};$('#fdP').onclick=()=>{z=Math.min(6,z*1.4);desenha();};
+    $('#fdX').onclick=()=>{closeSheet();fim(null);};
+    botoes();desenha();});
+}
+
 async function afinarPelaFoto(p,img,m){ // m: foto -> mapa (dos 2 toques). Devolve m afinado e quais furos apareceram na foto
   const hs=p.holes.filter(h=>h.status!=='nao');if(hs.length<8)return null;
   const im=await new Promise((ok,err)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=err;i.src=img.url;});
