@@ -210,6 +210,21 @@ a{color:#ffb27a}
 .ring span{width:46px;height:46px;border-radius:50%;background:#0d141f;display:grid;place-items:center;font:700 13px "Orbitron",ui-monospace,monospace;color:#fff}
 .card.poly .bar{display:none}
 .card.poly b{font-size:17px}
+
+/* ===== arte de desmonte ===== */
+.hero::after{display:none}
+.hero .art{position:absolute;right:-30px;top:-10px;width:62%;height:auto;opacity:.55;pointer-events:none}
+.hero>*:not(.art){position:relative}
+header h1 .logo svg{width:24px;height:24px}
+.card.poly{background-image:radial-gradient(circle,rgba(255,140,60,.22) 1.6px,transparent 2.4px),linear-gradient(160deg,rgba(255,255,255,.065),rgba(255,255,255,.025));background-size:18px 16px,auto;background-position:right -6px top 4px,0 0;background-repeat:repeat-y,no-repeat}
+.card h2{display:flex;align-items:center;gap:10px}
+.card h2::before{content:"";flex:0 0 auto;width:10px;height:10px;border-radius:50%;background:#ff8a1f;box-shadow:0 0 0 3px rgba(255,138,31,.18),0 0 10px #ff8a1f}
+.mapwrap{background-image:radial-gradient(circle,rgba(255,255,255,.07) 1.5px,transparent 2.2px);background-size:22px 19px;background-color:#0b1320}
+.banc{position:relative;margin:0 0 12px;border-radius:18px;overflow:hidden;border:1px solid rgba(255,140,60,.28);background:linear-gradient(180deg,#0d141f,#0a0f18)}
+.banc svg{display:block;width:100%;height:auto}
+.banc .bt{position:absolute;left:14px;top:10px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#ffc9a6;font-weight:700}
+.banc .bn{position:absolute;right:14px;top:6px;font:800 22px "Orbitron",ui-monospace,monospace;color:#fff;text-shadow:0 0 12px rgba(255,150,60,.65)}
+.banc .bs{position:absolute;right:14px;top:34px;font-size:11px;color:var(--mut)}
 @keyframes pfl{0%{opacity:1}50%{opacity:.15}100%{opacity:1}}.pfl{animation:pfl .9s ease-in-out 5;animation-fill-mode:forwards}
 </style>
 </head>
@@ -498,11 +513,11 @@ function render(){
 /* ===== Tela inicial ===== */
 const SLOGAN='Do furo ao fogo, tudo no controle';
 function renderHome(){
-  $('#ttl').innerHTML=`<span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2" fill="#fff" stroke="none"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg></span><span class="tt">Carregamento de Campo<small>${esc(SLOGAN)}</small></span>`;
+  $('#ttl').innerHTML=`<span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5l1.6 4 3.9-2-1.4 4.2 4.4.6-3.6 2.5 3.1 3.1-4.3-.2.2 4.3-3-3.1-.9 4.1-.9-4.1-3 3.1.2-4.3-4.3.2 3.1-3.1-3.6-2.5 4.4-.6L6.5 4.5l3.9 2z" fill="#fff" fill-opacity=".95" stroke="none"/><circle cx="12" cy="12" r="2.6" fill="#ff6a13" stroke="none"/></svg></span><span class="tt">Carregamento de Campo<small>${esc(SLOGAN)}</small></span>`;
   const q=homeQ.trim().toLowerCase();
   const ps=[...S.polys].filter(p=>(!homeSitu||situDe(p)===homeSitu)&&(!q||[p.pol,p.mina,p.cava,p.banco,p.resp,brDate(p.data)].join(' ').toLowerCase().includes(q))).sort((a,b)=>(b.data||'').localeCompare(a.data||'')||(b.criado||0)-(a.criado||0));
   const hj=today(),abertos=S.polys.filter(p=>situDe(p)==='aberto').length;let fh=0,kh=0,fok=0;S.polys.forEach(p=>p.holes.forEach(x=>{if(x.status==='carregado'&&diaDe(x.ts)===hj){fh++;kh+=holeKg(x);if(!alertasFuro(p,x).length)fok++;}}));
-  let h=`<div class="hero"><div class="k"><i></i>Painel do dia · ao vivo</div><h2>${esc(SLOGAN)}</h2><p>${new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})}</p>
+  let h=`<div class="hero">${artMalha()}<div class="k"><i></i>Painel do dia · ao vivo</div><h2>${esc(SLOGAN)}</h2><p>${new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})}</p>
     <div class="st"><div><b>${abertos}</b><span>polígonos em carregamento</span></div><div><b>${fmt(fh)}</b><span>furos carregados hoje</span></div><div><b>${kh>=1000?fmt(kh/1000,1)+' t':fmt(kh)+' kg'}</b><span>explosivo aplicado hoje</span></div><div><b>${fh?Math.round(fok/fh*100)+'%':'–'}</b><span>furos dentro do projeto</span></div></div></div>
   <div class="btns" style="margin:0 0 12px"><button class="btn pri" id="novo">+ Novo polígono</button><button class="btn" id="goCam">🚛 Modo caminhão</button><button class="btn" id="goInd">📊 Indicadores</button></div>`;
   if(S.polys.length>1)h+=`<div class="row" style="margin-bottom:10px;gap:6px"><input id="hq" placeholder="Buscar POL, mina, banco…" value="${esc(homeQ)}"><select id="hs">${[['','Todas as situações'],...Object.entries(SITU).map(([k,v])=>[k,v.n])].map(([k,t])=>`<option value="${k}" ${homeSitu===k?'selected':''}>${t}</option>`).join('')}</select></div>`;
@@ -592,7 +607,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-19.11';
+const APP_VER='2026-11-19.12';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -827,12 +842,40 @@ function lerMedicao(txt,nome){
 }
 
 /* ===== Polígono ===== */
+
+// ===== arte de desmonte (SVG) =====
+function artMalha(){
+  const W=420,H=330,sp=48,ix=330,iy=300,P=[];
+  for(let r=0;r<8;r++)for(let c=0;c<9;c++)P.push([20+c*sp+(r%2?sp/2:0),18+r*sp*.86]);
+  const dm=Math.max(...P.map(([x,y])=>Math.hypot(x-ix,y-iy)));let L='',C='';
+  P.forEach(([x,y])=>{const d=Math.hypot(x-ix,y-iy);let b=null;
+    P.forEach(([x2,y2])=>{const d2=Math.hypot(x2-ix,y2-iy);if(d2<d-1&&Math.hypot(x2-x,y2-y)<sp*1.15&&(!b||d2<b[2]))b=[x2,y2,d2];});
+    const q=d/dm,on=q<.6;
+    if(b)L+=`<line x1="${b[0]|0}" y1="${b[1]|0}" x2="${x|0}" y2="${y|0}" stroke="${on?'#ff8a1f':'#5a6577'}" stroke-width="${on?2:1.3}" stroke-opacity="${on?(.95-q).toFixed(2):.45}"/>`;
+    C+=on?`<circle cx="${x|0}" cy="${y|0}" r="${(13-q*10).toFixed(1)}" fill="url(#hb)" opacity="${(1-q).toFixed(2)}"/><circle cx="${x|0}" cy="${y|0}" r="4" fill="#ff8a1f" stroke="#ffe2a8" stroke-width="1"/>`
+         :`<circle cx="${x|0}" cy="${y|0}" r="4" fill="#0b0f17" stroke="#6b7689" stroke-width="1.4"/>`;});
+  const R=[.25,.42,.6].map((k,i)=>`<circle cx="${ix}" cy="${iy}" r="${(dm*k)|0}" fill="none" stroke="${i?'#ff8a1f':'#ffb11f'}" stroke-width="${2-i*.5}" stroke-opacity="${.6-i*.17}"${i?' stroke-dasharray="6 8"':''}/>`).join('');
+  return `<svg class="art" viewBox="0 0 ${W} ${H}" aria-hidden="true"><defs><radialGradient id="hb"><stop offset="0" stop-color="#ffe2a8"/><stop offset=".3" stop-color="#ffb11f"/><stop offset=".65" stop-color="#ff6a13" stop-opacity=".35"/><stop offset="1" stop-color="#e8341c" stop-opacity="0"/></radialGradient></defs>${L}${R}${C}<circle cx="${ix}" cy="${iy}" r="34" fill="url(#hb)"/><circle cx="${ix}" cy="${iy}" r="6" fill="#fff1d6"/></svg>`;
+}
+function artBancada(p){
+  const hs=p.holes,t=hs.length,c=hs.filter(x=>x.status==='carregado').length,pct=t?Math.round(c/t*100):0;
+  const n=12,W=720,H=200,top=100,fun=180,x0=40,dx=38,fogo=situDe(p)==='detonado';
+  let g=`<path d="M0 ${top} L600 ${top} L650 ${H} L0 ${H} Z" fill="url(#rk)"/><path d="M0 ${top} L600 ${top} L650 ${H}" fill="none" stroke="#ff8a1f" stroke-width="2" stroke-opacity=".8"/>`;
+  for(let i=0;i<3;i++)g+=`<path d="M0 ${top+18+i*22} Q200 ${top+10+i*22} 380 ${top+22+i*22} T${615+i*12} ${top+18+i*22}" fill="none" stroke="#2c3546" stroke-width="1.4"${i%2?' stroke-dasharray="10 6"':''}/>`;
+  const cheios=Math.round(n*c/(t||1));
+  for(let i=0;i<n;i++){const x=x0+i*dx,ok=i<cheios;
+    g+=`<rect x="${x-6}" y="${top}" width="12" height="${fun-top}" rx="3" fill="#070b12" stroke="#4a5568" stroke-width="1"/>`;
+    if(ok)g+=`<rect x="${x-4}" y="${top+2}" width="8" height="16" rx="2" fill="#5b6472"/><rect x="${x-4}" y="${top+20}" width="8" height="${fun-top-22}" rx="2" fill="url(#cl)"/><circle cx="${x}" cy="${fun-8}" r="3.4" fill="#ffb11f"/><path d="M${x} ${top+2} C${x} ${top-8} ${x+12} ${top-10} ${x+dx} ${top-12}" fill="none" stroke="#ffb11f" stroke-width="1.2" stroke-opacity=".8"/>`;}
+  if(fogo)g+=`<circle cx="640" cy="${top+40}" r="70" fill="url(#hb2)"/>`;
+  g+=`<rect x="0" y="${H-6}" width="${W*pct/100}" height="6" fill="url(#pg)"/>`;
+  return `<div class="banc"><svg viewBox="0 0 ${W} ${H}" aria-hidden="true"><defs><linearGradient id="rk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#252b37"/><stop offset="1" stop-color="#121722"/></linearGradient><linearGradient id="cl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb11f"/><stop offset="1" stop-color="#e8341c"/></linearGradient><linearGradient id="pg"><stop offset="0" stop-color="#ffb11f"/><stop offset="1" stop-color="#e8341c"/></linearGradient><radialGradient id="hb2"><stop offset="0" stop-color="#fff1d6"/><stop offset=".3" stop-color="#ffb11f"/><stop offset="1" stop-color="#e8341c" stop-opacity="0"/></radialGradient></defs>${g}</svg><div class="bt">Bancada · ${esc(p.banco||'')}</div><div class="bn">${pct}%</div><div class="bs">${c}/${t} furos carregados</div></div>`;
+}
 function renderPoly(){setTimeout(()=>{try{raioChecar(cur());}catch(e){}},0);
   const p=cur();if(!p){go('home');return;}
   $('#ttl').textContent=`POL ${p.pol} · ${p.mina}`;if(tab!=='mapa'&&gpsOn)gpsStop();
   const h=$('#hdrBtn');h.style.display='';h.textContent='⋯';h.onclick=polyMenu;
   const tabs=[['mapa','Mapa'],['lista','Lista'],['conf','Projeto x Exec.'],['tempo','Temporização'],['resumo','Caminhões e consumo'],['liber','Liberação'],['pos','Pós-fogo'],['relatorio','Relatório']];
-  let html=`<div class="tabs">${tabs.map(t=>`<button data-t="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}</button>`).join('')}</div><div id="planWBox"></div><div id="tabBox"></div>`;
+  let html=`${artBancada(p)}<div class="tabs">${tabs.map(t=>`<button data-t="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}</button>`).join('')}</div><div id="planWBox"></div><div id="tabBox"></div>`;
   $('#app').innerHTML=html;planWBarra();
   document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;renderPoly();});
   ({mapa:tabMapa,lista:tabLista,conf:tabConf,tempo:tabTempo,resumo:tabResumo,liber:tabLiber,pos:tabPos,relatorio:tabRelatorio})[tab](p);
