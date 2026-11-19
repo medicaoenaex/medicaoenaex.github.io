@@ -466,7 +466,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-19.5';
+const APP_VER='2026-11-19.6';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -701,7 +701,7 @@ function lerMedicao(txt,nome){
 }
 
 /* ===== Polígono ===== */
-function renderPoly(){
+function renderPoly(){setTimeout(()=>{try{raioChecar(cur());}catch(e){}},0);
   const p=cur();if(!p){go('home');return;}
   $('#ttl').textContent=`POL ${p.pol} · ${p.mina}`;if(tab!=='mapa'&&gpsOn)gpsStop();
   const h=$('#hdrBtn');h.style.display='';h.textContent='⋯';h.onclick=polyMenu;
@@ -713,7 +713,7 @@ function renderPoly(){
 }
 const p0=()=>cur();
 function polyMenu(){
-  openSheet(`<h3>Polígono<button class="btn sm" id="mClose">Fechar</button></h3><div class="btns" style="flex-direction:column"><button class="btn pri" id="mWpp">📲 Resumo para o WhatsApp</button><button class="btn" id="mPlE">Gerar planilha de carregamento (modelo Enaex)</button><button class="btn" id="mPlW">📗 Acompanhar planilha (preenche o app sozinho)</button><button class="btn" id="mPlI">Importar planilha preenchida</button><button class="btn" id="mTz">Importar tempos de detonação</button><button class="btn" id="mMed">Atualizar com a medição (Medição Enaex)</button><button class="btn pri" id="mProj">Projeto de carregamento (carga, tampão, tolerância)</button><button class="btn" id="mPrint">Relatório completo (imprimir / PDF)</button><button class="btn" id="mCpdf">Croqui em PDF (A4 / A3)</button><button class="btn" id="mLote">Lotes em uso (produto, booster, detonador)</button><button class="btn" id="mEdit">Editar dados (mina, POL, data…)</button><button class="btn" id="mAdd">Adicionar furo extra</button><button class="btn" id="mBg">${p0().bg?'Trocar / reposicionar croqui de fundo':'Colocar croqui de fundo (PDF ou foto)'}</button>${p0().bg?'<button class="btn" id="mBgDel">Remover croqui de fundo</button>':''}<button class="btn" id="mCsv">Exportar furos (CSV / Excel)</button><button class="btn bad" id="mDel">Excluir polígono</button></div>`);
+  openSheet(`<h3>Polígono<button class="btn sm" id="mClose">Fechar</button></h3><div class="btns" style="flex-direction:column"><button class="btn pri" id="mWpp">📲 Resumo para o WhatsApp</button><button class="btn" id="mPlE">Gerar planilha de carregamento (modelo Enaex)</button><button class="btn" id="mPlW">📗 Acompanhar planilha (preenche o app sozinho)</button><button class="btn" id="mPlI">Importar planilha preenchida</button><button class="btn" id="mTz">Importar tempos de detonação</button><button class="btn" id="mMed">Atualizar com a medição (Medição Enaex)</button><button class="btn pri" id="mProj">Projeto de carregamento (carga, tampão, tolerância)</button><button class="btn" id="mPrint">Relatório completo (imprimir / PDF)</button><button class="btn" id="mCpdf">Croqui em PDF (A4 / A3)</button><button class="btn" id="mLote">Lotes em uso (produto, booster, detonador)</button><button class="btn" id="mEdit">Editar dados (mina, POL, data…)</button><button class="btn" id="mAdd">Adicionar furo extra</button><button class="btn" id="mBg">${p0().bg?'Trocar / reposicionar croqui de fundo':'Colocar croqui de fundo (PDF ou foto)'}</button>${p0().bg?'<button class="btn" id="mBgDel">Remover croqui de fundo</button>':''}<button class="btn" id="mRaio">${S.raioOff?'⚡ Ligar alerta de raio':'⚡ Desligar alerta de raio'}</button><button class="btn" id="mCsv">Exportar furos (CSV / Excel)</button><button class="btn bad" id="mDel">Excluir polígono</button></div>`);
   const p=cur();
   $('#mClose').onclick=closeSheet;
   $('#mEdit').onclick=()=>{closeSheet();go('editpoly');};
@@ -728,6 +728,7 @@ function polyMenu(){
   $('#mAdd').onclick=()=>{closeSheet();addExtra(p);};
   $('#mBg').onclick=()=>{closeSheet();bgMenu(p);};
   if($('#mBgDel'))$('#mBgDel').onclick=()=>confirmBox('Remover o croqui de fundo deste polígono?',()=>{delete p.bg;bgDel(p.id);const y=SY();if(y.bq)delete y.bq[p.id];markP(p.id);save();renderPoly();},'Remover');
+  $('#mRaio').onclick=()=>{S.raioOff=!S.raioOff;save();closeSheet();toast(S.raioOff?'Alerta de raio desligado':'Alerta de raio ligado');if(!S.raioOff)raioChecar(p,true);else raioPinta();};
   $('#mCsv').onclick=()=>exportBox('Furos (CSV)',`POL${p.pol}-${p.data}.csv`,csv(p),'text/csv');
   $('#mDel').onclick=()=>confirmBox(`Excluir POL ${p.pol} e todos os lançamentos? Isso não pode ser desfeito.`,()=>{markDel(p);S.polys=S.polys.filter(x=>x.id!==p.id);S.cur=null;save();go('home');},'Excluir');
 }
@@ -1153,7 +1154,7 @@ async function fotosFuro(p,h){
     b.querySelectorAll('img[data-r]').forEach(im=>im.onclick=()=>verFoto(R[+im.dataset.r].url,async()=>{try{await api({acao:'foto_apagar',token:SY().token,poly_id:p.id,furo_id:h.id,ts:R[+im.dataset.r].ts});delete fotosRem[p.id];im.remove();toast('Foto apagada da equipe');}catch(e){toast(e.message);}}));};
   rem();
   const bt=$('#hFoto');if(bt)bt.onclick=async()=>{const file=await pickFile('image/*');if(!file)return;
-    try{const im=await imageFileToImage(file,1280);arr=await fotoGet(k);const ts=Date.now();arr.push({ts,url:im.url});const ok=await fotoPut(k,arr);pinta(arr);
+    try{const im=await imageFileToImage(file,1280);const ts=Date.now();const url=await carimbar(im.url,carimboTxt(p,h,ts));arr=await fotoGet(k);arr.push({ts,url});const ok=await fotoPut(k,arr);pinta(arr);
       if(ok)filaFoto(p.id,h.id,ts);
       if(ok&&SY().token&&!SY().fotoOff){enviarFotos();toast('Foto guardada e enviada para a equipe');}else toast(ok?'Foto guardada neste celular (sobe para a nuvem quando você entrar na conta da equipe)':'Aparelho sem espaço para a foto');}catch(e){toast('Não consegui abrir a foto');}};
 }
@@ -1176,6 +1177,50 @@ function gpsStart(){
     e=>{gpsErr=e.code===1?'Permissão do GPS negada. Libere a localização para este site.':'Sem sinal do GPS.';gpsDraw();},{enableHighAccuracy:true,maximumAge:3000,timeout:20000});
 }
 function gpsStop(){gpsOn=false;if(gpsId!=null)navigator.geolocation.clearWatch(gpsId);gpsId=null;gpsPos=null;}
+/* ===== UTM → lat/lon (para o alerta de raio; Brasil = hemisfério sul) ===== */
+function utm2ll(E,N,zone,sul=true){
+  const a=6378137,f=1/298.257223563,k0=0.9996,e2=f*(2-f),ep2=e2/(1-e2),e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));
+  const x=E-500000,y=sul?N-10000000:N,M=y/k0,mu=M/(a*(1-e2/4-3*e2*e2/64-5*e2**3/256));
+  const p1=mu+(3*e1/2-27*e1**3/32)*Math.sin(2*mu)+(21*e1*e1/16-55*e1**4/32)*Math.sin(4*mu)+(151*e1**3/96)*Math.sin(6*mu);
+  const C1=ep2*Math.cos(p1)**2,T1=Math.tan(p1)**2,N1=a/Math.sqrt(1-e2*Math.sin(p1)**2),R1=a*(1-e2)/Math.pow(1-e2*Math.sin(p1)**2,1.5),D=x/(N1*k0);
+  const lat=p1-(N1*Math.tan(p1)/R1)*(D*D/2-(5+3*T1+10*C1-4*C1*C1-9*ep2)*D**4/24+(61+90*T1+298*C1+45*T1*T1-252*ep2-3*C1*C1)*D**6/720);
+  const lon=(D-(1+2*T1+C1)*D**3/6+(5-2*C1+28*T1-3*C1*C1+8*ep2+24*T1*T1)*D**5/120)/Math.cos(p1);
+  return {lat:lat*180/Math.PI,lon:((zone-1)*6-177)+lon*180/Math.PI};}
+// coordenada UTM do furo (polígono importado com coordenadas)
+const furoUTM=(p,h)=>p&&p.geo&&geoUTM(p.geo)?{E:h.x+p.geo.mx,N:-(h.y+p.geo.my)}:null;
+
+/* ===== Carimbo na foto do furo (data, hora, furo, coordenada) ===== */
+function carimbar(url,linhas){return new Promise(res=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;const g=c.getContext('2d');g.drawImage(im,0,0);
+  const fs=Math.max(14,Math.round(c.width/42)),pad=Math.round(fs*.5),lh=Math.round(fs*1.3),hh=pad*2+lh*linhas.length;
+  g.fillStyle='rgba(0,0,0,.6)';g.fillRect(0,c.height-hh,c.width,hh);g.fillStyle='#fff';g.font=`600 ${fs}px system-ui,Arial,sans-serif`;g.textBaseline='top';
+  linhas.forEach((t,i)=>{let s=t;while(g.measureText(s).width>c.width-pad*2&&s.length>4)s=s.slice(0,-2);g.fillText(s,pad,c.height-hh+pad+i*lh);});
+  res(c.toDataURL('image/jpeg',.82));};im.onerror=()=>res(url);im.src=url;});}
+function carimboTxt(p,h,ts){const d=new Date(ts);const u=furoUTM(p,h)||(gpsPos?ll2utm(gpsPos.lat,gpsPos.lon):null);
+  return [`POL ${p.pol||''} · Furo ${h.id} · ${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`,
+    [u?`E ${Math.round(u.E)}  N ${Math.round(u.N)}`:'',[p.mina,p.cava].filter(Boolean).join(' / '),p.banco?'Banco '+p.banco:''].filter(Boolean).join(' · ')].filter(Boolean);}
+
+/* ===== Alerta de raio (previsão de tempestade na cava; precisa de internet) ===== */
+const RAIO_MS=15*60*1000;let raio={st:'',t:0,pid:null,avisado:''};
+function raioLocal(p){if(gpsPos)return {lat:gpsPos.lat,lon:gpsPos.lon};
+  if(p&&p.geo&&geoUTM(p.geo)&&p.holes.length){const xs=p.holes.map(h=>h.x),ys=p.holes.map(h=>h.y);const E=(Math.min(...xs)+Math.max(...xs))/2+p.geo.mx,N=-((Math.min(...ys)+Math.max(...ys))/2+p.geo.my);return utm2ll(E,N,num(S.utmZona)||23,true);}
+  return null;}
+async function raioChecar(p,forcar){
+  if(S.raioOff||!p)return;if(!forcar&&raio.pid===p.id&&Date.now()-raio.t<RAIO_MS)return;
+  raio.pid=p.id;raio.t=Date.now();const L=raioLocal(p);
+  if(!L){raio.st='sem local (polígono sem coordenadas UTM e GPS desligado)';raioPinta();return;}
+  if(!navigator.onLine){raio.st='desligado: sem internet';raioPinta();return;}
+  try{const u=`https://api.open-meteo.com/v1/forecast?latitude=${L.lat.toFixed(3)}&longitude=${L.lon.toFixed(3)}&hourly=weather_code&forecast_hours=4&timezone=auto`;
+    const r=await fetch(u);if(!r.ok)throw new Error();const j=await r.json();const hs=(j.hourly&&j.hourly.time)||[],wc=(j.hourly&&j.hourly.weather_code)||[];
+    const i=wc.findIndex((c,k)=>k<4&&c>=95);const hora=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    if(i>=0){const h=String(hs[i]||'').slice(11,13);raio.st=`previsão de tempestade com raio ${i===0?'agora':'por volta das '+h+'h'} (consultado ${hora})`;raio.grave=true;
+      const ch=p.id+'|'+hs[i];if(raio.avisado!==ch){raio.avisado=ch;aviso(`⚡ <b>Previsão de tempestade com raio</b> ${i===0?'agora':'por volta das '+h+'h'} na cava do POL ${esc(p.pol)}.<br>Avalie parar o carregamento e siga o procedimento da mina.`);}}
+    else{raio.st=`sem previsão de tempestade nas próximas 3 h (consultado ${hora})`;raio.grave=false;}
+  }catch(e){raio.st='desligado: sem internet';raio.grave=false;}
+  raioPinta();}
+function raioPinta(){const b=$('#raioSt');if(!b)return;b.innerHTML=S.raioOff?'⚡ Alerta de raio desligado':`⚡ Alerta de raio: ${esc(raio.st||'consultando…')}`;b.style.color=raio.grave&&!S.raioOff?'var(--bad)':'';b.style.fontWeight=raio.grave&&!S.raioOff?'700':'';}
+setInterval(()=>{const p=cur();if(p&&document.visibilityState==='visible')raioChecar(p);},60*1000);
+window.addEventListener('online',()=>{const p=cur();if(p)raioChecar(p,true);});
+
 function gpsDraw(){
   const gG=$('#gpsG'),info=$('#gpsInfo'),p=cur();if(!gG||!p||!p.geo||!lastGeom)return;
   if(!gpsOn){gG.innerHTML='';return;}
@@ -1215,7 +1260,7 @@ function tabLiber(p){
     <div class="row" style="margin-top:6px"><div><label>Liberado por</label><input id="nm_${k}" value="${esc(c.nome||meuNome()||p.resp||'')}"></div><div style="align-self:end"><button class="btn ${c.ts?'':'pri'}" data-lib="${k}" style="width:100%">${c.ts?'Registrar de novo':'Registrar liberação'}</button></div></div>
     ${c.ts?`<div class="hint" style="background:#eaf7ef;border-color:#b5e0c4">✔ Registrado por <b>${esc(c.nome)}</b> em ${new Date(c.ts).toLocaleString('pt-BR')}${nOk<itens.length?` · <b style="color:var(--bad)">${itens.length-nOk} item(ns) não marcado(s)</b>`:''}</div>`:''}</div>`;};
   const si=situDe(p);
-  $('#tabBox').innerHTML=faltasHtml(p)+`<div class="card"><h2>Situação do polígono</h2><div class="seg" id="situ">${Object.entries(SITU).map(([k,v])=>`<button data-s="${k}" class="${si===k?'on':''}">${v.n}</button>`).join('')}</div>
+  $('#tabBox').innerHTML=faltasHtml(p)+`<div class="card"><h2>Situação do polígono</h2><div id="raioSt" class="mut" style="margin:0 0 8px;font-size:14px"></div><div class="seg" id="situ">${Object.entries(SITU).map(([k,v])=>`<button data-s="${k}" class="${si===k?'on':''}">${v.n}</button>`).join('')}</div>
   ${si==='detonado'?`<div class="row"><div><label>Data e hora da detonação</label><input id="detAt" type="datetime-local" value="${esc(p.detAt||'')}"></div></div>`:''}</div>
   ${bloco('pre','Antes do carregamento',CHK_PRE)}${bloco('fim','Fechamento do carregamento',CHK_FIM)}
   <p class="mut">O checklist é registro do que foi conferido em campo. Ele não substitui os procedimentos e liberações da mina.</p>`;
@@ -1224,7 +1269,7 @@ function tabLiber(p){
     const ap=()=>{p.situ=v;markP(p.id);save();tabLiber(p);toast('Situação: '+SITU[v].n);};
     if(v!=='aberto'&&pend)confirmBox(`Ainda há ${nf(pend)} pendente(s). Marcar como "${SITU[v].n}" mesmo assim?`,ap,'Marcar');else ap();});
   if($('#detAt'))$('#detAt').onchange=e=>{p.detAt=e.target.value;markP(p.id);save();};
-  document.querySelectorAll('#tabBox [data-fi]').forEach(b=>b.onclick=()=>editHole(+b.dataset.fi));
+  document.querySelectorAll('#tabBox [data-fi]').forEach(b=>b.onclick=()=>editHole(+b.dataset.fi));raioPinta();
   document.querySelectorAll('#tabBox input[data-k]').forEach(c=>c.onchange=()=>{const k=c.dataset.k;p.check[k]=p.check[k]||{it:{}};p.check[k].it=p.check[k].it||{};p.check[k].it[c.dataset.i]=c.checked;markP(p.id);save();});
   document.querySelectorAll('[data-lib]').forEach(b=>b.onclick=()=>{const k=b.dataset.lib;const nm=$('#nm_'+k).value.trim();if(!nm){toast('Informe quem liberou');return;}
     const reg=()=>{p.check[k]=p.check[k]||{it:{}};p.check[k].nome=nm;p.check[k].ts=Date.now();
