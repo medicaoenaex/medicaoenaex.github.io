@@ -623,7 +623,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-23.2';
+const APP_VER='2026-11-23.3';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -671,7 +671,7 @@ function novoFuro(id,x,y,prof,line,n){return{id:String(id),x,y,line:line||null,n
 
 
 /* ===== Projeto de carregamento (valores do plano de fogo, informados pelo usuário) ===== */
-const PROJ_PADRAO={diam:'',afast:null,espac:null,dens:null,prod:'',kg:null,decks:1,tampao:null,booster:null,detTipo:'',detQtd:null,tolKg:10,tolProf:0.5,tolCam:3};
+const PROJ_PADRAO={diam:'',afast:null,espac:null,dens:null,prod:'',kg:null,decks:1,tampao:null,booster:null,brinel:null,detTipo:'',detQtd:null,tolKg:10,tolProf:0.5,tolCam:3};
 const projDe=p=>Object.assign({},PROJ_PADRAO,p.proj||{});
 const DIAMS=['3"','3 1/2"','4"','4 1/2"','5"','5 1/2"','6"','6 1/2"','7"','7 7/8"','9 7/8"'];
 const diamTxt=d=>{d=String(d??'').trim();if(!d)return'';return /["”]|pol/i.test(d)?d:d+'"';};
@@ -711,14 +711,15 @@ function editProjeto(p){
   <div class="row"><div><label>Malha: afastamento (m)</label><input id="pjAf" inputmode="decimal" value="${v(pr.afast)}" placeholder="ex.: 4,0"></div><div><label>Malha: espaçamento (m)</label><input id="pjEs" inputmode="decimal" value="${v(pr.espac)}" placeholder="ex.: 4,5"></div></div>
   <div class="row"><div><label>Densidade do produto (g/cm³)</label><input id="pjDe" inputmode="decimal" value="${v(pr.dens)}" placeholder="ex.: 1,15"></div><div><label>Carga por furo (kg)</label><input id="pjKg" inputmode="decimal" value="${pr.kg??''}"></div></div>
   <div class="row"><div><label>Decks</label><select id="pjDk">${[1,2,3].map(n=>`<option ${pr.decks==n?'selected':''}>${n}</option>`).join('')}</select></div><div><label>Tampão (m)</label><input id="pjTa" inputmode="decimal" value="${pr.tampao??''}"></div></div>
-  <div class="row"><div><label>Booster por furo</label><input id="pjBo" inputmode="numeric" value="${pr.booster??''}"></div><div><label>Detonador</label><select id="pjDt">${opts(DETS,pr.detTipo,'—')}</select></div></div>
-  <div class="row"><div><label>Detonadores por furo</label><input id="pjDq" inputmode="numeric" value="${pr.detQtd??''}"></div><div></div></div>
+  <p class="mut" style="margin:10px 0 0"><b>Acessórios por furo</b> (o operador não lança: entram sozinhos em cada furo carregado)</p>
+  <div class="row"><div><label>Booster por furo</label><input id="pjBo" inputmode="numeric" value="${pr.booster??''}"></div><div><label>Brinel por furo</label><input id="pjBr" inputmode="numeric" value="${pr.brinel??''}"></div></div>
+  <div class="row"><div><label>Detonador (DVT)</label><select id="pjDt">${opts(DETS,pr.detTipo,'—')}</select></div><div><label>Detonadores por furo</label><input id="pjDq" inputmode="numeric" value="${pr.detQtd??''}"></div></div>
   <div class="row"><div><label>Tolerância de carga (±%)</label><input id="pjTk" inputmode="decimal" value="${pr.tolKg}"></div><div><label>Tolerância de profundidade (m)</label><input id="pjTp" inputmode="decimal" value="${String(pr.tolProf).replace('.',',')}"></div></div>
   <div class="row"><div><label>Tolerância caminhão: NF x lançado (±%)</label><input id="pjTc" inputmode="decimal" value="${String(pr.tolCam).replace('.',',')}"></div><div></div></div>
   <p class="mut">Furo com carga diferente (ex.: borda, com água): abra o furo e preencha "Carga de projeto deste furo".</p>
   <div class="btns"><button class="btn pri" id="pjSave">Salvar projeto</button></div>`);
   $('#pjClose').onclick=closeSheet;
-  $('#pjSave').onclick=()=>{p.proj={diam:$('#pjDi').value.trim(),afast:num($('#pjAf').value),espac:num($('#pjEs').value),dens:densNum($('#pjDe').value),prod:$('#pjProd').value,kg:num($('#pjKg').value),decks:+$('#pjDk').value,tampao:num($('#pjTa').value),booster:num($('#pjBo').value),detTipo:$('#pjDt').value,detQtd:num($('#pjDq').value),tolKg:num($('#pjTk').value)??10,tolProf:num($('#pjTp').value)??0.5,tolCam:num($('#pjTc').value)??3};
+  $('#pjSave').onclick=()=>{p.proj={diam:$('#pjDi').value.trim(),afast:num($('#pjAf').value),espac:num($('#pjEs').value),dens:densNum($('#pjDe').value),prod:$('#pjProd').value,kg:num($('#pjKg').value),decks:+$('#pjDk').value,tampao:num($('#pjTa').value),booster:num($('#pjBo').value),brinel:num($('#pjBr').value),detTipo:$('#pjDt').value,detQtd:num($('#pjDq').value),tolKg:num($('#pjTk').value)??10,tolProf:num($('#pjTp').value)??0.5,tolCam:num($('#pjTc').value)??3};
     markP(p.id);save();closeSheet();if(view==='cam')renderCam();else renderPoly();toast('Plano de fogo salvo');};
 }
 
@@ -2210,17 +2211,17 @@ function tabOper(p){
   const h=p.holes[operIdx];if(!h){$('#tabBox').innerHTML='<div class="card empty">Este polígono não tem furos.</div>';return;}
   const pend=p.holes.filter(x=>x.status==='pendente').length;const meus=p.holes.filter(x=>camsDoFuro(x).includes(meu));const kgMeu=meus.reduce((s,x)=>s+kgDoCam(x,meu),0);
   const jaLancado=h.status!=='pendente';const kp=kgProj(p,h);const v=x=>x==null?'':String(x).replace('.',',');
-  const kgIni=jaLancado?(kgDoCam(h,meu)||holeKg(h)||null):(kp??L.kg??null);
+  const kgIni=jaLancado?(kgDoCam(h,meu)||holeKg(h)||null):null;
   const vals={kg:kgIni,prof:h.profMed,tamp:h.tampao??L.tampao??pr.tampao,dens:h.dens??meuDens()??L.dens??pr.dens};
   const abertos=S.polys.filter(x=>situDe(x)==='aberto'||x.id===p.id);
   let html=`<div class="card op">
   <div class="opbar"><button class="btn sm" id="opCam" style="border-left:6px solid ${camCor(meu)}">🚛 ${esc(camCurto(meu))} ▾</button>${abertos.length>1?`<select id="opPol" style="flex:1">${abertos.map(x=>`<option value="${x.id}" ${x.id===p.id?'selected':''}>POL ${esc(x.pol)}</option>`).join('')}</select>`:''}<span class="mut" style="margin-left:auto">${pend} pendente${pend===1?'':'s'}</span></div>
   ${!SY().token?'<div class="hint" style="margin:8px 0 0">📴 Fora da equipe online: fica só neste celular. Entre na equipe na tela inicial para mandar ao responsável.</div>':''}
   <div class="opfuro"><button class="btn opnav" id="opPrev" aria-label="Furo anterior">‹</button><div style="text-align:center;flex:1"><div class="mut" style="font-size:14px">FURO</div><input id="opId" value="${esc(h.id)}" aria-label="Número do furo"><div><span class="chip" style="background:${ST[h.status].c}">${ST[h.status].n}</span>${h.agua!=='seca'?' 💧':''}</div></div><button class="btn opnav" id="opNext" aria-label="Próximo furo">›</button></div>
-  <p class="mut" style="text-align:center;margin:4px 0 8px">${kp!=null?'Projeto '+fmt(kp)+' kg':''}${h.profProj!=null?' · prof. '+fmt(h.profProj,1)+' m':''}${pr.tampao!=null?' · tampão '+fmt(pr.tampao,1)+' m':''}${pr.dens!=null?' · dens. '+fmt(pr.dens,2):''}${h.obsCroqui?'<br>Croqui: '+esc(h.obsCroqui):''}</p>
+  <p class="mut" style="text-align:center;margin:4px 0 8px">${kp!=null?'Projeto '+fmt(kp)+' kg':''}${h.profProj!=null?' · prof. '+fmt(h.profProj,1)+' m':''}${pr.tampao!=null?' · tampão '+fmt(pr.tampao,1)+' m':''}${pr.dens!=null?' · dens. '+fmt(pr.dens,2):''}${(()=>{const a=[pr.booster!=null?pr.booster+' booster':'',pr.brinel!=null?pr.brinel+' brinel':'',pr.detQtd!=null||pr.detTipo?(pr.detQtd??1)+' '+(pr.detTipo||'detonador'):''].filter(Boolean);return a.length?'<br>Acessórios (projeto): '+esc(a.join(' · ')):'';})()}${h.obsCroqui?'<br>Croqui: '+esc(h.obsCroqui):''}</p>
   ${(()=>{const oc=camsDoFuro(h).filter(c=>c!==meu),ok=holeKg(h)-kgDoCam(h,meu);return oc.length&&ok>0?`<div class="hint" style="margin:0 0 8px">Já tem ${fmt(ok)} kg do ${esc(oc.map(camCurto).join(' + '))}. O seu entra como outro deck.</div>`:'';})()}
   <div class="opgrid">
-   <div><label for="opK">Explosivo (kg)</label><input id="opK" class="opin" inputmode="decimal" enterkeyhint="next" value="${v(vals.kg)}"></div>
+   <div><label for="opK">Carga (kg)</label><input id="opK" class="opin" inputmode="decimal" enterkeyhint="next" value="${v(vals.kg)}" placeholder="${kp!=null?'proj. '+fmt(kp):'kg'}"></div>
    <div><label for="opP">Profundidade (m)</label><input id="opP" class="opin" inputmode="decimal" enterkeyhint="next" value="${v(vals.prof)}" placeholder="${h.profProj!=null?v(h.profProj):'trena'}">${h.profProj!=null?`<button class="btn sm opeq" id="opPeq">= projeto ${fmt(h.profProj,1)}</button>`:''}</div>
    <div><label for="opT">Tampão (m)</label><input id="opT" class="opin" inputmode="decimal" enterkeyhint="next" value="${v(vals.tamp)}"></div>
    <div><label for="opD">Densidade (g/cm³)</label><input id="opD" class="opin" inputmode="decimal" enterkeyhint="done" value="${v(vals.dens)}"></div>
@@ -2250,11 +2251,12 @@ function tabOper(p){
   $('#opCam').onclick=()=>{S.ui=Object.assign(S.ui||{},{meuCam:''});save();tabOper(p);};
   if($('#opPol'))$('#opPol').onchange=e=>{S.cur=e.target.value;operIdx=null;save();renderPoly();};
   const salvar=st=>{const k=num($('#opK').value),pm=num($('#opP').value),t=num($('#opT').value),d=densNum($('#opD').value);
-    if(st==='carregado'&&!(k>0)){toast('Informe os kg de explosivo');$('#opK').focus();return;}
+    if(st==='carregado'&&!(k>0)){toast('Informe a carga (kg)');$('#opK').focus();return;}
     const antes=camFora(p,meu)?[meu]:[];pushUndo(p,[h],'furo '+h.id);
     if(st==='carregado')lancarCarga(h,meu,((h.decks||[]).find(x=>deckCam(h,x)===meu)||{}).prod||pr.prod||'',k);
     if(pm!=null)h.profMed=pm;h.tampao=t;h.dens=d;h.status=st;
-    S.ui=Object.assign(S.ui||{},{meuDens:d??meuDens(),operLast:{kg:k,tampao:t,dens:d}});
+    if(st==='carregado'){if(h.booster==null&&pr.booster!=null)h.booster=pr.booster;if(h.brinel==null&&pr.brinel!=null)h.brinel=pr.brinel;if(!h.detTipo&&pr.detTipo)h.detTipo=pr.detTipo;if(h.detQtd==null&&pr.detQtd!=null)h.detQtd=pr.detQtd;}
+    S.ui=Object.assign(S.ui||{},{meuDens:d??meuDens(),operLast:{tampao:t,dens:d}});
     if(d!=null){p.cams=p.cams||{};p.cams[meu]=p.cams[meu]||{};if(p.cams[meu].dens==null||p.cams[meu].dens===''){p.cams[meu].dens=d;markP(p.id);}}
     carimbaLotes(p,h);histAdd(h,'Operador: '+resumoFuro(h));h.ts=Date.now();h.por=meuNome()||meu;markF(p.id,h.id);save();
     toast('Furo '+h.id+(st==='carregado'?' carregado':' em repasse')+(SY().token?' · enviado':''));setTimeout(()=>checarAlertas(p,h,antes),60);
@@ -2427,7 +2429,7 @@ function editHole(i,voz,vozTxt){
     $('#hPP').oninput=showDif;$('#hPM').oninput=showDif;
     document.querySelectorAll('[data-dk]').forEach(e=>e.addEventListener('input',showPj));$('#hCP').oninput=showPj;
     $('#hUsePj').onclick=()=>{const pr=projDe(p);const kp=kgProj(p,Object.assign({},h,{cargaProj:num($('#hCP').value)}));if(kp==null){toast('Defina o projeto no menu ⋯ do polígono');return;}grab();
-      const n=pr.decks||1;f.decks=Array.from({length:n},()=>({prod:pr.prod,kg:Math.round(kp/n*10)/10}));if(pr.booster!=null)f.booster=pr.booster;if(pr.tampao!=null)f.tampao=pr.tampao;if(pr.detTipo)f.detTipo=pr.detTipo;if(pr.detQtd!=null)f.detQtd=pr.detQtd;if(f.status==='pendente')f.status='carregado';draw();toast('Preenchido com o projeto — ajuste se o real foi diferente');};
+      const n=pr.decks||1;f.decks=Array.from({length:n},()=>({prod:pr.prod,kg:Math.round(kp/n*10)/10}));if(pr.booster!=null)f.booster=pr.booster;if(pr.brinel!=null)f.brinel=pr.brinel;if(pr.tampao!=null)f.tampao=pr.tampao;if(pr.detTipo)f.detTipo=pr.detTipo;if(pr.detQtd!=null)f.detQtd=pr.detQtd;if(f.status==='pendente')f.status='carregado';draw();toast('Preenchido com o projeto — ajuste se o real foi diferente');};
     $('#hRep').onclick=()=>{const L=S.last&&S.last.furo;if(!L){toast('Nenhum lançamento anterior');return;}grab();
       f.decks=JSON.parse(JSON.stringify(L.decks));['booster','brinel','detTipo','detQtd','tampao','caminhao','dens'].forEach(k=>{if(L[k]!==undefined)f[k]=L[k];});if(f.status==='pendente')f.status='carregado';draw();toast('Carga do último furo copiada');};
     $('#hNear').onclick=()=>{grab();commit(false);closeSheet();addExtra(p,h);};
