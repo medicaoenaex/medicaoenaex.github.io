@@ -2228,7 +2228,7 @@ function amostraNova(p,meu,depois){
   <div id="dsAv" class="opav"></div>
   <button class="btn ok opgo" id="dsOk">✔ Registrar amostra</button>`);
   const av=()=>{const d=densNum($('#dsV').value);$('#dsAv').innerHTML=densFora(d)?'⚠️ Fora do comum (0,5 a 1,6 g/cm³)':(d!=null&&pr.dens!=null&&Math.abs(d-pr.dens)>0.05?`⚠️ Diferente do plano (${fmt(pr.dens,2)})`:'');};
-  $('#dsV').oninput=av;$('#dsX').onclick=closeSheet;setTimeout(()=>$('#dsV').focus(),50);
+  $('#dsV').oninput=av;$('#dsX').onclick=closeSheet;setTimeout(()=>{const e=$('#dsV');if(e)e.focus();},50);
   const ok=()=>{const d=densNum($('#dsV').value);if(d==null){toast('Informe a densidade');return;}
     p.dsam=p.dsam||{};p.dsam[uid()]={v:d,ts:Date.now(),cam:meu,furo:ult?ult.id:null,por:meuNome()||meu};densCamAtualiza(p,meu);
     markP(p.id);save();closeSheet();toast('Amostra '+fmt(d,2)+' registrada');depois&&depois();};
@@ -2286,7 +2286,7 @@ function tabOper(p){
   document.querySelectorAll('#opF button').forEach(b=>b.onclick=()=>{operFiltro=b.dataset.f;tabOper(p);});
   $('#dsNova').onclick=()=>amostraNova(p,meu,()=>tabOper(p));
   $('#opMT').onclick=()=>{S.ui=Object.assign(S.ui||{},{opMapOff:!(S.ui&&S.ui.opMapOff)});save();tabOper(p);};
-  const vaiFuro=i=>{let row=document.querySelector(`.opl[data-i="${i}"]`);if(!row){operFiltro='todos';tabOper(p);row=document.querySelector(`.opl[data-i="${i}"]`);}if(!row)return;row.scrollIntoView({block:'center',behavior:'smooth'});row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),1200);const inp=row.querySelector('[data-k="kg"]');setTimeout(()=>inp.focus({preventScroll:true}),350);operMapaMarca(i);};
+  const vaiFuro=i=>{let row=document.querySelector(`.opl[data-i="${i}"]`);if(!row){operFiltro='todos';tabOper(p);row=document.querySelector(`.opl[data-i="${i}"]`);}if(!row)return;row.scrollIntoView({block:'center',behavior:'smooth'});row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),1200);setTimeout(()=>{const inp=document.querySelector(`.opl[data-i="${i}"] [data-k="kg"]`);if(inp)inp.focus({preventScroll:true});},350);operMapaMarca(i);};
   document.querySelectorAll('#opMap .opd').forEach(e=>e.onclick=()=>vaiFuro(+e.dataset.oi));
   document.querySelectorAll('[data-ds]').forEach(b=>b.onclick=()=>amostraApagar(p,b.dataset.ds));
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>operMais(p,+b.dataset.m,meu));
