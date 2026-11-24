@@ -257,6 +257,7 @@ header h1 .logo svg{width:24px;height:24px}
 .opperf{display:block;font-size:11px;color:rgba(255,255,255,.45);line-height:1.2}
 .opadd{display:block;font-style:normal;font-size:11px;font-weight:800;color:#ffd43b;text-transform:uppercase}
 #opMap.add{cursor:crosshair}
+.dsg{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 40px;gap:6px;align-items:center;margin-top:8px}.dsg b{font-size:14px}.dsc{min-height:46px;border-radius:10px;background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.25);color:#cfd8e3;font-size:18px;font-weight:800}.dsc.on{border-style:solid;border-color:rgba(255,177,31,.5);color:#fff}
 .dsl{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.dschip{background:rgba(255,255,255,.06);border:1px solid var(--line);color:#fff;border-radius:999px;padding:8px 12px;font-size:15px}
 </style>
 </head>
@@ -642,7 +643,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-24.4';
+const APP_VER='2026-11-24.5';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1587,7 +1588,7 @@ async function imprimir(p){
     const cams=[...new Set([...Object.keys(r.cam),...Object.keys(p.cams||{})])].filter(c=>c!=='Sem caminhão'||r.cam[c]);
     const ck=k=>{const c=(p.check||{})[k];const it=k==='pre'?CHK_PRE:CHK_FIM;return T(it.map((t,i)=>[esc(t),c&&c.it&&c.it[i]?'✔':'—']),['Item','Conferido'])+`<p>${c&&c.ts?'Registrado por <b>'+esc(c.nome)+'</b> em '+new Date(c.ts).toLocaleString('pt-BR'):'Não registrado'}</p>`;};
     let h=`<h1>Relatório de carregamento – POL ${esc(p.pol)}</h1><div>${esc(p.mina)}${p.cava?' / '+esc(p.cava):''}${p.banco?' · Banco '+esc(p.banco):''} · Data ${brDate(p.data)}${p.resp?' · Responsável: '+esc(p.resp):''} · Situação: <b>${SITU[situDe(p)].n}</b>${p.detAt?' em '+new Date(p.detAt).toLocaleString('pt-BR'):''}</div><div style="color:#555">Gerado em ${new Date().toLocaleString('pt-BR')}${meuNome()?' por '+esc(meuNome()):''}</div>
-    ${planoTxt(p)?`<p><b>Plano de fogo:</b> ${esc(planoTxt(p))}</p>`:''}${amostras(p).length?`<p><b>Amostras de densidade:</b> ${amostras(p).map(a=>esc(new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' '+(a.cam?camCurto(a.cam)+' ':'')+fmt(a.v,2))).join(' · ')} — média ${fmt(mediaDens(amostras(p)),2)} g/cm³</p>`:''}<h2>Resumo</h2>${T([[r.total,r.st.carregado,r.st.pendente,r.st.repasse,r.st.perdido,r.st.nao,r.agua,fmt(r.kg)+' kg',fmt(r.pmMed,1)+' / '+fmt(r.ppMed,1)+' m']],['Furos','Carregados','Pendentes','Repasse','Perdidos','Não carregar','Com água','Total lançado','Prof. média med./proj.'])}
+    ${planoTxt(p)?`<p><b>Plano de fogo:</b> ${esc(planoTxt(p))}</p>`:''}${amostras(p).length?`<p><b>Amostras de densidade:</b> ${amostras(p).map(a=>esc(new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' '+(a.cam?camCurto(a.cam)+' ':'')+leituras(a).map(v=>fmt(v,2)).join('/'))).join(' · ')} — média ${fmt(mediaDens(amostras(p)),2)} g/cm³</p>`:''}<h2>Resumo</h2>${T([[r.total,r.st.carregado,r.st.pendente,r.st.repasse,r.st.perdido,r.st.nao,r.agua,fmt(r.kg)+' kg',fmt(r.pmMed,1)+' / '+fmt(r.ppMed,1)+' m']],['Furos','Carregados','Pendentes','Repasse','Perdidos','Não carregar','Com água','Total lançado','Prof. média med./proj.'])}
     <h2>Consumo lançado</h2>${T([...Object.entries(r.prod).map(([k,v])=>[esc(k),fmt(v)+' kg']),['Booster',fmt(r.booster)+' un'],['Brinel',fmt(r.brinel)+' un'],...Object.entries(r.det).map(([k,v])=>[esc(k),fmt(v)+' un'])],['Item','Quantidade'])}`;
     if(pj.kg!=null||p.holes.some(x=>x.cargaProj!=null)){const lanc=cf.n.ok+cf.n.abaixo+cf.n.acima;h+=`<h2>Projeto x executado</h2>${T([[fmt(cf.kgProj)+' kg',fmt(cf.kgExec)+' kg',cf.kgProj?fmt((cf.kgExec-cf.kgProj)/cf.kgProj*100,1)+'%':'–',`${cf.n.ok}/${lanc}`,cf.n.abaixo,cf.n.acima,cf.profBaixa]],['Carga projeto','Executado','Diferença',`Na tolerância (±${fmt(pj.tolKg,0)}%)`,'Abaixo','Acima','Prof. abaixo'])}`;}
     if(cams.length)h+=`<h2>Caminhões</h2>${T(cams.map(c=>{const d=(p.cams||{})[c]||{};const kl=Object.values(r.cam[c]||{}).reduce((a,b)=>a+b,0);const cd=camDif(p,c,kl);return[esc(c),esc(d.nf||(p.nfs||{})[c]||''),fmt(num(d.kgNF)),fmt(num(d.kgRet)),fmt(kl),cd?cd.txt:'–',esc(d.dens||''),esc(d.temp||''),esc(d.oper||''),esc([d.ini,d.fim].filter(Boolean).join(' – '))];}),['Caminhão','NF','kg NF','Retorno','Lançado','Diferença','Dens.','Temp.','Operador','Horário'])}`;
@@ -2220,30 +2221,74 @@ function abrirOperador(){
   if(!p){go('home');toast('Nenhum polígono em carregamento');return;}
   S.cur=p.id;save();tab='oper';go('poly');
 }
-/* ----- Amostras de densidade (copo): 3 a 4 por carregamento, por caminhão, separadas dos furos ----- */
-const amostras=(p,cam)=>Object.entries(p.dsam||{}).map(([id,a])=>Object.assign({id},a)).filter(a=>a&&a.v!=null&&(!cam||a.cam===cam)).sort((a,b)=>a.ts-b.ts);
-const mediaDens=l=>l.length?Math.round(l.reduce((s,a)=>s+a.v,0)/l.length*1000)/1000:null;
+/* ----- Amostras de densidade (copo): até 4 por carregamento, cada uma lida a 0, 15 e 30 min — igual à aba "Densidade" do modelo Enaex ----- */
+// no modelo: densidade = (peso do copo cheio − 6 g) / 535
+const COPO_TARA=6,COPO_VOL=535;
+const densDePeso=g=>g==null?null:Math.round((g-COPO_TARA)/COPO_VOL*1000)/1000;
+const pesoDeDens=d=>d==null?null:Math.round((d*COPO_VOL+COPO_TARA)*10)/10;
+const DS_T=[['v','0 min'],['v15','15 min'],['v30','30 min']];
+const amostras=(p,cam)=>Object.entries(p.dsam||{}).map(([id,a])=>Object.assign({id},a)).filter(a=>a&&DS_T.some(([k])=>a[k]!=null)&&(cam==null||a.cam===cam)).sort((a,b)=>a.ts-b.ts);
+const leituras=a=>DS_T.map(([k])=>a[k]).filter(v=>v!=null);
+const mediaDens=l=>{const v=l.flatMap(leituras);return v.length?Math.round(v.reduce((s,x)=>s+x,0)/v.length*1000)/1000:null;};
 function densCamAtualiza(p,cam){const l=amostras(p,cam);p.cams=p.cams||{};p.cams[cam]=p.cams[cam]||{};p.cams[cam].dens=mediaDens(l);}
-function amostraNova(p,meu,depois){
-  const pr=projDe(p);const ult=[...p.holes].filter(h=>h.ts&&camsDoFuro(h).includes(meu)).sort((a,b)=>b.ts-a.ts)[0];
-  openSheet(`<h3>Amostra de densidade<button class="btn sm" id="dsX">Fechar</button></h3>
-  <p class="mut" style="margin:0 0 6px">🚛 ${esc(meu)} · ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}${ult?' · depois do furo '+esc(ult.id):''}${pr.dens!=null?' · plano '+fmt(pr.dens,2):''}</p>
-  <label for="dsV">Densidade do copo (g/cm³)</label><input id="dsV" class="opin" inputmode="decimal" enterkeyhint="done" placeholder="ex.: 1,15" style="width:100%">
+// lança uma leitura (0, 15 ou 30 min) numa amostra nova ou existente
+function amostraNova(p,meu,depois,idEx,kEx){
+  const pr=projDe(p);const a=idEx?(p.dsam||{})[idEx]:null;const k=kEx||'v';const tn=DS_T.find(t=>t[0]===k)[1];
+  const ult=[...p.holes].filter(h=>h.ts&&camsDoFuro(h).includes(meu)).sort((a,b)=>b.ts-a.ts)[0];
+  const nAm=a?amostras(p,a.cam).findIndex(x=>x.id===idEx)+1:amostras(p,meu).length+1;
+  const modo=(S.ui&&S.ui.dsModo)||'peso';
+  openSheet(`<h3>Amostra ${nAm} · ${tn}<button class="btn sm" id="dsX">Fechar</button></h3>
+  <p class="mut" style="margin:0 0 6px">🚛 ${esc(a?a.cam:meu)} · ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}${!a&&ult?' · depois do furo '+esc(ult.id):''}${pr.dens!=null?' · plano '+fmt(pr.dens,2):''}</p>
+  <div class="seg" id="dsM"><button data-m="peso" class="${modo==='peso'?'on':''}">Peso do copo (g)</button><button data-m="dens" class="${modo==='dens'?'on':''}">Densidade (g/cm³)</button></div>
+  <input id="dsV" class="opin" inputmode="decimal" enterkeyhint="done" placeholder="${modo==='peso'?'ex.: 605':'ex.: 1,12'}" style="width:100%;margin-top:8px">
+  <div id="dsR" style="font-size:18px;font-weight:800;margin-top:8px;min-height:24px"></div>
   <div id="dsAv" class="opav"></div>
-  <button class="btn ok opgo" id="dsOk">✔ Registrar amostra</button>`);
-  const av=()=>{const d=densNum($('#dsV').value);$('#dsAv').innerHTML=densFora(d)?'⚠️ Fora do comum (0,5 a 1,6 g/cm³)':(d!=null&&pr.dens!=null&&Math.abs(d-pr.dens)>0.05?`⚠️ Diferente do plano (${fmt(pr.dens,2)})`:'');};
+  <button class="btn ok opgo" id="dsOk">✔ Registrar ${tn}</button>
+  ${modo==='peso'?`<p class="mut" style="margin:6px 0 0">Como na planilha: densidade = (peso − ${COPO_TARA} g) ÷ ${COPO_VOL}.</p>`:''}`);
+  const calc=()=>{const n=num($('#dsV').value);return modo==='peso'?{d:densDePeso(n),g:n}:{d:densNum($('#dsV').value),g:null};};
+  const av=()=>{const {d}=calc();$('#dsR').innerHTML=d!=null&&modo==='peso'?'= '+fmt(d,3)+' g/cm³':'';
+    $('#dsAv').innerHTML=densFora(d)?'⚠️ Fora do comum (0,5 a 1,6 g/cm³)':(d!=null&&pr.dens!=null&&Math.abs(d-pr.dens)>0.05?`⚠️ Diferente do plano (${fmt(pr.dens,2)})`:'');};
   $('#dsV').oninput=av;$('#dsX').onclick=closeSheet;setTimeout(()=>{const e=$('#dsV');if(e)e.focus();},50);
-  const ok=()=>{const d=densNum($('#dsV').value);if(d==null){toast('Informe a densidade');return;}
-    p.dsam=p.dsam||{};p.dsam[uid()]={v:d,ts:Date.now(),cam:meu,furo:ult?ult.id:null,por:meuNome()||meu};densCamAtualiza(p,meu);
-    markP(p.id);save();closeSheet();toast('Amostra '+fmt(d,2)+' registrada');depois&&depois();};
+  document.querySelectorAll('#dsM button').forEach(b=>b.onclick=()=>{S.ui=Object.assign(S.ui||{},{dsModo:b.dataset.m});save();amostraNova(p,meu,depois,idEx,kEx);});
+  const ok=()=>{const {d,g}=calc();if(d==null){toast('Informe o '+(modo==='peso'?'peso do copo':'valor da densidade'));return;}
+    p.dsam=p.dsam||{};let id=idEx;
+    if(!id){id=uid();p.dsam[id]={ts:Date.now(),cam:meu,furo:ult?ult.id:null,por:meuNome()||meu};}
+    const o=Object.assign({},p.dsam[id]);o[k]=d;o['g'+k.slice(1)]=g;o['t'+k.slice(1)]=Date.now();p.dsam[id]=o;
+    densCamAtualiza(p,o.cam);markP(p.id);save();closeSheet();toast(`Amostra ${nAm} · ${tn}: ${fmt(d,3)} g/cm³`);depois&&depois();};
   $('#dsOk').onclick=ok;$('#dsV').onkeydown=e=>{if(e.key==='Enter')ok();};
 }
-function amostraApagar(p,id){const a=(p.dsam||{})[id];if(!a)return;confirmBox(`Apagar a amostra ${fmt(a.v,2)} das ${new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}?`,()=>{p.dsam[id]=null;densCamAtualiza(p,a.cam);markP(p.id);save();renderPoly();},'Apagar');}
+function amostraApagar(p,id){const a=(p.dsam||{})[id];if(!a)return;confirmBox(`Apagar a amostra das ${new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}?`,()=>{p.dsam[id]=null;densCamAtualiza(p,a.cam);markP(p.id);save();renderPoly();},'Apagar');}
 function amostrasHTML(p,meu){const l=amostras(p,meu);const m=mediaDens(l);
   return `<div class="card op"><div class="opbar"><h2 style="margin:0">🧪 Densidade</h2><span class="mut" style="margin-left:auto">${l.length?`${l.length} amostra${l.length>1?'s':''} · média <b>${fmt(m,2)}</b>`:'nenhuma amostra ainda'}</span></div>
-  ${l.length?`<div class="dsl">${l.map(a=>`<button class="dschip" data-ds="${a.id}" title="Tocar para apagar">${new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} · <b>${fmt(a.v,2)}</b>${a.furo?` <span class="mut">(furo ${esc(a.furo)})</span>`:''}</button>`).join('')}</div>`:''}
-  <button class="btn pri" id="dsNova" style="width:100%;min-height:56px;font-size:19px;font-weight:800;margin-top:8px">+ Amostra de densidade</button>
-  <p class="mut" style="margin:6px 0 0">Tire a amostra umas 3 a 4 vezes durante o carregamento. A média vai para o seu caminhão.</p></div>`;}
+  ${l.length?`<div class="dsg"><span></span>${DS_T.map(t=>`<span class="mut">${t[1]}</span>`).join('')}<span></span>${l.map((a,i)=>`<b>${i+1}ª ${new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}${a.furo?`<small class="mut"> furo ${esc(a.furo)}</small>`:''}${i>3?'<small class="mut"> (fora da planilha)</small>':''}</b>${DS_T.map(([k])=>a[k]!=null?`<button class="dsc on" data-dsl="${a.id}|${k}">${a['g'+k.slice(1)]!=null?fmt(a['g'+k.slice(1)],1)+'<small> g</small>':fmt(a[k],2)}</button>`:`<button class="dsc" data-dsl="${a.id}|${k}">+</button>`).join('')}<button class="dsc" data-ds="${a.id}" aria-label="Apagar amostra">✕</button>`).join('')}</div>`:''}
+  <button class="btn pri" id="dsNova" style="width:100%;min-height:56px;font-size:19px;font-weight:800;margin-top:8px">+ Amostra de densidade (0 min)</button>
+  <p class="mut" style="margin:6px 0 0">Até 4 amostras por carregamento, cada uma com leitura de 0, 15 e 30 min (toque no + da linha). Vão para a aba Densidade da planilha Enaex; a média vai para o seu caminhão.</p></div>`;}
+// planilha modelo: a aba "Densidade" tem 3 blocos (CARREG.1, 2 e 3), 4 amostras cada, peso do copo nas linhas 3/6/9/12, colunas 0/15/30 min
+const DS_BLOCO={'CARREG.1':['B','C','D'],'CARREG.2':['G','H','I'],'CARREG.3':['L','M','N']};
+const DS_LIN=[3,6,9,12];
+// na CARREG.4+ (cópias) não há bloco: os valores vão direto nas células Dens.1–4 (linhas 8 e 9)
+const DS_CARREG=[['B8','C8','D8'],['B9','C9','D9'],['F8','G8','H8'],['F9','G9','H9']];
+function densPlanGravar(de,x,n,lista){
+  const bl=DS_BLOCO[n];
+  if(bl&&de){DS_LIN.forEach(r=>bl.forEach(c=>de.clear(c+r)));
+    lista.slice(0,4).forEach((a,i)=>DS_T.forEach(([k],j)=>{if(a[k]!=null)de.set(bl[j]+DS_LIN[i],a['g'+k.slice(1)]??pesoDeDens(a[k]));}));}
+  else if(!bl)DS_CARREG.forEach((cs,i)=>cs.forEach((c,j)=>{const a=lista[i];const v=a&&a[DS_T[j][0]];x.set(c,v!=null?Math.round(v*1000)/1000:null);}));
+}
+function densPlanLer(wb,n){const out=[];const cel=(s,r)=>{const c=s&&s[r];return c?num(c.v):null;};
+  const bl=DS_BLOCO[n],de=wb.Sheets['Densidade'];
+  for(let i=0;i<4;i++){const o={};
+    if(bl&&de)DS_T.forEach(([k],j)=>{const g=cel(de,bl[j]+DS_LIN[i]);if(g!=null&&g>0){o[k]=densDePeso(g);o['g'+k.slice(1)]=g;}});
+    else DS_T.forEach(([k],j)=>{const v=cel(wb.Sheets[n],DS_CARREG[i][j]);if(v!=null&&v>0)o[k]=Math.round(v*1000)/1000;});
+    out.push(Object.keys(o).length?o:null);}
+  return out;}
+// junta as amostras lidas da planilha (por caminhão, na ordem 1–4) com as do app; devolve quantas mudaram
+function densAplicar(p,dens,so){let n=0;
+  (dens||[]).forEach(({cam,lista})=>{const app=amostras(p,cam);lista.forEach((o,i)=>{if(!o)return;const a=app[i];
+    const dif=!a||DS_T.some(([k])=>o[k]!=null&&Math.abs((a[k]??-9)-o[k])>0.0005);if(!dif)return;n++;if(so)return;
+    p.dsam=p.dsam||{};if(a){const v=Object.assign({},p.dsam[a.id]);DS_T.forEach(([k])=>{if(o[k]!=null){v[k]=o[k];v['g'+k.slice(1)]=o['g'+k.slice(1)]??null;}});p.dsam[a.id]=v;}
+    else p.dsam[uid()]=Object.assign({ts:Date.now()+i,cam,furo:null,por:(meuNome()||'')+' (planilha)'},o);});
+    if(!so)densCamAtualiza(p,cam);});
+  if(n&&!so){markP(p.id);save();}return n;}
 // croqui pequeno da aba Operador: cor por caminhão, toque no furo leva à linha dele
 let operGeom=null;
 function operCor(h){if(h.status==='pendente')return'#5b6676';if(h.status==='carregado')return camCor(camsDoFuro(h)[0]||'');return ST[h.status].c;}
@@ -2293,6 +2338,7 @@ function tabOper(p){
   if($('#opPol'))$('#opPol').onchange=e=>{S.cur=e.target.value;save();renderPoly();};
   document.querySelectorAll('#opF button').forEach(b=>b.onclick=()=>{operFiltro=b.dataset.f;tabOper(p);});
   $('#dsNova').onclick=()=>amostraNova(p,meu,()=>tabOper(p));
+  document.querySelectorAll('[data-dsl]').forEach(b=>b.onclick=()=>{const [id,k]=b.dataset.dsl.split('|');amostraNova(p,meu,()=>tabOper(p),id,k);});
   $('#opMT').onclick=()=>{S.ui=Object.assign(S.ui||{},{opMapOff:!(S.ui&&S.ui.opMapOff)});save();tabOper(p);};
   const vaiFuro=i=>{let row=document.querySelector(`.opl[data-i="${i}"]`);if(!row){operFiltro='todos';tabOper(p);row=document.querySelector(`.opl[data-i="${i}"]`);}if(!row)return;row.scrollIntoView({block:'center',behavior:'smooth'});row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),1200);setTimeout(()=>{const inp=document.querySelector(`.opl[data-i="${i}"] [data-k="kg"]`);if(inp)inp.focus({preventScroll:true});},350);operMapaMarca(i);};
   document.querySelectorAll('#opMap .opd').forEach(e=>e.onclick=ev=>{if(operAdd)return;vaiFuro(+e.dataset.oi);});
@@ -2778,7 +2824,8 @@ async function preencherModelo(m,cfg){
   const ck=await sh('CHECK LIST');
   if(ck){ck.set(MOD_CHK.data,xlSerial(cfg.data));ck.set(MOD_CHK.umb,cfg.cam||'');ck.set(MOD_CHK.operador,cfg.operador||'');
     if(outroDia)['E4','G4','D5','G5'].forEach(r=>ck.clear(r));}
-  if(outroDia){const de=await sh('Densidade');if(de)[3,6,9,12].forEach(r=>['B','C','D','G','H','I','L','M','N'].forEach(c=>de.clear(c+r)));
+  const deS=await sh('Densidade');
+  if(outroDia){const de=deS;if(de)[3,6,9,12].forEach(r=>['B','C','D','G','H','I','L','M','N'].forEach(c=>de.clear(c+r)));
     const df=await sh('DF e UF');if(df)for(let r=4;r<=23;r++)['D','E','F','G','I'].forEach(c=>df.clear(c+r));}
   const fila=[];cfg.blocos.forEach(b=>{if(b.furos.length||b.sempre)fila.push({...b,furos:b.furos.slice()});});
   const usadas={},camAbas={},snapAbas={};let sobrou=0;
@@ -2788,7 +2835,9 @@ async function preencherModelo(m,cfg){
     if(!preenche)continue;
     const b=fila[0];const q=b.p,t=b.tec;const parte=b.furos.splice(0,capDe[n]);if(!b.furos.length)fila.shift();
     usadas[n]=q.id;camAbas[n]=b.cam||'';
-    const H={pol:q.pol,banco:num(q.banco)??q.banco,lito:t.lito,expl:t.expl,diam:t.diam,alt:t.alt,dens:t.dens,mina:q.mina,cava:q.cava,afast:t.afast,espac:t.espac,operador:cfg.operador,auxiliar:cfg.auxiliar};
+    const dsL=amostras(q,b.cam?b.cam:null);const dsM=mediaDens(dsL.slice(0,4));
+    densPlanGravar(deS,x,n,dsL);
+    const H={pol:q.pol,banco:num(q.banco)??q.banco,lito:t.lito,expl:t.expl,diam:t.diam,alt:t.alt,dens:dsM!=null?Math.round(dsM*100)/100:t.dens,mina:q.mina,cava:q.cava,afast:t.afast,espac:t.espac,operador:cfg.operador,auxiliar:cfg.auxiliar};
     Object.entries(MOD_HDR).forEach(([k,r])=>x.set(r,H[k]));
     // modo todos os caminhões: a UMB de cada aba vai no cabeçalho (no lugar da fórmula que puxa do CHECK LIST)
     if(cfg.todos)x.set(MOD_UMB,b.cam||'');
@@ -2931,10 +2980,11 @@ function planLerModelo(p,X,wb,forcar){
       else{const nd=kgs.map((kg,j)=>kg?Object.assign({},dk[j]||{},{prod:(dk[j]&&dk[j].prod)||prodApp,kg}):null).filter(Boolean);
         const tmp=normCams({caminhao:w.caminhao,decks:nd});w.decks=tmp.decks;w.caminhao=tmp.caminhao;}
     }});
+  const dens=minhas.map(n=>({cam:camDe(n),lista:densPlanLer(wb,n)})).filter(d=>d.cam&&d.lista.some(Boolean));
   const linhas=[];
   work.forEach((w,h)=>{const nv=w.nv;nv.decks=w.decks.map(d=>{const o={prod:d.prod||'',kg:d.kg};if(d.cam&&d.cam!==w.caminhao)o.cam=d.cam;return o;});
     if((w.caminhao||'')!==(h.caminhao||''))nv.caminhao=w.caminhao;linhas.push({h,nv});});
-  return {info,linhas,naoAchou};
+  return {info,linhas,naoAchou,dens};
 }
 // lê a planilha e devolve, por furo, os valores dela (nv) — usado na importação manual e no acompanhamento automático
 function planLer(p,X,wb,forcar){
@@ -2986,7 +3036,7 @@ async function importarPlanilha(p){
         <p class="mut">A planilha de carregamento é a que o app gera em ⋯ → Gerar planilha de carregamento (modelo Enaex), com as abas CARREG.</p>`);$('#ipX').onclick=closeSheet;return;}
       throw e;}
     const mostra=lido=>{
-    const {info,linhas,naoAchou}=lido;const mud=linhas.map(l=>planMud(l.h,l.nv)).filter(Boolean);
+    const {info,linhas,naoAchou}=lido;const mud=linhas.map(l=>planMud(l.h,l.nv)).filter(Boolean);const nDs=densAplicar(p,lido.dens,true);
     const outroPol=info.poly_id&&info.poly_id!==p.id;
     const opc=info.opc||[];const escolha=outroPol||info.forcar;const sel=(info.forcar||info.abasAuto||[]).join('|');
     const selHtml=escolha&&opc.length?`<label>Aba da planilha que entra no POL ${esc(p.pol)}</label><select id="ipAba">${opc.map(o=>`<option value="${esc(o.n)}" ${sel===o.n?'selected':''}>${esc(o.n)}${o.pol?' · POL '+esc(o.pol):''} · ${o.k} furos</option>`).join('')}${opc.length>1?`<option value="${esc(opc.map(o=>o.n).join('|'))}" ${sel===opc.map(o=>o.n).join('|')?'selected':''}>Todas as abas</option>`:''}</select>`:'';
@@ -2994,11 +3044,12 @@ async function importarPlanilha(p){
       ${outroPol&&!info.forcar?(info.pols&&info.pols.length>1?`<div class="hint">⚠️ Esta planilha tem o <b>${info.pols.map(v=>'POL '+esc(v)).join('</b> e o <b>')}</b>, e você está no POL ${esc(p.pol)}. Se for o mesmo polígono com outro número, escolha abaixo qual aba entra aqui.</div>`:`<div class="hint">⚠️ Esta planilha foi gerada para o <b>POL ${esc(info.pol)}${info.mina?' ('+esc(info.mina)+')':''}</b>, e você está no POL ${esc(p.pol)}. Confira antes de aplicar.</div>`):''}
       ${selHtml}
       <p><b>${mud.length}</b> furo(s) com alteração${naoAchou.length?` · ${naoAchou.length} furo(s) da planilha não existem neste polígono (${esc(naoAchou.slice(0,6).join(', '))}${naoAchou.length>6?'…':''})`:''}.</p>
-      ${mud.length?planTabela(mud):'<p class="mut">Nada diferente do que já está no app.</p>'}
-      <div class="btns"><button class="btn pri" id="ipOk" ${mud.length?'':'disabled style="opacity:.5"'}>Aplicar no app</button></div>`);
+      ${mud.length?planTabela(mud):nDs?'':'<p class="mut">Nada diferente do que já está no app.</p>'}
+      ${nDs?`<p>🧪 <b>${nDs}</b> amostra(s) de densidade da aba Densidade.</p>`:''}
+      <div class="btns"><button class="btn pri" id="ipOk" ${mud.length||nDs?'':'disabled style="opacity:.5"'}>Aplicar no app</button></div>`);
     $('#ipClose').onclick=closeSheet;
     if($('#ipAba'))$('#ipAba').onchange=e=>{try{mostra(planLer(p,X,wb,e.target.value.split('|')));}catch(er){toast(er.message);}};
-    if(mud.length)$('#ipOk').onclick=()=>{planAplicar(p,mud);closeSheet();corPor='caminhao';tab='mapa';renderPoly();toast(`${mud.length} furo(s) atualizados pela planilha`);};
+    if(mud.length||nDs)$('#ipOk').onclick=()=>{if(mud.length)planAplicar(p,mud);densAplicar(p,lido.dens);closeSheet();corPor='caminhao';if(mud.length)tab='mapa';renderPoly();toast(`${mud.length} furo(s)${nDs?' e '+nDs+' amostra(s) de densidade':''} atualizados pela planilha`);};
     };mostra(lido);
   }catch(e){busy();toast(e.message||'Não consegui ler a planilha');}
 }
@@ -3046,6 +3097,7 @@ async function planWTick(pid,forcar){const w=planW[pid];if(!w||w.lendo)return;if
     w.erro=null;const mud=[];
     r.linhas.forEach(({h,nv})=>{const ant=w.snap[String(h.id).toUpperCase()]||{};const ks=Object.keys(nv).filter(k=>ant[k]!==planCmp(k,nv[k]));if(!ks.length)return;const m=planMud(h,nv,ks);if(m)mud.push(m);});
     w.last=f.lastModified;w.snap=planSnap(r.linhas);w.lido=Date.now();
+    const nDs=densAplicar(p,r.dens);if(nDs)toast(`📗 Planilha: ${nDs} amostra(s) de densidade`,3000);
     if(mud.length){planAplicar(p,mud,'planilha acompanhada');w.ult={n:mud.length,ids:mud.map(m=>m.h.id),t:Date.now()};
       planFlash={ids:new Set(mud.map(m=>String(m.h.id))),ate:Date.now()+9000};if(corPor!=='caminhao')setCorPor('caminhao');
       const ids=mud.slice(0,5).map(m=>m.h.id).join(', ')+(mud.length>5?'…':'');toast(`📗 Planilha: ${mud.length} furo(s) atualizados (${ids})`,3500);
@@ -3077,7 +3129,7 @@ function tabConf(p){
   let h=`<div class="hint" style="margin:0 0 10px"><b>Plano de fogo:</b> ${esc(planoTxt(p))||'—'}</div><div class="kpis"><div class="kpi"><b>${lanc?fmt(r.n.ok/lanc*100,0)+'%':'–'}</b><span>furos dentro da tolerância (±${fmt(pr.tolKg,0)}%)</span></div><div class="kpi"><b>${r.n.abaixo}</b><span>abaixo do projeto</span></div><div class="kpi"><b>${r.n.acima}</b><span>acima do projeto</span></div><div class="kpi"><b>${r.n.sem}</b><span>sem carga lançada</span></div></div>
   <div class="card" style="margin-top:12px"><h2>Carga total</h2><table><tbody><tr><td>Projeto (furos a carregar)</td><td class="n">${fmt(r.kgProj)} kg</td></tr><tr><td>Executado (lançado)</td><td class="n"><b>${fmt(r.kgExec)} kg</b></td></tr><tr><td>Diferença</td><td class="n">${dif==null?'–':(dif>=0?'+':'')+fmt(dif,1)+'%'}</td></tr></tbody></table>
   <p class="mut">A diferença total só fecha quando todos os furos estiverem lançados.</p></div>
-  <div class="card"><h2>Outros pontos</h2><table><tbody><tr><td>Profundidade abaixo do projeto (> ${fmt(pr.tolProf,1)} m)</td><td class="n">${r.profBaixa}</td></tr>${pr.tampao!=null?`<tr><td>Tampão diferente do projeto (> 0,5 m)</td><td class="n">${r.tampDif}</td></tr>`:''}${pr.booster!=null?`<tr><td>Booster diferente do projeto</td><td class="n">${r.boosterDif}</td></tr>`:''}${(()=>{const l=amostras(p);if(!l.length)return'';const m=mediaDens(l);const fora=pr.dens!=null?l.filter(a=>Math.abs(a.v-pr.dens)>0.05).length:null;return `<tr><td>Amostras de densidade (${l.length}) · média</td><td class="n">${fmt(m,2)} g/cm³</td></tr>${fora!=null?`<tr><td>Amostras diferentes do plano (> 0,05 g/cm³)</td><td class="n">${fora}</td></tr>`:''}`;})()}<tr><td>Perdidos / não carregar</td><td class="n">${r.n.fora}</td></tr></tbody></table></div>`;
+  <div class="card"><h2>Outros pontos</h2><table><tbody><tr><td>Profundidade abaixo do projeto (> ${fmt(pr.tolProf,1)} m)</td><td class="n">${r.profBaixa}</td></tr>${pr.tampao!=null?`<tr><td>Tampão diferente do projeto (> 0,5 m)</td><td class="n">${r.tampDif}</td></tr>`:''}${pr.booster!=null?`<tr><td>Booster diferente do projeto</td><td class="n">${r.boosterDif}</td></tr>`:''}${(()=>{const l=amostras(p);if(!l.length)return'';const m=mediaDens(l);const fora=pr.dens!=null?l.filter(a=>leituras(a).some(v=>Math.abs(v-pr.dens)>0.05)).length:null;return `<tr><td>Amostras de densidade (${l.length}) · média</td><td class="n">${fmt(m,2)} g/cm³</td></tr>${fora!=null?`<tr><td>Amostras diferentes do plano (> 0,05 g/cm³)</td><td class="n">${fora}</td></tr>`:''}`;})()}<tr><td>Perdidos / não carregar</td><td class="n">${r.n.fora}</td></tr></tbody></table></div>`;
   if(r.lista.length)h+=`<div class="card" style="padding:4px 8px;overflow:auto"><h2 style="margin:10px 6px">Furos fora da tolerância</h2><table><thead><tr><th>Furo</th><th class="n">Projeto</th><th class="n">Exec.</th><th class="n">Desvio</th><th>Cam.</th></tr></thead><tbody>${r.lista.sort((a,b)=>Math.abs(b[1].d)-Math.abs(a[1].d)).map(([x,dv])=>`<tr class="click" data-i="${p.holes.indexOf(x)}"><td><b>${esc(x.id)}</b></td><td class="n">${fmt(kgProj(p,x))}</td><td class="n">${fmt(holeKg(x))}</td><td class="n" style="color:${DV[dv.c].c};font-weight:700">${dv.d>0?'+':''}${fmt(dv.d,0)}%</td><td>${esc(camsTxt(x))}</td></tr>`).join('')}</tbody></table></div>`;
   h+=`<div class="btns"><button class="btn" id="cfEd">Editar projeto</button><button class="btn" id="cfMap">Ver no mapa</button></div>`;
   $('#tabBox').innerHTML=h;
