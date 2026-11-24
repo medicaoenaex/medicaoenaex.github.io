@@ -260,6 +260,7 @@ header h1 .logo svg{width:24px;height:24px}
 .dsg{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 40px;gap:6px;align-items:center;margin-top:8px}.dsg b{font-size:14px}.dsc{min-height:46px;border-radius:10px;background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.25);color:#cfd8e3;font-size:18px;font-weight:800}.dsc .dsv{display:block;font-size:22px;font-weight:900;color:#ffb27a;line-height:1.1}.dsc .dsp{display:block;font-size:12px;font-weight:600;color:var(--mut)}.dsmed{font-size:30px;font-weight:900;color:#ffb27a;font-family:"Orbitron",ui-monospace,monospace;text-shadow:0 0 10px rgba(255,140,60,.4)}.dsc.on{border-style:solid;border-color:rgba(255,177,31,.5);color:#fff}
 .dsl{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.dschip{background:rgba(255,255,255,.06);border:1px solid var(--line);color:#fff;border-radius:999px;padding:8px 12px;font-size:15px}
 .avg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.avp{border:1px solid var(--line);border-radius:12px;padding:8px;cursor:pointer;background:var(--card,#fff)}.avt{display:flex;justify-content:space-between;align-items:baseline}.avt span{font-weight:800;color:#ff6a13}.avm{background:#1d2530;border-radius:8px;margin:6px 0;aspect-ratio:4/3;display:flex}.avm svg{width:100%;height:100%}.avc{display:flex;flex-wrap:wrap;gap:4px 8px;font-size:12px;margin:4px 0}.avc i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:3px;vertical-align:-1px}
+.dsft{grid-column:1/-1;display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:-2px 0 6px}.dsth{display:flex;gap:6px;flex-wrap:wrap}.dsth img{width:54px;height:54px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,.25);cursor:pointer}
 </style>
 </head>
 <body>
@@ -659,7 +660,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-24.8';
+const APP_VER='2026-11-24.9';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1614,9 +1615,9 @@ async function imprimir(p){
     h+=`<h2>Liberação – antes do carregamento</h2>${ck('pre')}<h2>Liberação – fechamento</h2>${ck('fim')}${lt}`;
     const po=p.pos;if(po&&po.ts)h+=`<h2>Pós-fogo</h2>${T([[po.dt?new Date(po.dt).toLocaleString('pt-BR'):'',esc(po.nome||''),po.falhas&&po.falhas.length?esc(po.falhas.join(', ')):'Nenhuma',esc(FRAG[po.frag]||''),po.matacoes??'',po.ultra==='sim'?'Sim'+(po.ultraDist!=null?' ('+fmt(po.ultraDist)+' m)':''):'Não',esc(FUMACA[po.fumaca]||''),po.vib!=null?fmt(po.vib,1):'',po.ruido!=null?fmt(po.ruido,0):'']],['Inspeção','Por','Falhas','Fragmentação','Matacões','Ultralanç.','Fumaça','Vib. mm/s','dB'])}${po.obs?'<p>'+esc(po.obs)+'</p>':''}`;
     if(img)h+=`<h2 class="pb">Croqui</h2><img src="${img}">`;
-    try{const fot=[];for(const x of [...p.holes,{id:'_pos'}]){const a=await fotoGet(p.id+'|'+x.id);a.forEach(f=>fot.push([x.id,f.url,f.ts]));}
+    try{const fot=[];for(const x of [...p.holes,{id:'_pos'},...amostras(p).map(a=>({id:amFk(a.id)}))]){const a=await fotoGet(p.id+'|'+x.id);a.forEach(f=>fot.push([x.id,f.url,f.ts]));}
       (await listarFotos(p.id)).forEach(r=>{if(!fot.some(f=>f[0]===r.furo_id&&f[2]===r.ts))fot.push([r.furo_id,r.url,r.ts]);});
-      if(fot.length)h+=`<h2 class="pb">Fotos</h2><div style="display:flex;flex-wrap:wrap;gap:8px">${fot.map(([id,u])=>`<div style="width:31%"><img src="${esc(u)}" style="width:100%"><div>${id==='_pos'?'Pós-fogo':'Furo '+esc(id)}</div></div>`).join('')}</div>`;}catch(e){}
+      if(fot.length)h+=`<h2 class="pb">Fotos</h2><div style="display:flex;flex-wrap:wrap;gap:8px">${fot.map(([id,u])=>`<div style="width:31%"><img src="${esc(u)}" style="width:100%"><div>${id==='_pos'?'Pós-fogo':/^AM-/.test(id)?esc(amRotulo(p,id.slice(3))):'Furo '+esc(id)}</div></div>`).join('')}</div>`;}catch(e){}
     h+=`<h2 class="pb">Furo a furo</h2>${T(p.holes.map(x=>[`<b>${esc(x.id)}</b>`,ST[x.status].n,fmt(x.profProj,1),fmt(x.profMed,1),AGUA_N[x.agua]||'',(x.decks||[]).map(d=>`${esc(d.prod||'')} ${fmt(num(d.kg))}${camsDoFuro(x).length>1&&deckCam(x,d)?' ('+esc(camCurto(deckCam(x,d)))+')':''}`).join(' + '),holeKg(x)?fmt(holeKg(x)):'',x.booster??'',[x.detQtd,x.detTipo].filter(Boolean).join(' '),fmt(x.tampao,1),esc(camsTxt(x)),temTempo(x)?(x.tempos&&x.tempos.length>1?x.tempos.join('/'):fmt(x.tempo)):'',esc((x.cond||[]).join(', ')),esc(x.obs||''),esc(x.por||'')]),['Furo','Status','Proj.','Med.','Água','Decks (kg)','Total','Bst','Detonador','Tamp.','Cam.','ms','Condição','Obs.','Por'])}`;
     h+=`<div class="sig"><div>Responsável pelo carregamento</div><div>Blaster</div><div>Supervisão</div></div>`;
     let pr=$('#print');if(!pr){pr=document.createElement('div');pr.id='print';document.body.appendChild(pr);}pr.innerHTML=h;busy();
@@ -2274,10 +2275,27 @@ function amostraNova(p,meu,depois,idEx,kEx){
     densCamAtualiza(p,o.cam);markP(p.id);save();closeSheet();toast(`Amostra ${nAm} · ${tn}: ${g!=null?fmt(g,1)+' g → ':''}${fmt(d,3)} g/cm³`);depois&&depois();};
   $('#dsOk').onclick=ok;$('#dsV').onkeydown=e=>{if(e.key==='Enter')ok();};
 }
+/* fotos das amostras de densidade: mesmo arquivo das fotos de furo (chave POL|AM-id), sobem para a equipe junto */
+const amFk=id=>'AM-'+id;
+function amNum(p,a,id){return amostras(p,a.cam).findIndex(x=>x.id===id)+1;}
+function amRotulo(p,id){const a=(p.dsam||{})[id];if(!a)return 'Amostra de densidade';return `Amostra ${amNum(p,a,id)} densidade · ${camCurto(a.cam||'')}`;}
+async function amFotosPinta(p){const els=[...document.querySelectorAll('[data-amt]')];if(!els.length)return;const R=await listarFotos(p.id).catch(()=>[]);
+  for(const el of els){const id=el.dataset.amt;const k=p.id+'|'+amFk(id);const arr=await fotoGet(k);const rem=(R||[]).filter(x=>x.furo_id===amFk(id)&&!arr.some(a=>a.ts===x.ts));
+    el.innerHTML=arr.map((f,i)=>`<img data-l="${i}" src="${f.url}">`).join('')+rem.map((x,i)=>`<img data-r="${i}" src="${esc(x.url)}" title="${esc(x.por||'')}">`).join('');
+    el.querySelectorAll('img[data-l]').forEach(im=>im.onclick=()=>verFoto(arr[+im.dataset.l].url,async()=>{arr.splice(+im.dataset.l,1);await fotoPut(k,arr);amFotosPinta(p);}));
+    el.querySelectorAll('img[data-r]').forEach(im=>im.onclick=()=>verFoto(rem[+im.dataset.r].url,async()=>{try{await api({acao:'foto_apagar',token:SY().token,poly_id:p.id,furo_id:amFk(id),ts:rem[+im.dataset.r].ts});delete fotosRem[p.id];amFotosPinta(p);toast('Foto apagada da equipe');}catch(e){toast(e.message);}}));}}
+async function amFotoNova(p,id){const a=(p.dsam||{})[id];if(!a)return;const file=await pickFile('image/*');if(!file)return;
+  try{busy('Guardando a foto…');const im=await imageFileToImage(file,1280);const ts=Date.now();const d=new Date(ts);
+    const lt=leituras(a).length?DS_T.filter(([k])=>a[k]!=null).map(([k,t])=>`${t}: ${fmt(a[k],3)}`).join('  '):'';
+    const url=await carimbar(im.url,[`POL ${p.pol||''} · Amostra ${amNum(p,a,id)} de densidade · ${camCurto(a.cam||'')} · ${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`,[lt?lt+' g/cm³':'',[p.mina,p.cava].filter(Boolean).join(' / '),p.banco?'Banco '+p.banco:''].filter(Boolean).join(' · ')].filter(Boolean));
+    const k=p.id+'|'+amFk(id);const arr=await fotoGet(k);arr.push({ts,url});const ok=await fotoPut(k,arr);busy();
+    if(ok)filaFoto(p.id,amFk(id),ts);amFotosPinta(p);
+    if(ok&&SY().token&&!SY().fotoOff){enviarFotos();toast('Foto da amostra guardada e enviada para a equipe');}else toast(ok?'Foto da amostra guardada neste celular (sobe quando entrar na equipe online)':'Aparelho sem espaço para a foto');}
+  catch(e){busy();toast('Não consegui abrir a foto');}}
 function amostraApagar(p,id){const a=(p.dsam||{})[id];if(!a)return;confirmBox(`Apagar a amostra das ${new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}?`,()=>{p.dsam[id]=null;densCamAtualiza(p,a.cam);markP(p.id);save();renderPoly();},'Apagar');}
 function amostrasHTML(p,meu){const l=amostras(p,meu);const m=mediaDens(l);
   return `<div class="card op"><div class="opbar"><h2 style="margin:0">🧪 Densidade</h2><span style="margin-left:auto;text-align:right">${l.length?`<span class="mut" style="font-size:13px">média de ${l.length} amostra${l.length>1?'s':''}</span><br><b class="dsmed">${fmt(m,3)}</b> <span class="mut">g/cm³</span>`:'<span class="mut">nenhuma amostra ainda</span>'}</span></div>
-  ${l.length?`<div class="dsg"><span></span>${DS_T.map(t=>`<span class="mut">${t[1]}</span>`).join('')}<span></span>${l.map((a,i)=>`<b>${i+1}ª ${new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}${a.furo?`<small class="mut"> furo ${esc(a.furo)}</small>`:''}${i>3?'<small class="mut"> (fora da planilha)</small>':''}</b>${DS_T.map(([k])=>a[k]!=null?`<button class="dsc on" data-dsl="${a.id}|${k}"><span class="dsv">${fmt(a[k],3)}</span>${a['g'+k.slice(1)]!=null?`<small class="dsp">${fmt(a['g'+k.slice(1)],a['g'+k.slice(1)]%1?1:0)} g</small>`:''}</button>`:`<button class="dsc" data-dsl="${a.id}|${k}">+</button>`).join('')}<button class="dsc" data-ds="${a.id}" aria-label="Apagar amostra">✕</button>`).join('')}</div>`:''}
+  ${l.length?`<div class="dsg"><span></span>${DS_T.map(t=>`<span class="mut">${t[1]}</span>`).join('')}<span></span>${l.map((a,i)=>`<b>${i+1}ª ${new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}${a.furo?`<small class="mut"> furo ${esc(a.furo)}</small>`:''}${i>3?'<small class="mut"> (fora da planilha)</small>':''}</b>${DS_T.map(([k])=>a[k]!=null?`<button class="dsc on" data-dsl="${a.id}|${k}"><span class="dsv">${fmt(a[k],3)}</span>${a['g'+k.slice(1)]!=null?`<small class="dsp">${fmt(a['g'+k.slice(1)],a['g'+k.slice(1)]%1?1:0)} g</small>`:''}</button>`:`<button class="dsc" data-dsl="${a.id}|${k}">+</button>`).join('')}<button class="dsc" data-ds="${a.id}" aria-label="Apagar amostra">✕</button><div class="dsft"><button class="btn sm" data-amf="${a.id}">📷 Foto da ${i+1}ª amostra</button><span class="dsth" data-amt="${a.id}"></span></div>`).join('')}</div>`:''}
   <button class="btn pri" id="dsNova" style="width:100%;min-height:56px;font-size:19px;font-weight:800;margin-top:8px">+ Amostra de densidade (0 min)</button>
   <p class="mut" style="margin:6px 0 0">Até 4 amostras por carregamento, cada uma com leitura de 0, 15 e 30 min (toque no + da linha). Vão para a aba Densidade da planilha Enaex; a média vai para o seu caminhão.</p></div>`;}
 // planilha modelo: a aba "Densidade" tem 3 blocos (CARREG.1, 2 e 3), 4 amostras cada, peso do copo nas linhas 3/6/9/12, colunas 0/15/30 min
@@ -2356,6 +2374,7 @@ function tabOper(p){
   document.querySelectorAll('#opF button').forEach(b=>b.onclick=()=>{operFiltro=b.dataset.f;tabOper(p);});
   $('#dsNova').onclick=()=>amostraNova(p,meu,()=>tabOper(p));
   document.querySelectorAll('[data-dsl]').forEach(b=>b.onclick=()=>{const [id,k]=b.dataset.dsl.split('|');amostraNova(p,meu,()=>tabOper(p),id,k);});
+  document.querySelectorAll('[data-amf]').forEach(b=>b.onclick=()=>amFotoNova(p,b.dataset.amf));amFotosPinta(p);
   $('#opMT').onclick=()=>{S.ui=Object.assign(S.ui||{},{opMapOff:!(S.ui&&S.ui.opMapOff)});save();tabOper(p);};
   const vaiFuro=i=>{let row=document.querySelector(`.opl[data-i="${i}"]`);if(!row){operFiltro='todos';tabOper(p);row=document.querySelector(`.opl[data-i="${i}"]`);}if(!row)return;row.scrollIntoView({block:'center',behavior:'smooth'});row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),1200);setTimeout(()=>{const inp=document.querySelector(`.opl[data-i="${i}"] [data-k="kg"]`);if(inp)inp.focus({preventScroll:true});},350);operMapaMarca(i);};
   document.querySelectorAll('#opMap .opd').forEach(e=>e.onclick=ev=>{if(operAdd)return;vaiFuro(+e.dataset.oi);});
