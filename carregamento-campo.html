@@ -239,6 +239,22 @@ header h1 .logo svg{width:24px;height:24px}
 .opeq{width:100%;margin-top:6px;min-height:40px}
 .opav{min-height:22px;margin:8px 0;color:#ffd08a;font-weight:700;font-size:15px}
 .opgo{width:100%;min-height:76px;font-size:24px;font-weight:900}
+.oplh,.opl{display:grid;grid-template-columns:minmax(58px,1fr) 1.15fr 1fr 1fr 44px;gap:6px;align-items:center}
+.oplh{font-size:13px;font-weight:700;color:var(--mut);padding:4px 2px;position:sticky;top:0;background:#0d1420;z-index:2}
+.opl{padding:6px 2px;border-bottom:1px solid var(--line)}
+.opl input{font-size:22px;font-weight:800;height:54px;text-align:center;padding:2px;min-width:0;border-width:2px}
+.opl input::placeholder{color:rgba(255,255,255,.2);font-weight:600}
+.opl input:focus{border-color:#ff8a1f;box-shadow:0 0 0 3px rgba(255,138,31,.35)}
+.oplid b{font-size:22px;display:block;line-height:1.1}.oplid span{font-size:13px;color:var(--mut)}.oplid i{font-style:normal;font-size:11px}
+.opl.carregado{background:rgba(31,157,85,.14)}.opl.carregado .oplid span{color:#4ade80;font-weight:800}
+.opl.repasse{background:rgba(240,140,0,.14)}.opl.perdido,.opl.nao{opacity:.55}
+.oplm{min-height:54px;padding:0;font-size:22px}
+.opmapw{background:#0b1320;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+#opMap{display:block;width:100%;height:auto;max-height:42vh}
+#opMap .opd{cursor:pointer}#opMap .opd.sel circle{stroke:#ffb11f!important}
+.oplg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px;color:var(--mut);margin-top:6px}.oplg i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.opl.flash{box-shadow:inset 0 0 0 3px #ffb11f}
+.dsl{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.dschip{background:rgba(255,255,255,.06);border:1px solid var(--line);color:#fff;border-radius:999px;padding:8px 12px;font-size:15px}
 </style>
 </head>
 <body>
@@ -407,12 +423,12 @@ function markAll(p){markP(p.id);p.holes.forEach(h=>markF(p.id,h.id));}
 function markDel(p){const y=SY();y.del=y.del||{};y.del[p.id]=polyDoc(p);y.dp[p.id]=Date.now();Object.keys(y.df).forEach(k=>{if(k.startsWith(p.id+'\u0001'))delete y.df[k];});syncLogo();}
 const GEO=['id','x','y','line','n','profProj','obsCroqui','cargaProj','tempo','tempos'];
 const DYN=['status','profMed','agua','aguaM','decks','booster','brinel','detTipo','detQtd','tampao','caminhao','obs','cond','lotes','hist','ts','por','dens'];
-const PK=['lotes','cams','acess','check','situ','geo','pos','detAt','bg','wpp'];
+const PK=['lotes','cams','acess','check','situ','geo','pos','detAt','bg','wpp','dsam'];
 function polyDoc(p){const ex={};PK.forEach(k=>{if(p[k]!=null)ex[k]=p[k];});if(ex.bg){ex.bg={...ex.bg};delete ex.bg.on;} /* mostrar/ocultar croqui é de cada celular */return{...ex,dvtProg:p.dvtProg??null,proj:p.proj||null,mina:p.mina,cava:p.cava,pol:p.pol,banco:p.banco,data:p.data,resp:p.resp,nfs:p.nfs||{},esp:p.esp||null,criado:p.criado||null,holes:p.holes.map(h=>{const o={};GEO.forEach(k=>{if(h[k]!=null)o[k]=h[k];});return o;})};}
 function furoDoc(h){const o={};DYN.forEach(k=>o[k]=h[k]??null);return o;}
 // cada parte do polígono vira um "caminho"; o celular manda só os caminhos que mudou desde a última sincronização
 // assim dois colegas mexendo no mesmo polígono (caminhões diferentes, furos extras, checklist) não apagam o trabalho um do outro
-const SUBK=['cams','acess','check','nfs','situ','pos','lotes','proj'];
+const SUBK=['cams','acess','check','nfs','situ','pos','lotes','proj','dsam'];
 const hsh=v=>{const t=JSON.stringify(v??null);let h=5381;for(let i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return(h>>>0).toString(36)+t.length.toString(36);};
 function mapaDoc(doc){const m={};Object.keys(doc||{}).forEach(k=>{const v=doc[k];
   if(k==='holes'&&Array.isArray(v))v.forEach(h=>{if(h&&h.id!=null)m['holes\u0001'+h.id]=hsh(h);});
@@ -623,7 +639,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-23.3';
+const APP_VER='2026-11-24.1';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1567,7 +1583,7 @@ async function imprimir(p){
     const cams=[...new Set([...Object.keys(r.cam),...Object.keys(p.cams||{})])].filter(c=>c!=='Sem caminhão'||r.cam[c]);
     const ck=k=>{const c=(p.check||{})[k];const it=k==='pre'?CHK_PRE:CHK_FIM;return T(it.map((t,i)=>[esc(t),c&&c.it&&c.it[i]?'✔':'—']),['Item','Conferido'])+`<p>${c&&c.ts?'Registrado por <b>'+esc(c.nome)+'</b> em '+new Date(c.ts).toLocaleString('pt-BR'):'Não registrado'}</p>`;};
     let h=`<h1>Relatório de carregamento – POL ${esc(p.pol)}</h1><div>${esc(p.mina)}${p.cava?' / '+esc(p.cava):''}${p.banco?' · Banco '+esc(p.banco):''} · Data ${brDate(p.data)}${p.resp?' · Responsável: '+esc(p.resp):''} · Situação: <b>${SITU[situDe(p)].n}</b>${p.detAt?' em '+new Date(p.detAt).toLocaleString('pt-BR'):''}</div><div style="color:#555">Gerado em ${new Date().toLocaleString('pt-BR')}${meuNome()?' por '+esc(meuNome()):''}</div>
-    ${planoTxt(p)?`<p><b>Plano de fogo:</b> ${esc(planoTxt(p))}</p>`:''}<h2>Resumo</h2>${T([[r.total,r.st.carregado,r.st.pendente,r.st.repasse,r.st.perdido,r.st.nao,r.agua,fmt(r.kg)+' kg',fmt(r.pmMed,1)+' / '+fmt(r.ppMed,1)+' m']],['Furos','Carregados','Pendentes','Repasse','Perdidos','Não carregar','Com água','Total lançado','Prof. média med./proj.'])}
+    ${planoTxt(p)?`<p><b>Plano de fogo:</b> ${esc(planoTxt(p))}</p>`:''}${amostras(p).length?`<p><b>Amostras de densidade:</b> ${amostras(p).map(a=>esc(new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' '+(a.cam?camCurto(a.cam)+' ':'')+fmt(a.v,2))).join(' · ')} — média ${fmt(mediaDens(amostras(p)),2)} g/cm³</p>`:''}<h2>Resumo</h2>${T([[r.total,r.st.carregado,r.st.pendente,r.st.repasse,r.st.perdido,r.st.nao,r.agua,fmt(r.kg)+' kg',fmt(r.pmMed,1)+' / '+fmt(r.ppMed,1)+' m']],['Furos','Carregados','Pendentes','Repasse','Perdidos','Não carregar','Com água','Total lançado','Prof. média med./proj.'])}
     <h2>Consumo lançado</h2>${T([...Object.entries(r.prod).map(([k,v])=>[esc(k),fmt(v)+' kg']),['Booster',fmt(r.booster)+' un'],['Brinel',fmt(r.brinel)+' un'],...Object.entries(r.det).map(([k,v])=>[esc(k),fmt(v)+' un'])],['Item','Quantidade'])}`;
     if(pj.kg!=null||p.holes.some(x=>x.cargaProj!=null)){const lanc=cf.n.ok+cf.n.abaixo+cf.n.acima;h+=`<h2>Projeto x executado</h2>${T([[fmt(cf.kgProj)+' kg',fmt(cf.kgExec)+' kg',cf.kgProj?fmt((cf.kgExec-cf.kgProj)/cf.kgProj*100,1)+'%':'–',`${cf.n.ok}/${lanc}`,cf.n.abaixo,cf.n.acima,cf.profBaixa]],['Carga projeto','Executado','Diferença',`Na tolerância (±${fmt(pj.tolKg,0)}%)`,'Abaixo','Acima','Prof. abaixo'])}`;}
     if(cams.length)h+=`<h2>Caminhões</h2>${T(cams.map(c=>{const d=(p.cams||{})[c]||{};const kl=Object.values(r.cam[c]||{}).reduce((a,b)=>a+b,0);const cd=camDif(p,c,kl);return[esc(c),esc(d.nf||(p.nfs||{})[c]||''),fmt(num(d.kgNF)),fmt(num(d.kgRet)),fmt(kl),cd?cd.txt:'–',esc(d.dens||''),esc(d.temp||''),esc(d.oper||''),esc([d.ini,d.fim].filter(Boolean).join(' – '))];}),['Caminhão','NF','kg NF','Retorno','Lançado','Diferença','Dens.','Temp.','Operador','Horário'])}`;
@@ -2191,77 +2207,124 @@ function renderIndic(){
   $('#imCsv').onclick=()=>{const n=v=>v==null?'':String(Math.round(v*10)/10).replace('.',',');exportBox('Indicadores','indicadores-'+today()+'.csv',['Data;Mina;POL;Banco;Furos;Carregados;Kg;KgPorFuro;NaTolerancia%;FurosForaTol;Agua%;ProfBaixa%;PerdidosNaoCarregar;Booster;Falhas;Fragmentacao;Ultralancamento',...L.map(x=>[x.p.data,x.p.mina,x.p.pol,x.p.banco,x.furos,x.carr,n(x.kg),n(x.kgFuro),n(x.tol),x.fora??'',n(x.agua),n(x.profBaixa),x.perd,x.booster,x.falhas,FRAG[x.frag]||'',x.ultra?'sim':''].join(';'))].join('\n'),'text/csv');};
 }
 
-/* ===== Aba Operador (dentro do lançamento de carga): um furo por vez, campos grandes, salva e já vai para o próximo ===== */
-let operIdx=null,operSujo=false;
+/* ===== Aba Operador (dentro do lançamento de carga): lista de furos, cada linha com carga, profundidade e tampão ===== */
+let operSujo=false,operFiltro='todos';
 const operLast=()=>(S.ui&&S.ui.operLast)||{};
-function operProximo(p,de){const n=p.holes.length;for(let k=1;k<=n;k++){const q=((de??-1)+k)%n;if(p.holes[q].status==='pendente')return q;}return -1;}
 function abrirOperador(){
   const ab=S.polys.filter(p=>situDe(p)==='aberto').sort((a,b)=>(b.data||'').localeCompare(a.data||'')||(b.criado||0)-(a.criado||0));
   const p=(S.cur&&ab.find(x=>x.id===S.cur))||ab[0]||S.polys.find(x=>x.id===S.cur);
   if(!p){go('home');toast('Nenhum polígono em carregamento');return;}
-  S.cur=p.id;save();tab='oper';operIdx=null;go('poly');
+  S.cur=p.id;save();tab='oper';go('poly');
 }
+/* ----- Amostras de densidade (copo): 3 a 4 por carregamento, por caminhão, separadas dos furos ----- */
+const amostras=(p,cam)=>Object.entries(p.dsam||{}).map(([id,a])=>Object.assign({id},a)).filter(a=>a&&a.v!=null&&(!cam||a.cam===cam)).sort((a,b)=>a.ts-b.ts);
+const mediaDens=l=>l.length?Math.round(l.reduce((s,a)=>s+a.v,0)/l.length*1000)/1000:null;
+function densCamAtualiza(p,cam){const l=amostras(p,cam);p.cams=p.cams||{};p.cams[cam]=p.cams[cam]||{};p.cams[cam].dens=mediaDens(l);}
+function amostraNova(p,meu,depois){
+  const pr=projDe(p);const ult=[...p.holes].filter(h=>h.ts&&camsDoFuro(h).includes(meu)).sort((a,b)=>b.ts-a.ts)[0];
+  openSheet(`<h3>Amostra de densidade<button class="btn sm" id="dsX">Fechar</button></h3>
+  <p class="mut" style="margin:0 0 6px">🚛 ${esc(meu)} · ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}${ult?' · depois do furo '+esc(ult.id):''}${pr.dens!=null?' · plano '+fmt(pr.dens,2):''}</p>
+  <label for="dsV">Densidade do copo (g/cm³)</label><input id="dsV" class="opin" inputmode="decimal" enterkeyhint="done" placeholder="ex.: 1,15" style="width:100%">
+  <div id="dsAv" class="opav"></div>
+  <button class="btn ok opgo" id="dsOk">✔ Registrar amostra</button>`);
+  const av=()=>{const d=densNum($('#dsV').value);$('#dsAv').innerHTML=densFora(d)?'⚠️ Fora do comum (0,5 a 1,6 g/cm³)':(d!=null&&pr.dens!=null&&Math.abs(d-pr.dens)>0.05?`⚠️ Diferente do plano (${fmt(pr.dens,2)})`:'');};
+  $('#dsV').oninput=av;$('#dsX').onclick=closeSheet;setTimeout(()=>{const e=$('#dsV');if(e)e.focus();},50);
+  const ok=()=>{const d=densNum($('#dsV').value);if(d==null){toast('Informe a densidade');return;}
+    p.dsam=p.dsam||{};p.dsam[uid()]={v:d,ts:Date.now(),cam:meu,furo:ult?ult.id:null,por:meuNome()||meu};densCamAtualiza(p,meu);
+    markP(p.id);save();closeSheet();toast('Amostra '+fmt(d,2)+' registrada');depois&&depois();};
+  $('#dsOk').onclick=ok;$('#dsV').onkeydown=e=>{if(e.key==='Enter')ok();};
+}
+function amostraApagar(p,id){const a=(p.dsam||{})[id];if(!a)return;confirmBox(`Apagar a amostra ${fmt(a.v,2)} das ${new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}?`,()=>{p.dsam[id]=null;densCamAtualiza(p,a.cam);markP(p.id);save();renderPoly();},'Apagar');}
+function amostrasHTML(p,meu){const l=amostras(p,meu);const m=mediaDens(l);
+  return `<div class="card op"><div class="opbar"><h2 style="margin:0">🧪 Densidade</h2><span class="mut" style="margin-left:auto">${l.length?`${l.length} amostra${l.length>1?'s':''} · média <b>${fmt(m,2)}</b>`:'nenhuma amostra ainda'}</span></div>
+  ${l.length?`<div class="dsl">${l.map(a=>`<button class="dschip" data-ds="${a.id}" title="Tocar para apagar">${new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} · <b>${fmt(a.v,2)}</b>${a.furo?` <span class="mut">(furo ${esc(a.furo)})</span>`:''}</button>`).join('')}</div>`:''}
+  <button class="btn pri" id="dsNova" style="width:100%;min-height:56px;font-size:19px;font-weight:800;margin-top:8px">+ Amostra de densidade</button>
+  <p class="mut" style="margin:6px 0 0">Tire a amostra umas 3 a 4 vezes durante o carregamento. A média vai para o seu caminhão.</p></div>`;}
+// croqui pequeno da aba Operador: cor por caminhão, toque no furo leva à linha dele
+function operCor(h){if(h.status==='pendente')return'#5b6676';if(h.status==='carregado')return camCor(camsDoFuro(h)[0]||'');return ST[h.status].c;}
+function operMapaHTML(p,meu){
+  if(p.bg&&!(p.id in bgCache))bgGet(p.id).then(()=>{if(view==='poly'&&tab==='oper'&&S.cur===p.id&&!operSujo)tabOper(p);});
+  const g=geom(p),r=g.r;let s='';
+  if(g.useBg){const m=p.bg.m;s+=`<g transform="translate(${g.pad+g.off-g.minX} ${g.pad-g.minY})"><image href="${g.bgUrl}" width="${p.bg.w}" height="${p.bg.h}" transform="matrix(${m.join(' ')})" preserveAspectRatio="none" opacity="0.8"/></g>`;}
+  p.holes.forEach((h,i)=>{const meuF=camsDoFuro(h).includes(meu);s+=`<g class="opd" data-oi="${i}"><circle cx="${g.X(h.x)}" cy="${g.Y(h.y)}" r="${r}" fill="${operCor(h)}" stroke="${meuF?'#fff':'rgba(0,0,0,.5)'}" stroke-width="${r*(meuF?0.22:0.1)}"/><text x="${g.X(h.x)}" y="${g.Y(h.y)+r*0.3}" text-anchor="middle" font-size="${r*0.8}" fill="#fff" font-weight="700" pointer-events="none">${esc(String(h.n!=null?h.n:h.id).slice(-4))}</text></g>`;});
+  const cams=camsPoly(p);
+  return `<div class="opmapw"><svg id="opMap" viewBox="0 0 ${g.W} ${g.H}" preserveAspectRatio="xMidYMid meet">${s}</svg></div>
+  <div class="oplg"><span><i style="background:#5b6676"></i>Pendente</span>${cams.map(c=>`<span><i style="background:${camCor(c)};${c===meu?'outline:2px solid #fff':''}"></i>${esc(camCurto(c))}</span>`).join('')}<span><i style="background:${ST.repasse.c}"></i>Repasse</span></div>`;}
+function operMapaPinta(p,meu,h){const el=document.querySelector(`#opMap [data-oi="${p.holes.indexOf(h)}"] circle`);if(!el)return;el.setAttribute('fill',operCor(h));const mf=camsDoFuro(h).includes(meu);el.setAttribute('stroke',mf?'#fff':'rgba(0,0,0,.5)');}
+function operMapaMarca(i){document.querySelectorAll('#opMap .opd.sel').forEach(e=>e.classList.remove('sel'));const e=document.querySelector(`#opMap [data-oi="${i}"]`);if(e)e.classList.add('sel');}
 function tabOper(p){
-  const meu=(S.ui&&S.ui.meuCam)||'';const pr=projDe(p);const L=operLast();
+  const meu=(S.ui&&S.ui.meuCam)||'';const pr=projDe(p);
   const camChips=[...new Set([...CAMS,...camsPoly(p)])];
   if(!meu){
     $('#tabBox').innerHTML=`<div class="card op"><h2 style="margin-top:0">Qual é o seu caminhão?</h2><div class="opcams">${camChips.map(c=>`<button class="btn" data-oc="${esc(c)}" style="border-left:8px solid ${camCor(c)}">${esc(camCurto(c))}</button>`).join('')}</div><p class="mut">Fica guardado neste celular. Dá para trocar depois.</p></div>`;
     document.querySelectorAll('[data-oc]').forEach(b=>b.onclick=()=>{S.ui=Object.assign(S.ui||{},{meuCam:b.dataset.oc});save();tabOper(p);});return;}
-  if(operIdx==null||!p.holes[operIdx]){operIdx=operProximo(p,-1);if(operIdx<0)operIdx=0;}
-  const h=p.holes[operIdx];if(!h){$('#tabBox').innerHTML='<div class="card empty">Este polígono não tem furos.</div>';return;}
   const pend=p.holes.filter(x=>x.status==='pendente').length;const meus=p.holes.filter(x=>camsDoFuro(x).includes(meu));const kgMeu=meus.reduce((s,x)=>s+kgDoCam(x,meu),0);
-  const jaLancado=h.status!=='pendente';const kp=kgProj(p,h);const v=x=>x==null?'':String(x).replace('.',',');
-  const kgIni=jaLancado?(kgDoCam(h,meu)||holeKg(h)||null):null;
-  const vals={kg:kgIni,prof:h.profMed,tamp:h.tampao??L.tampao??pr.tampao,dens:h.dens??meuDens()??L.dens??pr.dens};
-  const abertos=S.polys.filter(x=>situDe(x)==='aberto'||x.id===p.id);
-  let html=`<div class="card op">
-  <div class="opbar"><button class="btn sm" id="opCam" style="border-left:6px solid ${camCor(meu)}">🚛 ${esc(camCurto(meu))} ▾</button>${abertos.length>1?`<select id="opPol" style="flex:1">${abertos.map(x=>`<option value="${x.id}" ${x.id===p.id?'selected':''}>POL ${esc(x.pol)}</option>`).join('')}</select>`:''}<span class="mut" style="margin-left:auto">${pend} pendente${pend===1?'':'s'}</span></div>
+  const abertos=S.polys.filter(x=>situDe(x)==='aberto'||x.id===p.id);const v=x=>x==null?'':String(x).replace('.',',');
+  const lista=operFiltro==='pend'?p.holes.filter(x=>x.status==='pendente'):operFiltro==='meus'?meus:p.holes;
+  const tampPad=operLast().tampao??pr.tampao;
+  const linha=h=>{const i=p.holes.indexOf(h);const kgM=kgDoCam(h,meu);const outros=holeKg(h)-kgM;const st=h.status;
+    return `<div class="opl ${st}" data-i="${i}"><div class="oplid"><b>${esc(h.id)}</b><span>${st==='pendente'?(h.agua!=='seca'?'💧':''):st==='carregado'?'✔':ST[st].n}${outros>0?' <i>+'+fmt(outros)+' '+esc(camsDoFuro(h).filter(c=>c!==meu).map(camCurto).join('+'))+'</i>':''}</span></div>
+    <input data-k="kg" inputmode="decimal" enterkeyhint="next" value="${v(kgM||null)}" placeholder="${kgProj(p,h)!=null?fmt(kgProj(p,h)):'kg'}" aria-label="Carga do furo ${esc(h.id)}">
+    <input data-k="pm" inputmode="decimal" enterkeyhint="next" value="${v(h.profMed)}" placeholder="${h.profProj!=null?v(h.profProj):'m'}" aria-label="Profundidade do furo ${esc(h.id)}">
+    <input data-k="tp" inputmode="decimal" enterkeyhint="next" value="${v(h.tampao)}" placeholder="${tampPad!=null?v(tampPad):'m'}" aria-label="Tampão do furo ${esc(h.id)}">
+    <button class="btn oplm" data-m="${i}" aria-label="Mais opções do furo ${esc(h.id)}">⋯</button></div>`;};
+  $('#tabBox').innerHTML=`<div class="card op">
+  <div class="opbar"><button class="btn sm" id="opCam" style="border-left:6px solid ${camCor(meu)}">🚛 ${esc(camCurto(meu))} ▾</button>${abertos.length>1?`<select id="opPol" style="flex:1">${abertos.map(x=>`<option value="${x.id}" ${x.id===p.id?'selected':''}>POL ${esc(x.pol)}</option>`).join('')}</select>`:''}<span class="mut" style="margin-left:auto"><b>${pend}</b> pendente${pend===1?'':'s'}</span></div>
   ${!SY().token?'<div class="hint" style="margin:8px 0 0">📴 Fora da equipe online: fica só neste celular. Entre na equipe na tela inicial para mandar ao responsável.</div>':''}
-  <div class="opfuro"><button class="btn opnav" id="opPrev" aria-label="Furo anterior">‹</button><div style="text-align:center;flex:1"><div class="mut" style="font-size:14px">FURO</div><input id="opId" value="${esc(h.id)}" aria-label="Número do furo"><div><span class="chip" style="background:${ST[h.status].c}">${ST[h.status].n}</span>${h.agua!=='seca'?' 💧':''}</div></div><button class="btn opnav" id="opNext" aria-label="Próximo furo">›</button></div>
-  <p class="mut" style="text-align:center;margin:4px 0 8px">${kp!=null?'Projeto '+fmt(kp)+' kg':''}${h.profProj!=null?' · prof. '+fmt(h.profProj,1)+' m':''}${pr.tampao!=null?' · tampão '+fmt(pr.tampao,1)+' m':''}${pr.dens!=null?' · dens. '+fmt(pr.dens,2):''}${(()=>{const a=[pr.booster!=null?pr.booster+' booster':'',pr.brinel!=null?pr.brinel+' brinel':'',pr.detQtd!=null||pr.detTipo?(pr.detQtd??1)+' '+(pr.detTipo||'detonador'):''].filter(Boolean);return a.length?'<br>Acessórios (projeto): '+esc(a.join(' · ')):'';})()}${h.obsCroqui?'<br>Croqui: '+esc(h.obsCroqui):''}</p>
-  ${(()=>{const oc=camsDoFuro(h).filter(c=>c!==meu),ok=holeKg(h)-kgDoCam(h,meu);return oc.length&&ok>0?`<div class="hint" style="margin:0 0 8px">Já tem ${fmt(ok)} kg do ${esc(oc.map(camCurto).join(' + '))}. O seu entra como outro deck.</div>`:'';})()}
-  <div class="opgrid">
-   <div><label for="opK">Carga (kg)</label><input id="opK" class="opin" inputmode="decimal" enterkeyhint="next" value="${v(vals.kg)}" placeholder="${kp!=null?'proj. '+fmt(kp):'kg'}"></div>
-   <div><label for="opP">Profundidade (m)</label><input id="opP" class="opin" inputmode="decimal" enterkeyhint="next" value="${v(vals.prof)}" placeholder="${h.profProj!=null?v(h.profProj):'trena'}">${h.profProj!=null?`<button class="btn sm opeq" id="opPeq">= projeto ${fmt(h.profProj,1)}</button>`:''}</div>
-   <div><label for="opT">Tampão (m)</label><input id="opT" class="opin" inputmode="decimal" enterkeyhint="next" value="${v(vals.tamp)}"></div>
-   <div><label for="opD">Densidade (g/cm³)</label><input id="opD" class="opin" inputmode="decimal" enterkeyhint="done" value="${v(vals.dens)}"></div>
+  <p class="mut" style="margin:8px 0 0">${planoTxt(p)?esc(planoTxt(p)):'Plano de fogo não informado'}</p>
+  <div class="kpis" style="margin-top:8px"><div class="kpi"><b>${meus.length}</b><span>furos meus</span></div><div class="kpi"><b>${fmt(kgMeu)}</b><span>kg meus</span></div></div>
   </div>
-  <div id="opAv" class="opav"></div>
-  <button class="btn ok opgo" id="opSave">✔ ${jaLancado?'Corrigir e próximo':'Carregado · próximo'}</button>
-  <div class="btns" style="margin-top:8px"><button class="btn" id="opRep" style="flex:1;min-height:52px">Repasse</button><button class="btn" id="opSkip" style="flex:1;min-height:52px">Pular ›</button></div>
-  </div>
-  <div class="kpis"><div class="kpi"><b>${meus.length}</b><span>furos que carreguei</span></div><div class="kpi"><b>${fmt(kgMeu)}</b><span>kg lançados por mim</span></div></div>`;
-  $('#tabBox').innerHTML=html;operSujo=false;
-  const ins=['#opK','#opP','#opT','#opD'];
-  const av=()=>{const a=[];const k=num($('#opK').value),pm=num($('#opP').value),d=densNum($('#opD').value),t=num($('#opT').value);
-    if(k!=null&&kp!=null&&Math.abs(k-kp)/kp*100>pr.tolKg)a.push(`carga ${k>kp?'acima':'abaixo'} do projeto`);
-    if(pm!=null&&h.profProj!=null&&pm<h.profProj-pr.tolProf)a.push(`furo ${fmt(h.profProj-pm,1)} m mais raso`);
-    if(densFora(d))a.push('densidade fora do comum');else if(d!=null&&pr.dens!=null&&Math.abs(d-pr.dens)>0.05)a.push('densidade diferente do plano');
-    if(t!=null&&pr.tampao!=null&&Math.abs(t-pr.tampao)>0.5)a.push('tampão diferente do plano');
-    $('#opAv').innerHTML=a.length?'⚠️ '+a.join(' · '):'';};
-  ins.forEach((id,i)=>{const el=$(id);el.oninput=()=>{operSujo=true;av();};el.onfocus=()=>setTimeout(()=>{try{el.select();}catch(e){}},0);
-    el.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();if(i<ins.length-1)$(ins[i+1]).focus();else salvar('carregado');}};});
-  av();
-  if($('#opPeq'))$('#opPeq').onclick=()=>{$('#opP').value=v(h.profProj);operSujo=true;av();$('#opT').focus();};
-  const ir=i=>{operIdx=(i+p.holes.length)%p.holes.length;tabOper(p);window.scrollTo(0,0);};
-  $('#opPrev').onclick=()=>ir(operIdx-1);$('#opNext').onclick=()=>ir(operIdx+1);
-  $('#opSkip').onclick=()=>{const j=operProximo(p,operIdx);ir(j<0?operIdx+1:j);};
-  $('#opId').onfocus=()=>setTimeout(()=>$('#opId').select(),0);
-  $('#opId').onchange=()=>{const x=furoMap(p.holes)($('#opId').value);if(!x){toast('Furo '+$('#opId').value+' não encontrado');$('#opId').value=h.id;return;}ir(p.holes.indexOf(x));};
+  <div class="card op" style="padding:8px"><div class="opbar" style="margin-bottom:6px"><b>Croqui</b><span class="mut" style="margin-left:8px">toque no furo para lançar</span><button class="btn sm" id="opMT" style="margin-left:auto">${S.ui&&S.ui.opMapOff?'Mostrar ▾':'Esconder ▴'}</button></div>${S.ui&&S.ui.opMapOff?'':operMapaHTML(p,meu)}</div>
+  ${amostrasHTML(p,meu)}
+  <div class="seg" id="opF" style="margin:4px 0 8px">${[['todos','Todos'],['pend','Pendentes'],['meus','Meus']].map(([k,t])=>`<button data-f="${k}" class="${operFiltro===k?'on':''}">${t}</button>`).join('')}</div>
+  <div class="card op" style="padding:6px 8px"><div class="oplh"><span>Furo</span><span>Carga kg</span><span>Prof. m</span><span>Tampão m</span><span></span></div>
+  <div id="opList">${lista.map(linha).join('')||'<p class="mut" style="padding:10px">Nada aqui.</p>'}</div>
+  <p class="mut" style="margin:8px 4px">Digite e passe para o próximo: salva sozinho. Com a carga preenchida o furo fica <b>carregado</b> pelo ${esc(camCurto(meu))}. ⋯ = repasse e outros dados.</p></div>`;
+  operSujo=false;
   $('#opCam').onclick=()=>{S.ui=Object.assign(S.ui||{},{meuCam:''});save();tabOper(p);};
-  if($('#opPol'))$('#opPol').onchange=e=>{S.cur=e.target.value;operIdx=null;save();renderPoly();};
-  const salvar=st=>{const k=num($('#opK').value),pm=num($('#opP').value),t=num($('#opT').value),d=densNum($('#opD').value);
-    if(st==='carregado'&&!(k>0)){toast('Informe a carga (kg)');$('#opK').focus();return;}
-    const antes=camFora(p,meu)?[meu]:[];pushUndo(p,[h],'furo '+h.id);
-    if(st==='carregado')lancarCarga(h,meu,((h.decks||[]).find(x=>deckCam(h,x)===meu)||{}).prod||pr.prod||'',k);
-    if(pm!=null)h.profMed=pm;h.tampao=t;h.dens=d;h.status=st;
-    if(st==='carregado'){if(h.booster==null&&pr.booster!=null)h.booster=pr.booster;if(h.brinel==null&&pr.brinel!=null)h.brinel=pr.brinel;if(!h.detTipo&&pr.detTipo)h.detTipo=pr.detTipo;if(h.detQtd==null&&pr.detQtd!=null)h.detQtd=pr.detQtd;}
-    S.ui=Object.assign(S.ui||{},{meuDens:d??meuDens(),operLast:{tampao:t,dens:d}});
-    if(d!=null){p.cams=p.cams||{};p.cams[meu]=p.cams[meu]||{};if(p.cams[meu].dens==null||p.cams[meu].dens===''){p.cams[meu].dens=d;markP(p.id);}}
-    carimbaLotes(p,h);histAdd(h,'Operador: '+resumoFuro(h));h.ts=Date.now();h.por=meuNome()||meu;markF(p.id,h.id);save();
-    toast('Furo '+h.id+(st==='carregado'?' carregado':' em repasse')+(SY().token?' · enviado':''));setTimeout(()=>checarAlertas(p,h,antes),60);
-    operSujo=false;const j=operProximo(p,operIdx);if(j<0){toast('Todos os furos lançados 🎉');tabOper(p);}else ir(j);};
-  $('#opSave').onclick=()=>salvar('carregado');$('#opRep').onclick=()=>salvar('repasse');
+  if($('#opPol'))$('#opPol').onchange=e=>{S.cur=e.target.value;save();renderPoly();};
+  document.querySelectorAll('#opF button').forEach(b=>b.onclick=()=>{operFiltro=b.dataset.f;tabOper(p);});
+  $('#dsNova').onclick=()=>amostraNova(p,meu,()=>tabOper(p));
+  $('#opMT').onclick=()=>{S.ui=Object.assign(S.ui||{},{opMapOff:!(S.ui&&S.ui.opMapOff)});save();tabOper(p);};
+  const vaiFuro=i=>{let row=document.querySelector(`.opl[data-i="${i}"]`);if(!row){operFiltro='todos';tabOper(p);row=document.querySelector(`.opl[data-i="${i}"]`);}if(!row)return;row.scrollIntoView({block:'center',behavior:'smooth'});row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),1200);setTimeout(()=>{const inp=document.querySelector(`.opl[data-i="${i}"] [data-k="kg"]`);if(inp)inp.focus({preventScroll:true});},350);operMapaMarca(i);};
+  document.querySelectorAll('#opMap .opd').forEach(e=>e.onclick=()=>vaiFuro(+e.dataset.oi));
+  document.querySelectorAll('[data-ds]').forEach(b=>b.onclick=()=>amostraApagar(p,b.dataset.ds));
+  document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>operMais(p,+b.dataset.m,meu));
+  const ins=[...document.querySelectorAll('#opList input')];
+  ins.forEach((el,ix)=>{el.onfocus=()=>{operSujo=true;operMapaMarca(+el.closest('.opl').dataset.i);setTimeout(()=>{try{el.select();}catch(e){}},0);};
+    el.oninput=()=>{operSujo=true;};
+    el.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const nx=ins[ix+1];if(nx){nx.focus();nx.scrollIntoView({block:'center'});}else el.blur();}};
+    el.onchange=()=>operSalvaLinha(p,el.closest('.opl'),meu);
+    el.onblur=()=>setTimeout(()=>{if(!document.activeElement||!document.activeElement.closest||!document.activeElement.closest('#opList'))operSujo=false;},300);});
+}
+// salva a linha do furo (carga, profundidade, tampão) sem redesenhar a lista
+function operSalvaLinha(p,row,meu){
+  const h=p.holes[+row.dataset.i];if(!h)return;const pr=projDe(p);const g=k=>num(row.querySelector(`[data-k="${k}"]`).value);
+  const k=g('kg'),pm=g('pm');let t=g('tp');const kgAntes=kgDoCam(h,meu);if(t==null&&k>0&&h.tampao==null){t=tampoPadrao(p);if(t!=null)row.querySelector('[data-k="tp"]').value=String(t).replace('.',',');}
+  const mudou=(k??0)!==(kgAntes||0)||pm!==(h.profMed??null)||t!==(h.tampao??null);
+  if(!mudou)return;
+  const antes=camFora(p,meu)?[meu]:[];pushUndo(p,[h],'furo '+h.id);
+  if(k>0){lancarCarga(h,meu,((h.decks||[]).find(x=>deckCam(h,x)===meu)||{}).prod||pr.prod||'',k);if(h.status==='pendente'||h.status==='repasse')h.status='carregado';
+    if(h.booster==null&&pr.booster!=null)h.booster=pr.booster;if(h.brinel==null&&pr.brinel!=null)h.brinel=pr.brinel;if(!h.detTipo&&pr.detTipo)h.detTipo=pr.detTipo;if(h.detQtd==null&&pr.detQtd!=null)h.detQtd=pr.detQtd;}
+  else if(kgAntes>0){h.decks=(h.decks||[]).filter(d=>deckCam(h,d)!==meu);normCams(h);if(!holeKg(h)&&h.status==='carregado'){h.status='pendente';h.booster=h.brinel=h.detQtd=null;h.detTipo='';}}
+  h.profMed=pm;h.tampao=t;
+  if(t!=null)S.ui=Object.assign(S.ui||{},{operLast:{tampao:t}});
+  carimbaLotes(p,h);histAdd(h,'Operador: '+resumoFuro(h));h.ts=Date.now();h.por=meuNome()||meu;markF(p.id,h.id);save();
+  row.className='opl '+h.status;row.querySelector('.oplid span').innerHTML=h.status==='carregado'?'✔':h.status==='pendente'?'':esc(ST[h.status].n);
+  const av=[];const kp=kgProj(p,h);if(k>0&&kp!=null&&Math.abs(k-kp)/kp*100>pr.tolKg)av.push('carga '+(k>kp?'acima':'abaixo')+' do projeto');if(pm!=null&&h.profProj!=null&&pm<h.profProj-pr.tolProf)av.push(fmt(h.profProj-pm,1)+' m mais raso');if(t!=null&&pr.tampao!=null&&Math.abs(t-pr.tampao)>0.5)av.push('tampão diferente do plano');
+  toast('Furo '+h.id+(h.status==='carregado'?' carregado':' salvo')+(av.length?' · ⚠️ '+av.join(' · '):'')+(SY().token?' · enviado':''));
+  operMapaPinta(p,meu,h);
+  const cf=camFora(p,meu);if(cf&&!antes.includes(meu))setTimeout(()=>aviso(`<b>${esc(meu)}</b>: lançado x NF fora da tolerância (${esc(cf.txt)})`),60);
+}
+const tampoPadrao=p=>operLast().tampao??projDe(p).tampao??null;
+function operMais(p,i,meu){const h=p.holes[i];
+  openSheet(`<h3>Furo ${esc(h.id)}<button class="btn sm" id="omX">Fechar</button></h3><p class="mut" style="margin:0 0 8px">${ST[h.status].n}${holeKg(h)?' · '+fmt(holeKg(h))+' kg':''}</p>
+  <div class="btns" style="flex-direction:column"><button class="btn" id="omRep" style="min-height:56px;font-size:18px">Não deu para carregar (repasse)</button><button class="btn" id="omAg" style="min-height:56px;font-size:18px">💧 ${h.agua==='seca'?'Furo com água':'Furo seco'}</button><button class="btn" id="omAll" style="min-height:56px;font-size:18px">Lançamento completo do furo</button></div>`);
+  $('#omX').onclick=closeSheet;
+  const fim=t=>{histAdd(h,'Operador: '+t);h.ts=Date.now();h.por=meuNome()||meu;markF(p.id,h.id);save();closeSheet();renderPoly();toast('Furo '+h.id+': '+t);};
+  $('#omRep').onclick=()=>{pushUndo(p,[h],'furo '+h.id);h.status='repasse';fim('repasse');};
+  $('#omAg').onclick=()=>{pushUndo(p,[h],'furo '+h.id);h.agua=h.agua==='seca'?'agua':'seca';fim(h.agua==='seca'?'seco':'com água');};
+  $('#omAll').onclick=()=>{closeSheet();editHole(i);};
 }
 
 /* ===== Operadores (tela simples: o operador lança explosivo, profundidade, tampão e densidade) ===== */
@@ -2395,7 +2458,7 @@ function editHole(i,voz,vozTxt){
     <div class="row"><div><label>Booster (un)</label><input id="hBo" inputmode="numeric" value="${f.booster??''}"></div><div><label>Brinel (un)</label><input id="hBr" inputmode="numeric" value="${f.brinel??''}"></div></div>
     <div class="row"><div><label>Detonador</label><select id="hDT">${opts(DETS,f.detTipo,'—')}</select></div><div><label>Qtd. detonadores</label><input id="hDQ" inputmode="numeric" value="${f.detQtd??''}"></div></div>
     <div class="row"><div><label>Tampão (m)</label><input id="hTa" inputmode="decimal" value="${f.tampao??''}"></div><div><label>Caminhão${f.decks.length>1?' do furo':''}</label><select id="hCa">${opts([...new Set([...CAMS,f.caminhao].filter(Boolean))],f.caminhao,'—')}</select></div></div>
- <div class="row"><div><label>Tempo de detonação (ms)</label><input id="hTz" inputmode="decimal" value="${f.tempos&&f.tempos.length>1?f.tempos.join(';'):(f.tempo??'')}" placeholder="do plano"></div><div><label>Densidade (g/cm³)</label><input id="hDe" inputmode="decimal" value="${f.dens!=null?String(f.dens).replace('.',','):''}" placeholder="${projDe(p).dens!=null?'plano: '+fmt(projDe(p).dens,2):'ex.: 1,15'}"></div></div>
+ <div class="row"><div><label>Tempo de detonação (ms)</label><input id="hTz" inputmode="decimal" value="${f.tempos&&f.tempos.length>1?f.tempos.join(';'):(f.tempo??'')}" placeholder="do plano"></div><div></div></div>
  <label>Carga de projeto deste furo (kg) — só se for diferente do padrão</label><input id="hCP" inputmode="decimal" value="${f.cargaProj??''}" placeholder="padrão do polígono: ${projDe(p).kg!=null?fmt(projDe(p).kg)+' kg':'não definido'}">
     <label>Condição do furo</label><div class="conds" id="hCo">${CONDS.map(c=>`<button data-c="${esc(c)}" class="${(f.cond||[]).includes(c)?'on':''}">${esc(c)}</button>`).join('')}</div>
     <label>Observação</label><input id="hOb" value="${esc(f.obs)}" placeholder="ex.: obstruído a 8 m, repasse">
@@ -2412,7 +2475,7 @@ function editHole(i,voz,vozTxt){
     if($('#hAM'))f.aguaM=num($('#hAM').value);
     f.decks.forEach((d,k)=>{d.prod=document.querySelector(`[data-dp="${k}"]`).value;d.kg=num(document.querySelector(`[data-dk="${k}"]`).value);const c=document.querySelector(`[data-dc="${k}"]`);if(c){if(c.value)d.cam=c.value;else delete d.cam;}});
     f.booster=num($('#hBo').value);f.brinel=num($('#hBr').value);f.detTipo=$('#hDT').value;f.detQtd=num($('#hDQ').value);
-    f.tampao=num($('#hTa').value);f.dens=densNum($('#hDe').value);f.caminhao=$('#hCa').value;f.obs=$('#hOb').value.trim();f.cargaProj=num($('#hCP').value);{const l={prod:$('#hLp').value.trim(),booster:$('#hLb').value.trim(),det:$('#hLd').value.trim()};f.lotes=Object.values(l).some(Boolean)?l:null;}{const ts=$('#hTz').value.split(/[;\/]/).map(num).filter(v=>v!=null);f.tempo=ts.length?ts[0]:null;f.tempos=ts.length>1?ts:null;}
+    f.tampao=num($('#hTa').value);f.caminhao=$('#hCa').value;f.obs=$('#hOb').value.trim();f.cargaProj=num($('#hCP').value);{const l={prod:$('#hLp').value.trim(),booster:$('#hLb').value.trim(),det:$('#hLd').value.trim()};f.lotes=Object.values(l).some(Boolean)?l:null;}{const ts=$('#hTz').value.split(/[;\/]/).map(num).filter(v=>v!=null);f.tempo=ts.length?ts[0]:null;f.tempos=ts.length>1?ts:null;}
   };
   const showPj=()=>{const el=$('#hPj');if(!el)return;const pr=projDe(p);const tmp=Object.assign({},h,{decks:f.decks.map((d,k)=>({prod:d.prod,kg:num((document.querySelector(`[data-dk="${k}"]`)||{}).value)})),status:f.status,cargaProj:num(($('#hCP')||{}).value)});
     const kp=kgProj(p,tmp);if(kp==null&&pr.tampao==null&&pr.booster==null&&!planoTxt(p)){el.style.display='none';return;}el.style.display='';
@@ -2560,7 +2623,7 @@ async function exportarPlanilha(p){
     $('#mdX').onclick=closeSheet;$('#mdOld').onclick=()=>{closeSheet();exportarPlanilhaSimples(p);};
     $('#mdPick').onclick=async()=>{const v=await modeloEscolher();if(v){closeSheet();exportarPlanilha(p);}};return;}
   let L;try{busy('Lendo as listas do modelo…');L=await modeloListas(m);busy();}catch(e){busy();toast('Não consegui ler o modelo. Escolha de novo.');await bgDel(MOD_KEY);return;}
-  const cams=camsPoly(p);const PF=projDe(p);const dMed=(()=>{const a=p.holes.map(h=>h.dens).filter(v=>v!=null);return a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length*100)/100:null;})();
+  const cams=camsPoly(p);const PF=projDe(p);const dMed=(()=>{const m=mediaDens(amostras(p));return m==null?null:Math.round(m*100)/100;})();
   const E=Object.assign({},S.enaex||{},p.enaex||{});['diam','afast','espac','dens'].forEach(k=>{const v=k==='dens'?(PF.dens??dMed):k==='diam'?(PF.diam?String(PF.diam).replace(/["”]|pol\.?/gi,'').trim():null):PF[k];if(v!=null&&v!==''&&(p.enaex||{})[k]==null)E[k]=v;});
   const todosCams=[...new Set([...cams,...CAMS,...(L.umb||[]).map(String).filter(c=>/^UM[BT]\s/i.test(c))])];
   const marcados=new Set(Array.isArray(E.cams)&&E.cams.length?E.cams.filter(c=>todosCams.includes(c)).concat(cams):todosCams);
@@ -2989,7 +3052,7 @@ function tabConf(p){
   let h=`<div class="hint" style="margin:0 0 10px"><b>Plano de fogo:</b> ${esc(planoTxt(p))||'—'}</div><div class="kpis"><div class="kpi"><b>${lanc?fmt(r.n.ok/lanc*100,0)+'%':'–'}</b><span>furos dentro da tolerância (±${fmt(pr.tolKg,0)}%)</span></div><div class="kpi"><b>${r.n.abaixo}</b><span>abaixo do projeto</span></div><div class="kpi"><b>${r.n.acima}</b><span>acima do projeto</span></div><div class="kpi"><b>${r.n.sem}</b><span>sem carga lançada</span></div></div>
   <div class="card" style="margin-top:12px"><h2>Carga total</h2><table><tbody><tr><td>Projeto (furos a carregar)</td><td class="n">${fmt(r.kgProj)} kg</td></tr><tr><td>Executado (lançado)</td><td class="n"><b>${fmt(r.kgExec)} kg</b></td></tr><tr><td>Diferença</td><td class="n">${dif==null?'–':(dif>=0?'+':'')+fmt(dif,1)+'%'}</td></tr></tbody></table>
   <p class="mut">A diferença total só fecha quando todos os furos estiverem lançados.</p></div>
-  <div class="card"><h2>Outros pontos</h2><table><tbody><tr><td>Profundidade abaixo do projeto (> ${fmt(pr.tolProf,1)} m)</td><td class="n">${r.profBaixa}</td></tr>${pr.tampao!=null?`<tr><td>Tampão diferente do projeto (> 0,5 m)</td><td class="n">${r.tampDif}</td></tr>`:''}${pr.booster!=null?`<tr><td>Booster diferente do projeto</td><td class="n">${r.boosterDif}</td></tr>`:''}${r.densN?`<tr><td>Densidade média lançada pelos operadores (${r.densN} furo${r.densN>1?'s':''})</td><td class="n">${fmt(r.densSoma/r.densN,2)} g/cm³</td></tr>`:''}${pr.dens!=null?`<tr><td>Densidade diferente do projeto (> 0,05 g/cm³)</td><td class="n">${r.densDif}</td></tr>`:''}<tr><td>Perdidos / não carregar</td><td class="n">${r.n.fora}</td></tr></tbody></table></div>`;
+  <div class="card"><h2>Outros pontos</h2><table><tbody><tr><td>Profundidade abaixo do projeto (> ${fmt(pr.tolProf,1)} m)</td><td class="n">${r.profBaixa}</td></tr>${pr.tampao!=null?`<tr><td>Tampão diferente do projeto (> 0,5 m)</td><td class="n">${r.tampDif}</td></tr>`:''}${pr.booster!=null?`<tr><td>Booster diferente do projeto</td><td class="n">${r.boosterDif}</td></tr>`:''}${(()=>{const l=amostras(p);if(!l.length)return'';const m=mediaDens(l);const fora=pr.dens!=null?l.filter(a=>Math.abs(a.v-pr.dens)>0.05).length:null;return `<tr><td>Amostras de densidade (${l.length}) · média</td><td class="n">${fmt(m,2)} g/cm³</td></tr>${fora!=null?`<tr><td>Amostras diferentes do plano (> 0,05 g/cm³)</td><td class="n">${fora}</td></tr>`:''}`;})()}<tr><td>Perdidos / não carregar</td><td class="n">${r.n.fora}</td></tr></tbody></table></div>`;
   if(r.lista.length)h+=`<div class="card" style="padding:4px 8px;overflow:auto"><h2 style="margin:10px 6px">Furos fora da tolerância</h2><table><thead><tr><th>Furo</th><th class="n">Projeto</th><th class="n">Exec.</th><th class="n">Desvio</th><th>Cam.</th></tr></thead><tbody>${r.lista.sort((a,b)=>Math.abs(b[1].d)-Math.abs(a[1].d)).map(([x,dv])=>`<tr class="click" data-i="${p.holes.indexOf(x)}"><td><b>${esc(x.id)}</b></td><td class="n">${fmt(kgProj(p,x))}</td><td class="n">${fmt(holeKg(x))}</td><td class="n" style="color:${DV[dv.c].c};font-weight:700">${dv.d>0?'+':''}${fmt(dv.d,0)}%</td><td>${esc(camsTxt(x))}</td></tr>`).join('')}</tbody></table></div>`;
   h+=`<div class="btns"><button class="btn" id="cfEd">Editar projeto</button><button class="btn" id="cfMap">Ver no mapa</button></div>`;
   $('#tabBox').innerHTML=h;
