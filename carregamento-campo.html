@@ -261,6 +261,7 @@ header h1 .logo svg{width:24px;height:24px}
 .dsl{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.dschip{background:rgba(255,255,255,.06);border:1px solid var(--line);color:#fff;border-radius:999px;padding:8px 12px;font-size:15px}
 .avg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.avp{border:1px solid var(--line);border-radius:12px;padding:8px;cursor:pointer;background:var(--card,#fff)}.avt{display:flex;justify-content:space-between;align-items:baseline}.avt span{font-weight:800;color:#ff6a13}.avm{background:#1d2530;border-radius:8px;margin:6px 0;aspect-ratio:4/3;display:flex}.avm svg{width:100%;height:100%}.avc{display:flex;flex-wrap:wrap;gap:4px 8px;font-size:12px;margin:4px 0}.avc i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:3px;vertical-align:-1px}
 .dsft{grid-column:1/-1;display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:-2px 0 6px}.dsth{display:flex;gap:6px;flex-wrap:wrap}.dsth img{width:54px;height:54px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,.25);cursor:pointer}
+.opnms{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:46vh;overflow:auto}.opnms .btn{min-height:56px;font-size:17px;font-weight:800}
 </style>
 </head>
 <body>
@@ -660,7 +661,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-24.10';
+const APP_VER='2026-11-24.11';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -2344,11 +2345,22 @@ const camOpers=(q,c)=>{const d=((q&&q.cams)||{})[c]||{};return (d.opers&&d.opers
 const meuOper=()=>(S.ui&&S.ui.meuOper)||'';
 function operNomes(){const s=new Set();S.polys.forEach(q=>Object.values(q.cams||{}).forEach(c=>{if(c&&c.oper)s.add(c.oper);}));return [...s].sort();}
 function operCamGrava(p,meu){const n=meuOper();if(!n||!meu)return;p.cams=p.cams||{};const c=p.cams[meu]=p.cams[meu]||{};if(c.oper===n)return;c.oper=n;c.opers=[...new Set([...(c.opers||[]),n])];markP(p.id);save();}
-function operNomeSheet(p,meu,depois){openSheet(`<h3>Quem está operando o ${esc(camCurto(meu))}?<button class="btn sm" id="onX">Fechar</button></h3>
-  <input id="onN" class="opin" list="onL" autocomplete="name" value="${esc(meuOper())}" placeholder="Nome do operador" style="width:100%"><datalist id="onL">${operNomes().map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
-  <button class="btn ok opgo" id="onOk">✔ Confirmar</button><p class="mut" style="margin:6px 0 0">Fica guardado neste celular. Troque quando mudar o turno: os furos já lançados continuam com o nome de quem lançou.</p>`);
-  const ok=()=>{const v=$('#onN').value.trim().replace(/\s+/g,' ');if(!v){toast('Digite o nome do operador');return;}S.ui=Object.assign(S.ui||{},{meuOper:v});save();operCamGrava(p,meu);closeSheet();toast('Operador: '+v);depois&&depois();};
-  $('#onX').onclick=closeSheet;$('#onOk').onclick=ok;$('#onN').onkeydown=e=>{if(e.key==='Enter')ok();};setTimeout(()=>{const e=$('#onN');if(e)e.focus();},50);}
+const OPERADORES=['ANDERSON','ANDERSON MALAQUIAS','EVERTON','GUSTAVO H','IAGO','HERIK','WELLINGTON','NARCISIO','HENRIQUE','BRENO L','AFRANIO'];
+const operLista=()=>(S.ui&&Array.isArray(S.ui.operLista)?S.ui.operLista:OPERADORES);
+function operListaEditar(depois){openSheet(`<h3>Lista de operadores<button class="btn sm" id="olX">Cancelar</button></h3><p class="mut" style="margin:0 0 6px">Um nome por linha. Fica guardada neste celular.</p>
+  <textarea id="olT" style="min-height:260px;text-transform:uppercase">${esc(operLista().join('\n'))}</textarea>
+  <div class="btns"><button class="btn" id="olP">Voltar a lista padrão</button><button class="btn pri" id="olOk">Salvar lista</button></div>`);
+  $('#olX').onclick=()=>depois();$('#olP').onclick=()=>{S.ui=Object.assign(S.ui||{},{operLista:null});save();depois();};
+  $('#olOk').onclick=()=>{const l=[...new Set($('#olT').value.split('\n').map(v=>v.trim().replace(/\s+/g,' ').toUpperCase()).filter(Boolean))];S.ui=Object.assign(S.ui||{},{operLista:l});save();toast('Lista salva ('+l.length+' operadores)');depois();};}
+function operNomeSheet(p,meu,depois){const atual=meuOper();const extras=operNomes().filter(n=>!operLista().some(x=>x.toUpperCase()===n.toUpperCase()));
+  openSheet(`<h3>Quem está operando o ${esc(camCurto(meu))}?<button class="btn sm" id="onX">Fechar</button></h3>
+  <div class="opnms">${[...operLista(),...extras].map(n=>`<button class="btn ${n.toUpperCase()===atual.toUpperCase()?'pri':''}" data-on="${esc(n)}">${esc(n)}</button>`).join('')}</div>
+  <label style="margin-top:10px">Outro nome</label>
+  <input id="onN" class="opin" list="onL" autocomplete="name" value="" placeholder="Digite o nome" style="width:100%"><datalist id="onL">${operNomes().map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+  <button class="btn ok opgo" id="onOk">✔ Confirmar</button><button class="btn sm" id="onEd" style="margin-top:8px">✎ Editar lista de operadores</button><p class="mut" style="margin:6px 0 0">Toque no seu nome. Fica guardado neste celular. Troque quando mudar o turno: os furos já lançados continuam com o nome de quem lançou.</p>`);
+  const ok=nm=>{const v=String(nm||$('#onN').value).trim().replace(/\s+/g,' ').toUpperCase();if(!v){toast('Digite o nome do operador');return;}S.ui=Object.assign(S.ui||{},{meuOper:v});save();operCamGrava(p,meu);closeSheet();toast('Operador: '+v);depois&&depois();};
+  $('#onX').onclick=closeSheet;$('#onOk').onclick=()=>ok();$('#onN').onkeydown=e=>{if(e.key==='Enter')ok();};
+  document.querySelectorAll('[data-on]').forEach(b=>b.onclick=()=>ok(b.dataset.on));$('#onEd').onclick=()=>operListaEditar(()=>operNomeSheet(p,meu,depois));}
 function tabOper(p){
   const meu=(S.ui&&S.ui.meuCam)||'';const pr=projDe(p);
   const camChips=[...new Set([...CAMS,...camsPoly(p)])];
