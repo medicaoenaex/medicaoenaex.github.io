@@ -257,7 +257,7 @@ header h1 .logo svg{width:24px;height:24px}
 .opperf{display:block;font-size:11px;color:rgba(255,255,255,.45);line-height:1.2}
 .opadd{display:block;font-style:normal;font-size:11px;font-weight:800;color:#ffd43b;text-transform:uppercase}
 #opMap.add{cursor:crosshair}
-.dsg{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 40px;gap:6px;align-items:center;margin-top:8px}.dsg b{font-size:14px}.dsc{min-height:46px;border-radius:10px;background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.25);color:#cfd8e3;font-size:18px;font-weight:800}.dsc .dsd{display:block;font-size:13px;color:#ffb27a;font-weight:800}.dsc.on{border-style:solid;border-color:rgba(255,177,31,.5);color:#fff}
+.dsg{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 40px;gap:6px;align-items:center;margin-top:8px}.dsg b{font-size:14px}.dsc{min-height:46px;border-radius:10px;background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.25);color:#cfd8e3;font-size:18px;font-weight:800}.dsc .dsv{display:block;font-size:22px;font-weight:900;color:#ffb27a;line-height:1.1}.dsc .dsp{display:block;font-size:12px;font-weight:600;color:var(--mut)}.dsmed{font-size:30px;font-weight:900;color:#ffb27a;font-family:"Orbitron",ui-monospace,monospace;text-shadow:0 0 10px rgba(255,140,60,.4)}.dsc.on{border-style:solid;border-color:rgba(255,177,31,.5);color:#fff}
 .dsl{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.dschip{background:rgba(255,255,255,.06);border:1px solid var(--line);color:#fff;border-radius:999px;padding:8px 12px;font-size:15px}
 </style>
 </head>
@@ -643,7 +643,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-24.6';
+const APP_VER='2026-11-24.7';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -2242,12 +2242,12 @@ function amostraNova(p,meu,depois,idEx,kEx){
   <p class="mut" style="margin:0 0 6px">🚛 ${esc(a?a.cam:meu)} · ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}${!a&&ult?' · depois do furo '+esc(ult.id):''}${pr.dens!=null?' · plano '+fmt(pr.dens,2):''}</p>
   <div class="seg" id="dsM"><button data-m="peso" class="${modo==='peso'?'on':''}">Peso do copo (g)</button><button data-m="dens" class="${modo==='dens'?'on':''}">Densidade (g/cm³)</button></div>
   <input id="dsV" class="opin" inputmode="decimal" enterkeyhint="done" placeholder="${modo==='peso'?'ex.: 605':'ex.: 1,12'}" style="width:100%;margin-top:8px">
-  <div id="dsR" style="font-size:18px;font-weight:800;margin-top:8px;min-height:24px"></div>
+  <div id="dsR" style="margin-top:8px;min-height:44px;text-align:center"></div>
   <div id="dsAv" class="opav"></div>
   <button class="btn ok opgo" id="dsOk">✔ Registrar ${tn}</button>
   ${modo==='peso'?`<p class="mut" style="margin:6px 0 0">Como na planilha: densidade = (peso − ${COPO_TARA} g) ÷ ${COPO_VOL}.</p>`:''}`);
   const calc=()=>{const n=num($('#dsV').value);return modo==='peso'?{d:densDePeso(n),g:n}:{d:densNum($('#dsV').value),g:null};};
-  const av=()=>{const {d}=calc();$('#dsR').innerHTML=d!=null&&modo==='peso'?'= '+fmt(d,3)+' g/cm³':'';
+  const av=()=>{const {d}=calc();$('#dsR').innerHTML=d!=null&&modo==='peso'?`<span class="mut">Densidade</span><br><b class="dsmed" style="font-size:40px">${fmt(d,3)}</b> <span class="mut">g/cm³</span>`:'';
     $('#dsAv').innerHTML=densFora(d)?'⚠️ Fora do comum (0,5 a 1,6 g/cm³)':(d!=null&&pr.dens!=null&&Math.abs(d-pr.dens)>0.05?`⚠️ Diferente do plano (${fmt(pr.dens,2)})`:'');};
   $('#dsV').oninput=av;$('#dsX').onclick=closeSheet;setTimeout(()=>{const e=$('#dsV');if(e)e.focus();},50);
   document.querySelectorAll('#dsM button').forEach(b=>b.onclick=()=>{S.ui=Object.assign(S.ui||{},{dsModo:b.dataset.m});save();amostraNova(p,meu,depois,idEx,kEx);});
@@ -2260,8 +2260,8 @@ function amostraNova(p,meu,depois,idEx,kEx){
 }
 function amostraApagar(p,id){const a=(p.dsam||{})[id];if(!a)return;confirmBox(`Apagar a amostra das ${new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}?`,()=>{p.dsam[id]=null;densCamAtualiza(p,a.cam);markP(p.id);save();renderPoly();},'Apagar');}
 function amostrasHTML(p,meu){const l=amostras(p,meu);const m=mediaDens(l);
-  return `<div class="card op"><div class="opbar"><h2 style="margin:0">🧪 Densidade</h2><span class="mut" style="margin-left:auto">${l.length?`${l.length} amostra${l.length>1?'s':''} · média <b>${fmt(m,3)}</b> g/cm³`:'nenhuma amostra ainda'}</span></div>
-  ${l.length?`<div class="dsg"><span></span>${DS_T.map(t=>`<span class="mut">${t[1]}</span>`).join('')}<span></span>${l.map((a,i)=>`<b>${i+1}ª ${new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}${a.furo?`<small class="mut"> furo ${esc(a.furo)}</small>`:''}${i>3?'<small class="mut"> (fora da planilha)</small>':''}</b>${DS_T.map(([k])=>a[k]!=null?`<button class="dsc on" data-dsl="${a.id}|${k}">${a['g'+k.slice(1)]!=null?`${fmt(a['g'+k.slice(1)],a['g'+k.slice(1)]%1?1:0)}<small>g</small><small class="dsd">${fmt(a[k],3)}</small>`:fmt(a[k],3)}</button>`:`<button class="dsc" data-dsl="${a.id}|${k}">+</button>`).join('')}<button class="dsc" data-ds="${a.id}" aria-label="Apagar amostra">✕</button>`).join('')}</div>`:''}
+  return `<div class="card op"><div class="opbar"><h2 style="margin:0">🧪 Densidade</h2><span style="margin-left:auto;text-align:right">${l.length?`<span class="mut" style="font-size:13px">média de ${l.length} amostra${l.length>1?'s':''}</span><br><b class="dsmed">${fmt(m,3)}</b> <span class="mut">g/cm³</span>`:'<span class="mut">nenhuma amostra ainda</span>'}</span></div>
+  ${l.length?`<div class="dsg"><span></span>${DS_T.map(t=>`<span class="mut">${t[1]}</span>`).join('')}<span></span>${l.map((a,i)=>`<b>${i+1}ª ${new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}${a.furo?`<small class="mut"> furo ${esc(a.furo)}</small>`:''}${i>3?'<small class="mut"> (fora da planilha)</small>':''}</b>${DS_T.map(([k])=>a[k]!=null?`<button class="dsc on" data-dsl="${a.id}|${k}"><span class="dsv">${fmt(a[k],3)}</span>${a['g'+k.slice(1)]!=null?`<small class="dsp">${fmt(a['g'+k.slice(1)],a['g'+k.slice(1)]%1?1:0)} g</small>`:''}</button>`:`<button class="dsc" data-dsl="${a.id}|${k}">+</button>`).join('')}<button class="dsc" data-ds="${a.id}" aria-label="Apagar amostra">✕</button>`).join('')}</div>`:''}
   <button class="btn pri" id="dsNova" style="width:100%;min-height:56px;font-size:19px;font-weight:800;margin-top:8px">+ Amostra de densidade (0 min)</button>
   <p class="mut" style="margin:6px 0 0">Até 4 amostras por carregamento, cada uma com leitura de 0, 15 e 30 min (toque no + da linha). Vão para a aba Densidade da planilha Enaex; a média vai para o seu caminhão.</p></div>`;}
 // planilha modelo: a aba "Densidade" tem 3 blocos (CARREG.1, 2 e 3), 4 amostras cada, peso do copo nas linhas 3/6/9/12, colunas 0/15/30 min
