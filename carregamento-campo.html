@@ -254,6 +254,7 @@ header h1 .logo svg{width:24px;height:24px}
 #opMap .opd{cursor:pointer}#opMap .opd.sel circle{stroke:#ffb11f!important}
 .oplg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px;color:var(--mut);margin-top:6px}.oplg i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:4px;vertical-align:-1px}
 .opl.flash{box-shadow:inset 0 0 0 3px #ffb11f}
+.opperf{display:block;font-size:11px;color:rgba(255,255,255,.45);line-height:1.2}
 .opadd{display:block;font-style:normal;font-size:11px;font-weight:800;color:#ffd43b;text-transform:uppercase}
 #opMap.add{cursor:crosshair}
 .dsl{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.dschip{background:rgba(255,255,255,.06);border:1px solid var(--line);color:#fff;border-radius:999px;padding:8px 12px;font-size:15px}
@@ -641,7 +642,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-24.3';
+const APP_VER='2026-11-24.4';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -2268,7 +2269,7 @@ function tabOper(p){
   const lista=operFiltro==='pend'?p.holes.filter(x=>x.status==='pendente'):operFiltro==='meus'?meus:p.holes;
   const tampPad=operLast().tampao??pr.tampao;
   const linha=h=>{const i=p.holes.indexOf(h);const kgM=kgDoCam(h,meu);const outros=holeKg(h)-kgM;const st=h.status;
-    return `<div class="opl ${st}" data-i="${i}"><div class="oplid"><b>${esc(h.id)}</b>${ehExtraOp(h)?'<em class="opadd">extra operador</em>':ehExtra(h)?'<em class="opadd">extra</em>':''}<span>${st==='pendente'?(h.agua!=='seca'?'💧':''):st==='carregado'?'✔':ST[st].n}${outros>0?' <i>+'+fmt(outros)+' '+esc(camsDoFuro(h).filter(c=>c!==meu).map(camCurto).join('+'))+'</i>':''}</span></div>
+    return `<div class="opl ${st}" data-i="${i}"><div class="oplid"><b>${esc(h.id)}</b>${ehExtraOp(h)?'<em class="opadd">extra operador</em>':ehExtra(h)?'<em class="opadd">extra</em>':''}<span>${st==='pendente'?(h.agua!=='seca'?'💧':''):st==='carregado'?'✔':ST[st].n}${outros>0?' <i>+'+fmt(outros)+' '+esc(camsDoFuro(h).filter(c=>c!==meu).map(camCurto).join('+'))+'</i>':''}</span>${h.profProj!=null||h.obsCroqui?`<small class="opperf">${h.profProj!=null?'perf. '+fmt(h.profProj,1)+' m':''}${h.obsCroqui?' · '+esc(String(h.obsCroqui).replace(/_/g,' ')):''}</small>`:''}</div>
     <input data-k="kg" inputmode="decimal" enterkeyhint="next" value="${v(kgM||null)}" placeholder="${kgProj(p,h)!=null?fmt(kgProj(p,h)):'kg'}" aria-label="Carga do furo ${esc(h.id)}">
     <input data-k="pm" inputmode="decimal" enterkeyhint="next" value="${v(h.profMed)}" placeholder="${h.profProj!=null?v(h.profProj):'m'}" aria-label="Profundidade do furo ${esc(h.id)}">
     <input data-k="tp" inputmode="decimal" enterkeyhint="next" value="${v(h.tampao)}" placeholder="${tampPad!=null?v(tampPad):'m'}" aria-label="Tampão do furo ${esc(h.id)}">
