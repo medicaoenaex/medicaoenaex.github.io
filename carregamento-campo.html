@@ -259,6 +259,7 @@ header h1 .logo svg{width:24px;height:24px}
 #opMap.add{cursor:crosshair}
 .dsg{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 40px;gap:6px;align-items:center;margin-top:8px}.dsg b{font-size:14px}.dsc{min-height:46px;border-radius:10px;background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.25);color:#cfd8e3;font-size:18px;font-weight:800}.dsc .dsv{display:block;font-size:22px;font-weight:900;color:#ffb27a;line-height:1.1}.dsc .dsp{display:block;font-size:12px;font-weight:600;color:var(--mut)}.dsmed{font-size:30px;font-weight:900;color:#ffb27a;font-family:"Orbitron",ui-monospace,monospace;text-shadow:0 0 10px rgba(255,140,60,.4)}.dsc.on{border-style:solid;border-color:rgba(255,177,31,.5);color:#fff}
 .dsl{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.dschip{background:rgba(255,255,255,.06);border:1px solid var(--line);color:#fff;border-radius:999px;padding:8px 12px;font-size:15px}
+.avg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.avp{border:1px solid var(--line);border-radius:12px;padding:8px;cursor:pointer;background:var(--card,#fff)}.avt{display:flex;justify-content:space-between;align-items:baseline}.avt span{font-weight:800;color:#ff6a13}.avm{background:#1d2530;border-radius:8px;margin:6px 0;aspect-ratio:4/3;display:flex}.avm svg{width:100%;height:100%}.avc{display:flex;flex-wrap:wrap;gap:4px 8px;font-size:12px;margin:4px 0}.avc i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:3px;vertical-align:-1px}
 </style>
 </head>
 <body>
@@ -559,6 +560,7 @@ function renderHome(){
   if(S.polys.length>1)h+=`<div class="row" style="margin-bottom:10px;gap:6px"><input id="hq" placeholder="Buscar POL, mina, banco…" value="${esc(homeQ)}"><select id="hs">${[['','Todas as situações'],...Object.entries(SITU).map(([k,v])=>[k,v.n])].map(([k,t])=>`<option value="${k}" ${homeSitu===k?'selected':''}>${t}</option>`).join('')}</select></div>`;
   if(S.polys.length&&!ps.length)h+=`<div class="card empty">Nenhum polígono neste filtro.</div>`;
   if(!S.polys.length)h+=`<div class="card empty">Nenhum polígono ainda.<br>Toque em <b>+ Novo polígono</b> para gerar a malha de furos ou colar a lista do croqui.</div>`;
+  h+=aoVivoHTML();
   ps.forEach(p=>{const t=p.holes.length,c=p.holes.filter(x=>x.status==='carregado').length;
     h+=`<div class="card poly" data-id="${p.id}"><div style="flex:1"><b>POL ${esc(p.pol)}</b> · ${esc(p.mina)}${p.cava?' / '+esc(p.cava):''}${p.banco?' · Banco '+esc(p.banco):''}<div class="mut">${brDate(p.data)} · ${c}/${t} carregados${p.resp?' · '+esc(p.resp):''} <span class="chip" style="background:${SITU[situDe(p)].c}">${SITU[situDe(p)].n}</span></div><div class="bar"><i style="width:${t?c/t*100:0}%"></i></div></div><div class="ring" style="--p:${t?Math.round(c/t*100):0}"><span>${t?Math.round(c/t*100):0}%</span></div></div>`;});
   if(S.polys.length)h+=`<div class="card" id="painel">${painelHTML()}</div>`;
@@ -572,9 +574,23 @@ function renderHome(){
   $('#bkp').onclick=()=>exportBox('Backup','backup-carregamento-'+today()+'.json',JSON.stringify(S),'application/json');
   $('#rst').onclick=restoreBox;bindSyncBox();bindVozCard();
   if($('#painel'))bindPainel();
+  document.querySelectorAll('.avp').forEach(el=>el.onclick=()=>{mapScroll.x=mapScroll.y=0;pincel=null;selMode=false;selSet.clear();gpsStop();S.cur=el.dataset.id;save();tab='mapa';corPor='caminhao';go('poly');});
   if($('#hq')){$('#hq').oninput=e=>{homeQ=e.target.value;const pos=e.target.selectionStart;renderHome();const n=$('#hq');n.focus();try{n.setSelectionRange(pos,pos);}catch(_){}};$('#hs').onchange=e=>{homeSitu=e.target.value;renderHome();};}
 }
 let homeQ='',homeSitu='';
+// ===== Ao vivo: todos os polígonos em carregamento lado a lado (croqui pequeno, cor por caminhão) =====
+function aoVivoMini(p){if(!p.holes.length)return'';const g=geom(p,true),r=g.r;
+  return `<svg viewBox="0 0 ${g.W} ${g.H}" preserveAspectRatio="xMidYMid meet">${p.holes.map(h=>`<circle cx="${g.X(h.x)}" cy="${g.Y(h.y)}" r="${r}" fill="${operCor(h)}"/>`).join('')}</svg>`;}
+function aoVivoHTML(){
+  const ps=S.polys.filter(p=>situDe(p)==='aberto'&&p.holes.length).sort((a,b)=>ultMov(b)-ultMov(a));
+  if(ps.length<2&&!ps.some(p=>planWLista(p.id).length))return'';
+  return `<div class="card"><h2 style="margin-bottom:4px">🔴 Ao vivo · ${ps.length} carregamento${ps.length>1?'s':''} em andamento</h2><p class="mut" style="margin:0 0 8px">Cada área com seu croqui, na cor do caminhão. Atualiza sozinho com a equipe online e com as planilhas acompanhadas. Toque para abrir.</p><div class="avg">${ps.map(p=>{
+    const t=p.holes.length,c=p.holes.filter(x=>x.status==='carregado').length,pc=t?Math.round(c/t*100):0;const u=ultMov(p);const nw=planWLista(p.id).length;
+    const cams=camsPoly(p).map(cm=>({cm,n:p.holes.filter(x=>x.status==='carregado'&&camsDoFuro(x).includes(cm)).length}));
+    return `<div class="avp" data-id="${p.id}"><div class="avt"><b>POL ${esc(p.pol)}</b><span>${pc}%</span></div><div class="mut" style="font-size:12px">${esc(p.mina||'')}${p.banco?' · B'+esc(p.banco):''} · ${c}/${t}</div><div class="avm">${aoVivoMini(p)}</div><div class="bar"><i style="width:${pc}%"></i></div>
+      <div class="avc">${cams.map(o=>`<span><i style="background:${camCor(o.cm)}"></i>${esc(camCurto(o.cm))} ${o.n}</span>`).join('')||'<span class="mut">sem caminhão ainda</span>'}</div>
+      <div class="mut" style="font-size:11px">${u?'último lançamento '+new Date(u).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'nada lançado ainda'}${nw?` · 📗 ${nw} planilha${nw>1?'s':''}`:''}</div></div>`;}).join('')}</div></div>`;}
+const ultMov=p=>p.holes.reduce((m,h)=>h.status!=='pendente'&&h.ts>m?h.ts:m,0);
 function restoreBox(){
   openSheet(`<h3>Restaurar backup<button class="btn sm" id="rClose">Fechar</button></h3><p class="mut">Escolha o arquivo .json ou cole o texto do backup. Polígonos com o mesmo código serão substituídos; os outros continuam.</p><button class="btn" id="rFile" style="width:100%">Escolher arquivo</button><label>Ou cole aqui</label><textarea id="rTxt"></textarea><div class="btns"><button class="btn pri" id="rGo">Restaurar</button></div>`);
   $('#rClose').onclick=closeSheet;
@@ -643,7 +659,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-24.7';
+const APP_VER='2026-11-24.8';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -2719,7 +2735,7 @@ async function exportarPlanilha(p){
     <div class="row"><div><label>Tampão programado (m)</label><input id="mdTp" inputmode="decimal" value="${esc(pr.tampao??'')}"></div><div></div></div>
     <div class="row" id="mdPBox"><div><label>CARREG.2 (outro polígono do dia)</label><select id="mdP2">${optsP(E.p2)}</select></div><div><label>CARREG.3</label><select id="mdP3">${optsP(E.p3)}</select></div></div>
     <p class="mut" id="mdTxt"></p>
-    <div class="hint" id="mdSim" style="margin-top:8px">👥 <b>Várias pessoas preenchendo ao mesmo tempo:</b> salve a planilha no OneDrive/SharePoint e abra no Excel (todos editam juntos). Num computador com Chrome ou Edge, abra o app e use ⋯ → <b>Acompanhar planilha</b> no arquivo da pasta do OneDrive: o que cada um digitar entra no app e vai para os celulares da equipe pela base online.</div>
+    <div class="hint" id="mdSim" style="margin-top:8px">👥 <b>Várias pessoas preenchendo ao mesmo tempo:</b> salve a planilha no OneDrive/SharePoint e abra no Excel (todos editam juntos). Num computador com Chrome ou Edge, abra o app e use ⋯ → <b>Acompanhar planilha</b> no arquivo da pasta do OneDrive: o que cada um digitar entra no app e vai para os celulares da equipe pela base online. <b>Dois caminhões?</b> Gere uma planilha para cada um e acompanhe as duas (＋ Acompanhar outra planilha): o app lê cada uma e só aplica o que mudou nela.</div>
     <div class="btns"><button class="btn" id="mdOld">Planilha simples do app</button>${planWPode()&&window.showSaveFilePicker?`<button class="btn" id="mdGo">Só gerar</button><button class="btn pri" id="mdGoW">📗 Gerar e acompanhar ao vivo</button>`:`<button class="btn pri" id="mdGo">Gerar planilha</button>`}</div>
     ${planWPode()&&window.showSaveFilePicker?`<p class="mut"><b>Gerar e acompanhar ao vivo:</b> salve a planilha na pasta do OneDrive/SharePoint e abra no Excel com o Salvamento Automático ligado. Cada furo digitado aparece no croqui na cor do caminhão em poucos segundos, aqui e nos celulares da equipe. Deixe esta aba do app aberta.</p>`:''}`);
   const ckd=()=>[...document.querySelectorAll('.mdCk')].filter(x=>x.checked).map(x=>x.value);
@@ -3058,12 +3074,18 @@ async function importarPlanilha(p){
 /* ----- Acompanhar a planilha (automático): o app relê o .xlsx sempre que ele é salvo ----- */
 // Chrome/Edge no computador (File System Access API). Só aplica o que MUDOU na planilha desde a última leitura,
 // para não desfazer o que foi lançado direto no app.
-const planW={};const PLW_MS=2000;
+const planW={};const PLW_MS=2000; // planW[pid] = {chave: acompanhamento} — várias planilhas ao mesmo tempo (ex.: uma por caminhão)
 const planWKey=pid=>'planw|'+pid;
+const planWFhKey=(pid,k)=>planWKey(pid)+'|fh|'+k;
 const planWPode=()=>!!window.showOpenFilePicker;
-// o atalho do arquivo (handle) fica numa chave separada e só é lido quando a pessoa toca em Retomar
-async function planWGuardar(pid){const w=planW[pid];if(!w)return;await bgPut(planWKey(pid),{nome:w.nome,last:w.last,snap:w.snap},true);}
-async function planWSalvo(pid){const v=await bgGet(planWKey(pid));return v&&v.nome?v:null;}
+const planWLista=pid=>Object.values(planW[pid]||{});
+// guardado: lista [{k,nome,last,snap}] (versão antiga guardava 1 objeto só)
+// lista guardada no aparelho, com cópia em memória para as gravações não se atropelarem
+const planWMem={};
+async function planWSalvos(pid){if(!planWMem[pid]){const v=await bgGet(planWKey(pid));if(!planWMem[pid])planWMem[pid]=!v?[]:Array.isArray(v)?v.filter(x=>x&&x.nome):v.nome?[{k:v.nome,nome:v.nome,last:v.last,snap:v.snap,velho:1}]:[];}return planWMem[pid];}
+async function planWGrava(pid){const l=planWMem[pid]||[];await bgPut(planWKey(pid),l.length?l.map(({velho,...x})=>x):null,true);}
+async function planWGuardar(pid){const l=await planWSalvos(pid);planWLista(pid).forEach(w=>{const o={k:w.k,nome:w.nome,last:w.last,snap:w.snap};const i=l.findIndex(x=>x.k===w.k);if(i>=0)l[i]=o;else l.push(o);});await planWGrava(pid);}
+async function planWEsquecer(pid,k){const l=await planWSalvos(pid);const i=l.findIndex(x=>x.k===k);const velho=i>=0&&l[i].velho;if(i>=0)l.splice(i,1);await planWGrava(pid);await bgPut(planWFhKey(pid,k),null,true);if(velho)await bgPut(planWKey(pid)+'|fh',null,true);}
 function planSnap(linhas){const s={};linhas.forEach(({h,nv})=>{const o={};Object.keys(nv).forEach(k=>o[k]=planCmp(k,nv[k]));s[String(h.id).toUpperCase()]=o;});return s;}
 async function planWLer(w,p){const f=await w.fh.getFile();const X=await loadXlsx();const wb=X.read(await f.arrayBuffer(),{type:'array',cellDates:true});return {f,...planLer(p,X,wb)};}
 function planWSemPC(){openSheet(`<h3>Acompanhar planilha<button class="btn sm" id="awX">Fechar</button></h3>
@@ -3074,12 +3096,14 @@ async function planAcompanhar(p){
   let fh;try{[fh]=await window.showOpenFilePicker({types:[{description:'Planilha Excel',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]});}catch(e){return;}
   if(!fh)return;
   try{busy('Lendo planilha…');const w={fh,nome:fh.name,last:0,snap:{}};const r=await planWLer(w,p);busy();
+    const ja=planWLista(p.id).find(x=>x.nome===fh.name);if(ja){toast('Essa planilha já está sendo acompanhada');return;}
     if(r.info.poly_id&&r.info.poly_id!==p.id){openSheet(`<h3>Acompanhar planilha<button class="btn sm" id="awX">Fechar</button></h3><div class="hint">⚠️ Esta planilha é do <b>POL ${esc(r.info.pol)} (${esc(r.info.mina)})</b>, e você está no POL ${esc(p.pol)}. Abra o polígono certo ou gere a planilha deste polígono.</div>`);$('#awX').onclick=closeSheet;return;}
     const mud=r.linhas.map(l=>planMud(l.h,l.nv)).filter(Boolean);
     openSheet(`<h3>Acompanhar planilha<button class="btn sm" id="awX">Cancelar</button></h3>
       <p>O app vai ficar de olho em <b>${esc(fh.name)}</b>: toda vez que você <b>salvar</b> a planilha no Excel (Ctrl+S), os furos alterados entram aqui sozinhos em poucos segundos.</p>
       ${mud.length?`<p>Agora a planilha tem <b>${mud.length}</b> furo(s) diferentes do app:</p>${planTabela(mud)}`:'<p class="mut">Agora a planilha está igual ao app.</p>'}
       ${r.naoAchou.length?`<p class="mut">${r.naoAchou.length} furo(s) da planilha não existem neste polígono (${esc(r.naoAchou.slice(0,6).join(', '))}${r.naoAchou.length>6?'…':''}).</p>`:''}
+      ${planWLista(p.id).length?`<p>📗 Já ${planWLista(p.id).length>1?'são':'é'} acompanhada${planWLista(p.id).length>1?'s':''} <b>${planWLista(p.id).map(x=>esc(x.nome)).join('</b>, <b>')}</b>. Esta entra <b>junto</b> (uma por caminhão, por exemplo); as outras continuam.</p>`:''}
       <p class="mut">Depois de ligado, só o que <b>mudar na planilha</b> entra no app; o que você lançar direto no app não é apagado. Deixe esta aba aberta.</p>
       <div class="btns">${mud.length?`<button class="btn pri" id="awA">Aplicar ${mud.length} e acompanhar</button><button class="btn" id="awS">Acompanhar sem aplicar agora</button>`:`<button class="btn pri" id="awS">Começar a acompanhar</button>`}</div>`);
     $('#awX').onclick=closeSheet;
@@ -3087,39 +3111,46 @@ async function planAcompanhar(p){
     if($('#awA'))$('#awA').onclick=()=>liga(true);$('#awS').onclick=()=>liga(false);
   }catch(e){busy();toast(e.message||'Não consegui ler a planilha');}
 }
-function planWStart(pid,w){planWStop(pid,true);planW[pid]=w;w.timer=setInterval(()=>planWTick(pid),PLW_MS);planWGuardar(pid);bgPut(planWKey(pid)+'|fh',w.fh,true);}
-function planWStop(pid,silencio){const w=planW[pid];if(!w)return;clearInterval(w.timer);delete planW[pid];if(!silencio){bgPut(planWKey(pid),null,true);bgPut(planWKey(pid)+'|fh',null,true);}}
-async function planWTick(pid,forcar){const w=planW[pid];if(!w||w.lendo)return;if(document.hidden&&!forcar)return;
-  const p=S.polys.find(x=>x.id===pid);if(!p){planWStop(pid);return;}
+function planWStart(pid,w){w.k=w.k||w.nome;planWStop(pid,w.k,true);(planW[pid]=planW[pid]||{})[w.k]=w;w.timer=setInterval(()=>planWTick(pid,w.k),PLW_MS);planWGuardar(pid);bgPut(planWFhKey(pid,w.k),w.fh,true);}
+function planWStop(pid,k,silencio){const w=planW[pid]&&planW[pid][k];if(!w)return;clearInterval(w.timer);delete planW[pid][k];if(!silencio)planWEsquecer(pid,k);}
+async function planWTick(pid,k,forcar){const w=planW[pid]&&planW[pid][k];if(!w||w.lendo)return;if(document.hidden&&!forcar)return;
+  const p=S.polys.find(x=>x.id===pid);if(!p){planWStop(pid,k);return;}
   w.lendo=true;try{
-    let f;try{f=await w.fh.getFile();}catch(e){if(e&&e.name==='NotAllowedError'){w.erro='sem permissão';planWStop(pid,true);planWBarra();return;}w.erro='arquivo não encontrado';planWBarra();return;}
+    let f;try{f=await w.fh.getFile();}catch(e){if(e&&e.name==='NotAllowedError'){w.erro='sem permissão';planWStop(pid,k,true);planWBarra();return;}w.erro='arquivo não encontrado';planWBarra();return;}
     if(f.lastModified===w.last&&!forcar){if(w.erro){w.erro=null;planWBarra();}return;}
     let r;try{const X=await loadXlsx();const wb=X.read(await f.arrayBuffer(),{type:'array',cellDates:true});r={f,...planLer(p,X,wb)};}catch(e){w.erro='não consegui ler (o Excel ainda está salvando?)';planWBarra();return;} // tenta de novo no próximo ciclo
     w.erro=null;const mud=[];
-    r.linhas.forEach(({h,nv})=>{const ant=w.snap[String(h.id).toUpperCase()]||{};const ks=Object.keys(nv).filter(k=>ant[k]!==planCmp(k,nv[k]));if(!ks.length)return;const m=planMud(h,nv,ks);if(m)mud.push(m);});
+    // só entra o que mudou NESTA planilha desde a última leitura dela: duas planilhas não apagam o que a outra lançou
+    r.linhas.forEach(({h,nv})=>{const ant=w.snap[String(h.id).toUpperCase()]||{};const ks=Object.keys(nv).filter(k2=>ant[k2]!==planCmp(k2,nv[k2]));if(!ks.length)return;const m=planMud(h,nv,ks);if(m)mud.push(m);});
     w.last=f.lastModified;w.snap=planSnap(r.linhas);w.lido=Date.now();
-    const nDs=densAplicar(p,r.dens);if(nDs)toast(`📗 Planilha: ${nDs} amostra(s) de densidade`,3000);
-    if(mud.length){planAplicar(p,mud,'planilha acompanhada');w.ult={n:mud.length,ids:mud.map(m=>m.h.id),t:Date.now()};
+    const nDs=densAplicar(p,r.dens);if(nDs)toast(`📗 ${w.nome}: ${nDs} amostra(s) de densidade`,3000);
+    if(mud.length){planAplicar(p,mud,'planilha acompanhada '+w.nome);w.ult={n:mud.length,ids:mud.map(m=>m.h.id),t:Date.now()};
       planFlash={ids:new Set(mud.map(m=>String(m.h.id))),ate:Date.now()+9000};if(corPor!=='caminhao')setCorPor('caminhao');
-      const ids=mud.slice(0,5).map(m=>m.h.id).join(', ')+(mud.length>5?'…':'');toast(`📗 Planilha: ${mud.length} furo(s) atualizados (${ids})`,3500);
-      if(S.cur===pid&&view==='poly'&&$('#sheet').classList.contains('hidden'))renderPoly();else planWBarra();}
+      const ids=mud.slice(0,5).map(m=>m.h.id).join(', ')+(mud.length>5?'…':'');toast(`📗 ${w.nome}: ${mud.length} furo(s) atualizados (${ids})`,3500);
+      if(S.cur===pid&&view==='poly'&&$('#sheet').classList.contains('hidden')&&!(tab==='oper'&&operSujo))renderPoly();else if(view==='home'&&$('#sheet').classList.contains('hidden'))renderHome();else planWBarra();}
     else planWBarra();
     planWGuardar(pid);
-  }finally{if(planW[pid])planW[pid].lendo=false;}
+  }finally{w.lendo=false;}
 }
 const hhmm=t=>new Date(t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-// faixa no topo do polígono
-async function planWBarra(){const box=$('#planWBox');const p=cur();if(!box||!p)return;const w=planW[p.id];
-  if(w){box.innerHTML=`<div class="hint" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0;background:#e8f6ec;border-color:#a9dcb8">📗 <span style="flex:1;min-width:180px">Acompanhando <b>${esc(w.nome)}</b>${w.erro?` · <b style="color:#b3261e">${esc(w.erro)}</b>`:` · lida às ${hhmm(w.lido||Date.now())}`}${w.ult?` · última atualização: ${w.ult.n} furo(s) às ${hhmm(w.ult.t)}`:''}</span><button class="btn sm" id="pwLer">Ler agora</button><button class="btn sm" id="pwPar">Parar</button></div>`;
-    $('#pwLer').onclick=()=>planWTick(p.id,true);$('#pwPar').onclick=()=>{planWStop(p.id);planWBarra();toast('Parou de acompanhar a planilha');};return;}
-  const sv=planWPode()?await planWSalvo(p.id):null;if(cur()!==p||!$('#planWBox'))return;
-  if(sv){box.innerHTML=`<div class="hint" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0">📗 <span style="flex:1;min-width:180px">A planilha <b>${esc(sv.nome)}</b> estava sendo acompanhada.</span><button class="btn sm pri" id="pwRet">Retomar</button><button class="btn sm" id="pwEsq">Esquecer</button></div>`;
-    $('#pwRet').onclick=async()=>{let fh=null;
-      try{fh=await bgGet(planWKey(p.id)+'|fh');if(fh){let ok=await fh.queryPermission({mode:'read'});if(ok!=='granted')ok=await fh.requestPermission({mode:'read'});if(ok!=='granted')fh=null;}}catch(e){fh=null;}
-      if(!fh){toast('Escolha de novo a planilha '+sv.nome);try{[fh]=await window.showOpenFilePicker({types:[{description:'Planilha Excel',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]});}catch(e){return;}if(!fh)return;}
-      const w={fh,nome:fh.name||sv.nome,last:sv.last||0,snap:sv.snap||{},lido:Date.now()};planWStart(p.id,w);planWBarra();planWTick(p.id,true);};
-    $('#pwEsq').onclick=()=>{bgPut(planWKey(p.id),null,true);bgPut(planWKey(p.id)+'|fh',null,true);box.innerHTML='';};}
-  else box.innerHTML='';}
+async function planWRetomar(p,sv){let fh=null;
+  try{fh=await bgGet(sv.velho?planWKey(p.id)+'|fh':planWFhKey(p.id,sv.k));if(fh){let ok=await fh.queryPermission({mode:'read'});if(ok!=='granted')ok=await fh.requestPermission({mode:'read'});if(ok!=='granted')fh=null;}}catch(e){fh=null;}
+  if(!fh){toast('Escolha de novo a planilha '+sv.nome);try{[fh]=await window.showOpenFilePicker({types:[{description:'Planilha Excel',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]});}catch(e){return;}if(!fh)return;}
+  if(sv.velho)await bgPut(planWKey(p.id)+'|fh',null,true);
+  const w={fh,k:sv.k,nome:fh.name||sv.nome,last:sv.last||0,snap:sv.snap||{},lido:Date.now()};if(w.nome!==sv.k){w.k=w.nome;await planWEsquecer(p.id,sv.k);}planWStart(p.id,w);planWBarra();planWTick(p.id,w.k,true);}
+// faixa no topo do polígono: uma linha por planilha acompanhada
+async function planWBarra(){const box=$('#planWBox');const p=cur();if(!box||!p)return;
+  const at=planWLista(p.id);const sv=planWPode()?(await planWSalvos(p.id)).filter(x=>!at.some(w=>w.k===x.k)):[];if(cur()!==p||!$('#planWBox'))return;
+  if(!at.length&&!sv.length){box.innerHTML='';return;}
+  const st='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0';
+  box.innerHTML=at.map((w,i)=>`<div class="hint" style="${st};background:rgba(31,157,85,.16);border-color:#1f9d55">📗 <span style="flex:1;min-width:180px">Acompanhando <b>${esc(w.nome)}</b>${w.erro?` · <b style="color:#b3261e">${esc(w.erro)}</b>`:` · lida às ${hhmm(w.lido||Date.now())}`}${w.ult?` · última: ${w.ult.n} furo(s) às ${hhmm(w.ult.t)}`:''}</span><button class="btn sm" data-pwl="${i}">Ler agora</button><button class="btn sm" data-pwp="${i}">Parar</button></div>`).join('')
+    +sv.map((x,i)=>`<div class="hint" style="${st}">📗 <span style="flex:1;min-width:180px">A planilha <b>${esc(x.nome)}</b> estava sendo acompanhada.</span><button class="btn sm pri" data-pwr="${i}">Retomar</button><button class="btn sm" data-pwe="${i}">Esquecer</button></div>`).join('')
+    +(at.length&&planWPode()?`<div style="margin:-2px 0 6px"><button class="btn sm" id="pwMais">＋ Acompanhar outra planilha (outro caminhão)</button></div>`:'');
+  box.querySelectorAll('[data-pwl]').forEach(b=>b.onclick=()=>planWTick(p.id,at[+b.dataset.pwl].k,true));
+  box.querySelectorAll('[data-pwp]').forEach(b=>b.onclick=()=>{const w=at[+b.dataset.pwp];planWStop(p.id,w.k);planWBarra();toast('Parou de acompanhar '+w.nome);});
+  box.querySelectorAll('[data-pwr]').forEach(b=>b.onclick=()=>planWRetomar(p,sv[+b.dataset.pwr]));
+  box.querySelectorAll('[data-pwe]').forEach(b=>b.onclick=async()=>{await planWEsquecer(p.id,sv[+b.dataset.pwe].k);planWBarra();});
+  if($('#pwMais'))$('#pwMais').onclick=()=>planAcompanhar(p);}
 
 /* ----- Projeto x Executado ----- */
 function tabConf(p){
