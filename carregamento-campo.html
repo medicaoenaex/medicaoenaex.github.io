@@ -641,7 +641,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-24.2';
+const APP_VER='2026-11-24.3';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -944,7 +944,8 @@ function polyMenu(){
   $('#mCsv').onclick=()=>exportBox('Furos (CSV)',`POL${p.pol}-${p.data}.csv`,csv(p),'text/csv');
   $('#mDel').onclick=()=>confirmBox(`Excluir POL ${p.pol} e todos os lançamentos? Isso não pode ser desfeito.`,()=>{markDel(p);S.polys=S.polys.filter(x=>x.id!==p.id);S.cur=null;save();go('home');},'Excluir');
 }
-const ehExtra=h=>/^EX\d+$/i.test(String(h.id));
+const ehExtra=h=>/^(EX\d+|XO-\d+)$/i.test(String(h.id));
+const ehExtraOp=h=>/^XO-\d+$/i.test(String(h.id));
 function maisPerto(p,x,y){let b=null,d=Infinity;p.holes.forEach(h=>{const q=Math.hypot(h.x-x,h.y-y);if(q<d){d=q;b=h;}});return b;}
 function addExtra(p,near,ponto){
   const base=near||(ponto&&maisPerto(p,ponto.x,ponto.y))||p.holes[p.holes.length-1]||{x:0,y:0};
@@ -1179,7 +1180,7 @@ function tabMapa(p){
   p.holes.forEach((h,i)=>{const cx=g.X(h.x),cy=g.Y(h.y),c=corFuro(h);
     const lbl=h.n!=null?h.n:h.id;const agua=h.agua!=='seca';const sl=selMode&&selSet.has(i);
     const fl=planFlash&&Date.now()<planFlash.ate&&planFlash.ids.has(String(h.id));
-    s+=`<g data-i="${i}">${fl?`<circle class="pfl" cx="${cx}" cy="${cy}" r="${r*1.6}" fill="none" stroke="${camCor(camsDoFuro(h)[0]||'')}" stroke-width="${r*0.3}" pointer-events="none"/>`:''}${semFoto&&semFoto.has(h.id)?`<circle cx="${cx}" cy="${cy}" r="${r*1.7}" fill="none" stroke="#f76707" stroke-width="${r*0.22}" stroke-dasharray="${r*0.5} ${r*0.3}" pointer-events="none"/>`:''}${sl?`<circle cx="${cx}" cy="${cy}" r="${r*1.45}" fill="none" stroke="#fab005" stroke-width="${r*0.35}" pointer-events="none"/>`:''}${(h.cond||[]).length?`<circle cx="${cx+r*0.8}" cy="${cy-r*0.8}" r="${r*0.32}" fill="#7a4b00" stroke="#fff" stroke-width="${r*0.08}" pointer-events="none"/>`:''}<circle data-i="${i}" cx="${cx}" cy="${cy}" r="${r}" fill="${c}" fill-opacity="${g.useBg?0.85:1}" stroke="${agua?'#1971c2':'#fff'}" stroke-width="${agua?r*0.32:r*0.12}"/>${meiaLua(h,cx,cy,r)}`+
+    s+=`<g data-i="${i}">${ehExtra(h)?`<circle cx="${cx}" cy="${cy}" r="${r*1.4}" fill="none" stroke="#ffd43b" stroke-width="${r*0.12}" stroke-dasharray="${r*0.35} ${r*0.25}" pointer-events="none"/>`:''}${fl?`<circle class="pfl" cx="${cx}" cy="${cy}" r="${r*1.6}" fill="none" stroke="${camCor(camsDoFuro(h)[0]||'')}" stroke-width="${r*0.3}" pointer-events="none"/>`:''}${semFoto&&semFoto.has(h.id)?`<circle cx="${cx}" cy="${cy}" r="${r*1.7}" fill="none" stroke="#f76707" stroke-width="${r*0.22}" stroke-dasharray="${r*0.5} ${r*0.3}" pointer-events="none"/>`:''}${sl?`<circle cx="${cx}" cy="${cy}" r="${r*1.45}" fill="none" stroke="#fab005" stroke-width="${r*0.35}" pointer-events="none"/>`:''}${(h.cond||[]).length?`<circle cx="${cx+r*0.8}" cy="${cy-r*0.8}" r="${r*0.32}" fill="#7a4b00" stroke="#fff" stroke-width="${r*0.08}" pointer-events="none"/>`:''}<circle data-i="${i}" cx="${cx}" cy="${cy}" r="${r}" fill="${c}" fill-opacity="${g.useBg?0.85:1}" stroke="${agua?'#1971c2':'#fff'}" stroke-width="${agua?r*0.32:r*0.12}"/>${meiaLua(h,cx,cy,r)}`+
     `<text data-i="${i}" x="${cx}" y="${cy+r*0.3}" text-anchor="middle" font-size="${r*0.8}" fill="#fff" font-weight="700" pointer-events="none">${esc(String(lbl).slice(-4))}</text>`+
     (rotulos?(corPor==='tempo'?(temTempo(h)?[(h.tempos&&h.tempos.length>1?h.tempos.map(v=>fmt(v)).join('/'):fmt(h.tempo))+' ms']:[]):rotuloFuro(h)).map((t,k)=>`<text x="${cx}" y="${cy+r*(1.5+k*0.56)}" text-anchor="middle" font-size="${r*0.5}" fill="${corPor!=='tempo'&&k===0&&h.caminhao?camCor(h.caminhao):'#14202b'}" font-weight="700" stroke="#fff" stroke-width="${r*0.15}" paint-order="stroke" pointer-events="none">${esc(t)}</text>`).join(''):'')+`</g>`;});
   const lines={};p.holes.forEach(h=>{if(h.line&&lines[h.line]==null)lines[h.line]=h.y;});
@@ -2253,7 +2254,7 @@ function operMapaHTML(p,meu){
   const cams=camsPoly(p);
   operGeom=g;
   return `<div class="opmapw"><svg id="opMap" viewBox="0 0 ${g.W} ${g.H}" preserveAspectRatio="xMidYMid meet">${s}</svg></div>
-  <div class="oplg"><span><i style="background:#5b6676"></i>Pendente</span>${cams.map(c=>`<span><i style="background:${camCor(c)};${c===meu?'outline:2px solid #fff':''}"></i>${esc(camCurto(c))}</span>`).join('')}<span><i style="background:${ST.repasse.c}"></i>Repasse</span><span><i style="background:transparent;border:2px dashed #ffd43b"></i>Adicional</span></div>`;}
+  <div class="oplg"><span><i style="background:#5b6676"></i>Pendente</span>${cams.map(c=>`<span><i style="background:${camCor(c)};${c===meu?'outline:2px solid #fff':''}"></i>${esc(camCurto(c))}</span>`).join('')}<span><i style="background:${ST.repasse.c}"></i>Repasse</span><span><i style="background:transparent;border:2px dashed #ffd43b"></i>Extra (XO = operador)</span></div>`;}
 function operMapaPinta(p,meu,h){const el=document.querySelector(`#opMap [data-oi="${p.holes.indexOf(h)}"] circle`);if(!el)return;el.setAttribute('fill',operCor(h));const mf=camsDoFuro(h).includes(meu);el.setAttribute('stroke',mf?'#fff':'rgba(0,0,0,.5)');}
 function operMapaMarca(i){document.querySelectorAll('#opMap .opd.sel').forEach(e=>e.classList.remove('sel'));const e=document.querySelector(`#opMap [data-oi="${i}"]`);if(e)e.classList.add('sel');}
 function tabOper(p){
@@ -2267,7 +2268,7 @@ function tabOper(p){
   const lista=operFiltro==='pend'?p.holes.filter(x=>x.status==='pendente'):operFiltro==='meus'?meus:p.holes;
   const tampPad=operLast().tampao??pr.tampao;
   const linha=h=>{const i=p.holes.indexOf(h);const kgM=kgDoCam(h,meu);const outros=holeKg(h)-kgM;const st=h.status;
-    return `<div class="opl ${st}" data-i="${i}"><div class="oplid"><b>${esc(h.id)}</b>${ehExtra(h)?'<em class="opadd">adicional</em>':''}<span>${st==='pendente'?(h.agua!=='seca'?'💧':''):st==='carregado'?'✔':ST[st].n}${outros>0?' <i>+'+fmt(outros)+' '+esc(camsDoFuro(h).filter(c=>c!==meu).map(camCurto).join('+'))+'</i>':''}</span></div>
+    return `<div class="opl ${st}" data-i="${i}"><div class="oplid"><b>${esc(h.id)}</b>${ehExtraOp(h)?'<em class="opadd">extra operador</em>':ehExtra(h)?'<em class="opadd">extra</em>':''}<span>${st==='pendente'?(h.agua!=='seca'?'💧':''):st==='carregado'?'✔':ST[st].n}${outros>0?' <i>+'+fmt(outros)+' '+esc(camsDoFuro(h).filter(c=>c!==meu).map(camCurto).join('+'))+'</i>':''}</span></div>
     <input data-k="kg" inputmode="decimal" enterkeyhint="next" value="${v(kgM||null)}" placeholder="${kgProj(p,h)!=null?fmt(kgProj(p,h)):'kg'}" aria-label="Carga do furo ${esc(h.id)}">
     <input data-k="pm" inputmode="decimal" enterkeyhint="next" value="${v(h.profMed)}" placeholder="${h.profProj!=null?v(h.profProj):'m'}" aria-label="Profundidade do furo ${esc(h.id)}">
     <input data-k="tp" inputmode="decimal" enterkeyhint="next" value="${v(h.tampao)}" placeholder="${tampPad!=null?v(tampPad):'m'}" aria-label="Tampão do furo ${esc(h.id)}">
@@ -2280,7 +2281,7 @@ function tabOper(p){
   </div>
   <div class="card op" style="padding:8px"><div class="opbar" style="margin-bottom:6px"><b>Croqui</b><span class="mut" style="margin-left:8px">toque no furo para lançar</span><button class="btn sm" id="opMT" style="margin-left:auto">${S.ui&&S.ui.opMapOff?'Mostrar ▾':'Esconder ▴'}</button></div>${S.ui&&S.ui.opMapOff?'':operMapaHTML(p,meu)}</div>
   ${amostrasHTML(p,meu)}
-  <button class="btn ${operAdd?'pri':''}" id="opAdd" style="width:100%;min-height:58px;font-size:19px;font-weight:800;margin:0 0 8px;border:2px dashed #ffd43b">${operAdd?'👆 Toque no croqui onde fica o furo':'+ Furo adicional'}</button>
+  <button class="btn ${operAdd?'pri':''}" id="opAdd" style="width:100%;min-height:58px;font-size:19px;font-weight:800;margin:0 0 8px;border:2px dashed #ffd43b">${operAdd?'👆 Toque no croqui onde fica o furo':'+ Furo extra do operador (XO)'}</button>
   ${operAdd?`<div class="btns" style="margin:0 0 8px"><button class="btn" id="opAddJa" style="flex:1;min-height:52px">Pôr ao lado do último furo</button><button class="btn" id="opAddX" style="flex:1;min-height:52px">Cancelar</button></div>`:''}
   <div class="seg" id="opF" style="margin:4px 0 8px">${[['todos','Todos'],['pend','Pendentes'],['meus','Meus']].map(([k,t])=>`<button data-f="${k}" class="${operFiltro===k?'on':''}">${t}</button>`).join('')}</div>
   <div class="card op" style="padding:6px 8px"><div class="oplh"><span>Furo</span><span>Carga kg</span><span>Prof. m</span><span>Tampão m</span><span></span></div>
@@ -2330,12 +2331,14 @@ function operSalvaLinha(p,row,meu){
 function operNovoFuro(p,meu,pt){
   const ult=[...p.holes].filter(h=>h.ts&&camsDoFuro(h).includes(meu)).sort((a,b)=>b.ts-a.ts)[0]||p.holes[p.holes.length-1]||{x:0,y:0};
   const base=pt?maisPerto(p,pt.x,pt.y)||ult:ult;
-  const ids=new Set(p.holes.map(h=>h.id));let k=1;while(ids.has('EX'+k))k++;
-  const h=pt?novoFuro('EX'+k,Math.round(pt.x*100)/100,Math.round(pt.y*100)/100,base.profProj):novoFuro('EX'+k,(base.x||0)+(p.esp||4)/2,(base.y||0)+1.5,base.profProj);
-  histAdd(h,'Furo adicional criado pelo operador ('+meu+')');h.por=meuNome()||meu;
+  // prefixo próprio XO- (extra do operador): nunca colide com furos do projeto nem com extras da medição
+  const ids=new Set(p.holes.map(h=>String(h.id).toUpperCase()));let k=1;while(ids.has('XO-'+k))k++;
+  const id='XO-'+k;
+  const h=pt?novoFuro(id,Math.round(pt.x*100)/100,Math.round(pt.y*100)/100,base.profProj):novoFuro(id,(base.x||0)+(p.esp||4)/2,(base.y||0)+1.5,base.profProj);
+  h.obs='Furo extra do operador';histAdd(h,'Furo extra do operador criado ('+meu+')');h.por=meuNome()||meu;
   p.holes.push(h);markP(p.id);markF(p.id,h.id);save();operAdd=false;operFiltro='todos';tabOper(p);
   const i=p.holes.length-1;setTimeout(()=>{const row=document.querySelector(`.opl[data-i="${i}"]`);if(row){row.scrollIntoView({block:'center'});row.classList.add('flash');const inp=row.querySelector('[data-k="kg"]');if(inp)inp.focus({preventScroll:true});}operMapaMarca(i);},80);
-  toast('Furo adicional '+h.id+' criado — lance a carga');
+  toast('Furo extra do operador '+h.id+' criado — lance a carga');
 }
 const tampoPadrao=p=>operLast().tampao??projDe(p).tampao??null;
 function operMais(p,i,meu){const h=p.holes[i];
