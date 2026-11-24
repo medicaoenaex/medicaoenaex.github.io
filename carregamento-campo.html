@@ -257,7 +257,7 @@ header h1 .logo svg{width:24px;height:24px}
 .opperf{display:block;font-size:11px;color:rgba(255,255,255,.45);line-height:1.2}
 .opadd{display:block;font-style:normal;font-size:11px;font-weight:800;color:#ffd43b;text-transform:uppercase}
 #opMap.add{cursor:crosshair}
-.dsg{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 40px;gap:6px;align-items:center;margin-top:8px}.dsg b{font-size:14px}.dsc{min-height:46px;border-radius:10px;background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.25);color:#cfd8e3;font-size:18px;font-weight:800}.dsc.on{border-style:solid;border-color:rgba(255,177,31,.5);color:#fff}
+.dsg{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 40px;gap:6px;align-items:center;margin-top:8px}.dsg b{font-size:14px}.dsc{min-height:46px;border-radius:10px;background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.25);color:#cfd8e3;font-size:18px;font-weight:800}.dsc .dsd{display:block;font-size:13px;color:#ffb27a;font-weight:800}.dsc.on{border-style:solid;border-color:rgba(255,177,31,.5);color:#fff}
 .dsl{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.dschip{background:rgba(255,255,255,.06);border:1px solid var(--line);color:#fff;border-radius:999px;padding:8px 12px;font-size:15px}
 </style>
 </head>
@@ -643,7 +643,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-24.5';
+const APP_VER='2026-11-24.6';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -2224,7 +2224,8 @@ function abrirOperador(){
 /* ----- Amostras de densidade (copo): até 4 por carregamento, cada uma lida a 0, 15 e 30 min — igual à aba "Densidade" do modelo Enaex ----- */
 // no modelo: densidade = (peso do copo cheio − 6 g) / 535
 const COPO_TARA=6,COPO_VOL=535;
-const densDePeso=g=>g==null?null:Math.round((g-COPO_TARA)/COPO_VOL*1000)/1000;
+// mesma conta da linha cinza da planilha: =SE(peso=0;"";(peso-6)/535) — sem arredondar, para bater com o Excel
+const densDePeso=g=>g==null||g===0?null:(g-COPO_TARA)/COPO_VOL;
 const pesoDeDens=d=>d==null?null:Math.round((d*COPO_VOL+COPO_TARA)*10)/10;
 const DS_T=[['v','0 min'],['v15','15 min'],['v30','30 min']];
 const amostras=(p,cam)=>Object.entries(p.dsam||{}).map(([id,a])=>Object.assign({id},a)).filter(a=>a&&DS_T.some(([k])=>a[k]!=null)&&(cam==null||a.cam===cam)).sort((a,b)=>a.ts-b.ts);
@@ -2254,13 +2255,13 @@ function amostraNova(p,meu,depois,idEx,kEx){
     p.dsam=p.dsam||{};let id=idEx;
     if(!id){id=uid();p.dsam[id]={ts:Date.now(),cam:meu,furo:ult?ult.id:null,por:meuNome()||meu};}
     const o=Object.assign({},p.dsam[id]);o[k]=d;o['g'+k.slice(1)]=g;o['t'+k.slice(1)]=Date.now();p.dsam[id]=o;
-    densCamAtualiza(p,o.cam);markP(p.id);save();closeSheet();toast(`Amostra ${nAm} · ${tn}: ${fmt(d,3)} g/cm³`);depois&&depois();};
+    densCamAtualiza(p,o.cam);markP(p.id);save();closeSheet();toast(`Amostra ${nAm} · ${tn}: ${g!=null?fmt(g,1)+' g → ':''}${fmt(d,3)} g/cm³`);depois&&depois();};
   $('#dsOk').onclick=ok;$('#dsV').onkeydown=e=>{if(e.key==='Enter')ok();};
 }
 function amostraApagar(p,id){const a=(p.dsam||{})[id];if(!a)return;confirmBox(`Apagar a amostra das ${new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}?`,()=>{p.dsam[id]=null;densCamAtualiza(p,a.cam);markP(p.id);save();renderPoly();},'Apagar');}
 function amostrasHTML(p,meu){const l=amostras(p,meu);const m=mediaDens(l);
-  return `<div class="card op"><div class="opbar"><h2 style="margin:0">🧪 Densidade</h2><span class="mut" style="margin-left:auto">${l.length?`${l.length} amostra${l.length>1?'s':''} · média <b>${fmt(m,2)}</b>`:'nenhuma amostra ainda'}</span></div>
-  ${l.length?`<div class="dsg"><span></span>${DS_T.map(t=>`<span class="mut">${t[1]}</span>`).join('')}<span></span>${l.map((a,i)=>`<b>${i+1}ª ${new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}${a.furo?`<small class="mut"> furo ${esc(a.furo)}</small>`:''}${i>3?'<small class="mut"> (fora da planilha)</small>':''}</b>${DS_T.map(([k])=>a[k]!=null?`<button class="dsc on" data-dsl="${a.id}|${k}">${a['g'+k.slice(1)]!=null?fmt(a['g'+k.slice(1)],1)+'<small> g</small>':fmt(a[k],2)}</button>`:`<button class="dsc" data-dsl="${a.id}|${k}">+</button>`).join('')}<button class="dsc" data-ds="${a.id}" aria-label="Apagar amostra">✕</button>`).join('')}</div>`:''}
+  return `<div class="card op"><div class="opbar"><h2 style="margin:0">🧪 Densidade</h2><span class="mut" style="margin-left:auto">${l.length?`${l.length} amostra${l.length>1?'s':''} · média <b>${fmt(m,3)}</b> g/cm³`:'nenhuma amostra ainda'}</span></div>
+  ${l.length?`<div class="dsg"><span></span>${DS_T.map(t=>`<span class="mut">${t[1]}</span>`).join('')}<span></span>${l.map((a,i)=>`<b>${i+1}ª ${new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}${a.furo?`<small class="mut"> furo ${esc(a.furo)}</small>`:''}${i>3?'<small class="mut"> (fora da planilha)</small>':''}</b>${DS_T.map(([k])=>a[k]!=null?`<button class="dsc on" data-dsl="${a.id}|${k}">${a['g'+k.slice(1)]!=null?`${fmt(a['g'+k.slice(1)],a['g'+k.slice(1)]%1?1:0)}<small>g</small><small class="dsd">${fmt(a[k],3)}</small>`:fmt(a[k],3)}</button>`:`<button class="dsc" data-dsl="${a.id}|${k}">+</button>`).join('')}<button class="dsc" data-ds="${a.id}" aria-label="Apagar amostra">✕</button>`).join('')}</div>`:''}
   <button class="btn pri" id="dsNova" style="width:100%;min-height:56px;font-size:19px;font-weight:800;margin-top:8px">+ Amostra de densidade (0 min)</button>
   <p class="mut" style="margin:6px 0 0">Até 4 amostras por carregamento, cada uma com leitura de 0, 15 e 30 min (toque no + da linha). Vão para a aba Densidade da planilha Enaex; a média vai para o seu caminhão.</p></div>`;}
 // planilha modelo: a aba "Densidade" tem 3 blocos (CARREG.1, 2 e 3), 4 amostras cada, peso do copo nas linhas 3/6/9/12, colunas 0/15/30 min
