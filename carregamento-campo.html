@@ -1104,17 +1104,34 @@ function furosNaFoto(im,area){
   const lum=(x,y)=>{const i=(y*W+x)*4;return(dat[i]+dat[i+1]+dat[i+2])/3;};
   const LV=[];for(let y=0;y<H;y+=3)for(let x=0;x<W;x+=3)LV.push(lum(x,y));LV.sort((a,b)=>a-b);
   const claro=Math.max(185,LV[Math.floor(LV.length*0.985)]+8);
-  P.forEach(q=>{let br=0,bn=0,mn=1e9,dS=0,dN=0;const x0=Math.round(q.sx),y0=Math.round(q.sy);
+  const medir=q=>{let br=0,bn=0,mn=1e9,mx=q.sx,my=q.sy,dS=0,dN=0;
     for(let yy=Math.max(1,Math.floor(q.sy-1.4*R));yy<=Math.min(H-2,Math.ceil(q.sy+1.4*R));yy++)for(let xx=Math.max(1,Math.floor(q.sx-1.4*R));xx<=Math.min(W-2,Math.ceil(q.sx+1.4*R));xx++){
-      const d=Math.hypot(xx-q.sx,yy-q.sy),l=lum(xx,yy);if(d<=0.6*R){bn++;if(l>=claro)br++;
-        let m=0;for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)m+=lum(xx+a,yy+b);if(m/9<mn)mn=m/9;}
-      else if(d>=0.8*R&&d<=1.4*R){dS+=l;dN++;}}
-    q.claro=bn?br/bn:0;q.dot=dN&&mn<1e9?dS/dN-mn:0;}); // dot: o furo tem um ponto preto no meio da mancha
+      const d=Math.hypot(xx-q.sx,yy-q.sy),l=lum(xx,yy);if(d<=0.6*R){bn++;if(l>=claro)br++;}
+      if(d<=1.4*R){let m=0;for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)m+=lum(xx+a,yy+b);if(m/9<mn){mn=m/9;mx=xx;my=yy;}}
+      if(d>=0.8*R&&d<=1.4*R){dS+=l;dN++;}}
+    q.claro=bn?br/bn:0;q.dot=dN&&mn<1e9?dS/dN-mn:0;q.px=mx;q.py=my;return q;}; // dot: o furo tem um ponto preto no meio da mancha; px,py: onde está o ponto
+  P.forEach(medir);
   P=P.filter(q=>q.claro<=0.3);
   // 3b) mancha cinza sem o ponto preto do furo = sombra, pó, pedra (se a foto mostra o ponto)
   const dm=mediana(P.map(q=>q.dot));if(dm>=15)P=P.filter(q=>q.dot>=0.5*dm);
   // 4) furo de verdade está na malha: tem vizinhos na distância da malha
   for(let it=0;it<3;it++){const nn=nnDist(P);P=P.filter((q,i)=>nn[i]<1.8*d0&&P.filter(o=>{if(o===q)return false;const d=Math.hypot(o.x-q.x,o.y-q.y);return d>0.5*d0&&d<2.2*d0;}).length>=2);}
+  // 5) malha da bancada (espaçamento x afastamento): onde dois furos achados, um de cada lado, mandam ter um furo no meio, aceita a marca mais fraca que estiver ali
+  if(P.length>=6){const pega=new Set(P);const cand=best.P0.map(q=>({x:q.x/k+bx0,y:q.y/k+by0,sx:q.x,sy:q.y,v:q.v})).map(medir)
+      .filter(q=>q.claro<=0.3&&(!(dm>=15)||q.dot>=0.22*dm)).sort((a,b)=>b.dot-a.dot);
+    for(let it=0;it<3;it++){let novo=0;cand.forEach(q=>{if(pega.has(q))return;if(P.some(o=>Math.hypot(o.x-q.x,o.y-q.y)<0.55*d0||Math.hypot(o.px/k+bx0-(q.px/k+bx0),o.py/k+by0-(q.py/k+by0))<0.4*d0))return;
+      const V=P.filter(o=>{const d=Math.hypot(o.x-q.x,o.y-q.y);return d>0.6*d0&&d<1.6*d0;});let ok=false;
+      for(let i=0;i<V.length&&!ok;i++)for(let j=i+1;j<V.length;j++){const a=V[i],b=V[j],ab=Math.hypot(a.x-b.x,a.y-b.y);
+        if(ab>1.4*d0&&ab<3.2*d0&&Math.hypot((a.x+b.x)/2-q.x,(a.y+b.y)/2-q.y)<0.22*d0){ok=true;break;}}
+      if(ok){P.push(q);pega.add(q);novo++;}});if(!novo)break;}}
+  // o círculo vai para o ponto preto do furo (o centro da mancha nem sempre é o furo)
+  {const c=document.createElement('canvas');c.width=aw;c.height=ah;const g=c.getContext('2d');g.drawImage(im,bx0,by0,aw,ah,0,0,aw,ah);const D=g.getImageData(0,0,aw,ah).data;
+    const L=(x,y)=>{const i=(y*aw+x)*4;return D[i]+D[i+1]+D[i+2];};const rr=Math.max(3,Math.round(Math.min(1.7*R/k,0.52*d0))),pr=Math.max(1,Math.round(0.15*R/k));
+    P.forEach(q=>{const cx=Math.round(q.x-bx0),cy=Math.round(q.y-by0);let mn=Infinity,mx=cx,my=cy,sum=0,n=0;
+      for(let y=Math.max(pr,cy-rr);y<=Math.min(ah-1-pr,cy+rr);y++)for(let x=Math.max(pr,cx-rr);x<=Math.min(aw-1-pr,cx+rr);x++){if((x-cx)**2+(y-cy)**2>rr*rr)continue;
+        let m=0;for(let a=-pr;a<=pr;a++)m+=L(x+a,y)+L(x,y+a);sum+=L(x,y);n++;if(m<mn){mn=m;mx=x;my=y;}}
+      let perto=false;const cr=3*pr+2;for(let y=Math.max(0,my-cr);y<=Math.min(ah-1,my+cr)&&!perto;y++)for(let x=Math.max(0,mx-cr);x<=Math.min(aw-1,mx+cr);x++)if(L(x,y)>=3*claro){perto=true;break;} // janela escura de carro não é furo
+      if(n&&!perto&&mn/(4*pr+2)<0.75*sum/n){q.x=mx+bx0;q.y=my+by0;}});} // só move se o ponto for bem mais escuro que a volta
   return{furos:P.map(q=>({x:q.x,y:q.y})),sp:d0};}
 // numera em sequência pela malha: acha as linhas de furos (fileiras), da esquerda para a direita; em cada fileira, de cima para baixo (1, 2, 3…)
 function numerarFuros(P,sp){if(!P.length)return P;
@@ -1122,15 +1139,16 @@ function numerarFuros(P,sp){if(!P.length)return P;
   const mx=P.reduce((a,q)=>a+q.x,0)/n,my=P.reduce((a,q)=>a+q.y,0)/n;
   let sxx=0,syy=0,sxy=0;P.forEach(q=>{const dx=q.x-mx,dy=q.y-my;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;});
   const angL=n>2?0.5*Math.atan2(2*sxy,sxx-syy):0; // lado maior do polígono
+  const tr=sxx+syy,dt=Math.sqrt(Math.max(0,(sxx-syy)**2/4+sxy*sxy)),alongado=(tr/2+dt)>2.2*Math.max(1e-9,tr/2-dt); // área comprida: fileira atravessa o lado maior; área quase quadrada: fileira mais em pé na foto
   // direções da malha: ângulos dos vizinhos próximos (mod 180°)
   const NB=36,hist=new Float32Array(NB),V=[];
-  P.forEach((a,i)=>P.forEach((b,j)=>{if(j<=i)return;const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d<1.5*sp&&d>0.3*sp){let t=Math.atan2(dy,dx);if(t<0)t+=Math.PI;if(t>=Math.PI)t-=Math.PI;V.push({t,d});hist[Math.floor(t/Math.PI*NB)%NB]+=1;}}));
+  P.forEach((a,i)=>P.forEach((b,j)=>{if(j<=i)return;const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d<1.25*sp&&d>0.3*sp){let t=Math.atan2(dy,dx);if(t<0)t+=Math.PI;if(t>=Math.PI)t-=Math.PI;V.push({t,d});hist[Math.floor(t/Math.PI*NB)%NB]+=1;}}));
   const hs=Array.from(hist,(v,i)=>v+0.5*(hist[(i+1)%NB]+hist[(i+NB-1)%NB])),hmax=Math.max(...hs);
   let angC=angL+Math.PI/2,bestS=-1; // fileira: direção da malha mais atravessada ao lado maior
   if(hmax>0)hs.forEach((v,i)=>{if(v<0.4*hmax||v<hs[(i+1)%NB]||v<hs[(i+NB-1)%NB])return;
     const sum=V.filter(o=>{let dd=Math.abs(o.t-(i+0.5)/NB*Math.PI);dd=Math.min(dd,Math.PI-dd);return dd<Math.PI/NB*1.5;});
     const t=Math.atan2(sum.reduce((a,o)=>a+Math.sin(2*o.t),0),sum.reduce((a,o)=>a+Math.cos(2*o.t),0))/2;
-    const sc=Math.abs(Math.sin(t-angL))*(0.5+0.5*v/hmax);if(sc>bestS){bestS=sc;angC=t;}});
+    const sc=(alongado?Math.abs(Math.sin(t-angL)):Math.abs(Math.sin(t)))*(0.5+0.5*v/hmax);if(sc>bestS){bestS=sc;angC=t;}});
   let ux=Math.cos(angC),uy=Math.sin(angC);if(Math.abs(uy)>0.3?uy<0:ux<0){ux=-ux;uy=-uy;} // u: ao longo da fileira, para baixo
   let vx=-uy,vy=ux;if(Math.abs(vx)>0.3?vx<0:vy<0){vx=-vx;vy=-vy;} // v: de uma fileira para a outra (esquerda -> direita)
   const L=P.map(q=>({q,u:(q.x-mx)*ux+(q.y-my)*uy,v:(q.x-mx)*vx+(q.y-my)*vy,dn:-1,up:-1}));
