@@ -675,11 +675,12 @@ function renderNovo(p){
       <div class="row"><div><label>Profundidade de projeto (m)</label><input id="gP" inputmode="decimal" value="15"></div><div><label>Arranjo</label><select id="gS"><option value="0">Retangular</option><option value="1" selected>Estagiado (pé de galinha)</option></select></div></div>
       <label>Numeração</label><select id="gN"><option value="lf">Linha-Furo (L1-F1, L1-F2…)</option><option value="seq">Sequencial (1, 2, 3…)</option></select>
       <p class="mut">Afastamento e espaçamento servem só para desenhar o mapa.</p>`
-      :novoModo==='medicao'?`<p class="mut" style="margin:10px 0 6px">No app Medição Enaex, exporte o <b>Backup (.json)</b> do polígono (traz a posição dos furos igual ao croqui) ou o <b>CSV</b>. Depois escolha o arquivo aqui.</p><button class="btn pri" id="mLoc" style="width:100%">Buscar no Medição Enaex deste celular</button><button class="btn" id="mFile" style="width:100%;margin-top:8px">Escolher arquivo do Medição Enaex</button><button class="btn" id="mPdf" style="width:100%;margin-top:8px">Ler PDF da temporização (desenho com os tempos)</button><button class="btn" id="mDrone" style="width:100%;margin-top:8px">📷 Achar os furos na foto do drone</button><div id="mInfo" class="hint" style="display:none"></div>`
+      :novoModo==='medicao'?`<p class="mut" style="margin:10px 0 6px">No app Medição Enaex, exporte o <b>Backup (.json)</b> do polígono (traz a posição dos furos igual ao croqui) ou o <b>CSV</b>. Depois escolha o arquivo aqui.</p><button class="btn pri" id="mLoc" style="width:100%">Buscar no Medição Enaex deste celular</button><button class="btn" id="mFile" style="width:100%;margin-top:8px">Escolher arquivo do Medição Enaex</button><button class="btn" id="mCroq" style="width:100%;margin-top:8px">📄 Ler croqui em PDF (bolinhas com o nº do furo)</button><button class="btn" id="mPdf" style="width:100%;margin-top:8px">Ler PDF da temporização (desenho com os tempos)</button><button class="btn" id="mDrone" style="width:100%;margin-top:8px">📷 Achar os furos na foto do drone</button><div id="mInfo" class="hint" style="display:none"></div>`
       :`<label>Uma linha por furo: <b>ID;PROF</b> ou <b>ID;X;Y;PROF</b></label><textarea id="gList" placeholder="L1-F1;15&#10;L1-F2;15&#10;ou&#10;1;612345,2;7765432,8;15"></textarea><button class="btn" id="lFile" style="width:100%;margin-top:8px">Ler arquivo de coordenadas (Excel, CSV, TXT ou PDF)</button><div class="hint">Funciona com coordenadas do topógrafo (X = leste, Y = norte) ou só a lista de furos. Separador pode ser ponto e vírgula ou tab (direto do Excel).</div>`;};
-    const bindMed=()=>{const lf=$('#lFile');if(lf)lf.onclick=async()=>{const file=await pickFile('.xlsx,.xls,.csv,.txt,.pdf');if(!file)return;try{const hs=rowsToHoles(await fileToRows(file));$('#gList').value=hs.map(h=>[h.id,fmtC(h.x),fmtC(h.y),h.p!=null?fmtC(h.p):''].join(';').replace(/;$/,'')).join('\n');toast(hs.length+' furos lidos — confira a lista');}catch(e){busy();if(e.carreg){const hn=lf.nextElementSibling;if(hn)hn.innerHTML=avisoPlanCarreg(file.name,e.carreg);toast(e.message,5000);}else toast(e.message);}};
-    const mostra=(r,nome)=>{medImport=r;const i=$('#mInfo');i.style.display='';i.innerHTML=`✅ <b>${esc(nome)}</b><br>${r.holes.length} furos · ${r.resumo}`;if(r.nome&&!$('#fPol').value){const m=r.nome.match(/POL[\s_\-]*(\d+)/i)||r.nome.match(/(\d+)(?:[_\-\/]\d+)?[A-Za-z]?\s*$/)||r.nome.match(/(\d+[A-Za-z]?)/);if(m)$('#fPol').value=m[1];}};
+    const bindMed=()=>{const lf=$('#lFile');if(lf)lf.onclick=async()=>{const file=await pickFile('.xlsx,.xls,.csv,.txt,.pdf');if(!file)return;try{if(/\.pdf$/i.test(file.name)){let hs0=null;try{hs0=rowsToHoles(await fileToRows(file));}catch(e){busy();}if(!hs0){const r=await croquiPdfFluxo(file);if(r){novoModo='medicao';document.querySelectorAll('#modo button').forEach(x=>x.classList.toggle('on',x.dataset.m==='medicao'));draw();mostra(r,r.nome);toast(r.holes.length+' furos lidos do croqui');}return;}}const hs=rowsToHoles(await fileToRows(file));$('#gList').value=hs.map(h=>[h.id,fmtC(h.x),fmtC(h.y),h.p!=null?fmtC(h.p):''].join(';').replace(/;$/,'')).join('\n');toast(hs.length+' furos lidos — confira a lista');}catch(e){busy();if(e.carreg){const hn=lf.nextElementSibling;if(hn)hn.innerHTML=avisoPlanCarreg(file.name,e.carreg);toast(e.message,5000);}else toast(e.message);}};
+    const mostra=(r,nome)=>{medImport=r;const i=$('#mInfo');i.style.display='';i.innerHTML=`✅ <b>${esc(nome)}</b><br>${r.holes.length} furos · ${r.resumo}`;const inf=r.info||{};if(inf.pol&&!$('#fPol').value)$('#fPol').value=inf.pol;if(inf.banco&&!$('#fBanco').value)$('#fBanco').value=inf.banco;if(inf.mina&&!$('#fMina').value)$('#fMina').value=inf.mina;if(r.nome&&!$('#fPol').value){const m=r.nome.match(/POL[\s_\-]*(\d+)/i)||r.nome.match(/(\d+)(?:[_\-\/]\d+)?[A-Za-z]?\s*$/)||r.nome.match(/(\d+[A-Za-z]?)/);if(m)$('#fPol').value=m[1];}};
     if($('#mLoc'))$('#mLoc').onclick=()=>escolherMedicao(r=>mostra(r,r.nome||'Medição Enaex'));
+    if($('#mCroq'))$('#mCroq').onclick=async()=>{const r=await croquiPdfFluxo();if(r)mostra(r,r.nome);};
     if($('#mPdf'))$('#mPdf').onclick=async()=>{const r=await pdfTemposFluxo(null);if(r)mostra(r,r.nome);};
     if($('#mDrone'))$('#mDrone').onclick=async()=>{const r=await fotoDroneFluxo();if(r)mostra(r,r.nome);};
     const b=$('#mFile');if(!b)return;b.onclick=()=>{const fi=$('#fileIn');fi.accept='.json,.csv,.txt';fi.value='';fi.onchange=()=>{const file=fi.files[0];if(!file)return;const r=new FileReader();r.onload=()=>{try{medImport=lerMedicao(String(r.result),file.name);const i=$('#mInfo');i.style.display='';i.innerHTML=`✅ <b>${esc(file.name)}</b><br>${medImport.holes.length} furos · ${medImport.resumo}`;if(medImport.nome&&!$('#fPol').value){const m=medImport.nome.match(/(\d+[A-Za-z]?)\s*$/);if(m)$('#fPol').value=m[1];}}catch(e){medImport=null;toast(e.message);}};r.readAsText(file);};fi.click();};};
@@ -718,7 +719,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-25.1';
+const APP_VER='2026-11-25.2';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1916,6 +1917,63 @@ function conferirOcr(res,aoFim){
       const fim=()=>{closeSheet();aoFim(F.filter(f=>f.t));};
       if(rep.length)confirmBox(`Há tempo repetido (${rep.map(r=>r[0]).slice(0,5).join(', ')}). No plano isso significa furos detonando juntos. Usar mesmo assim?`,fim,'Usar');else fim();};};
   draw();
+}
+/* ===== Croqui em PDF desenhado (ex.: Paradigm Terra): bolinha de cada furo + número ao lado, sem coordenadas escritas ===== */
+// lê o desenho vetorial do PDF (não é OCR): acha os círculos dos furos e o número mais perto de cada um
+async function lerCroquiPdf(file){
+  const lib=await loadPdf();const doc=await lib.getDocument({data:new Uint8Array(await readBuf(file)),isEvalSupported:false}).promise;const O=lib.OPS;
+  const mul=(m,n)=>[m[0]*n[0]+m[2]*n[1],m[1]*n[0]+m[3]*n[1],m[0]*n[2]+m[2]*n[3],m[1]*n[2]+m[3]*n[3],m[0]*n[4]+m[2]*n[5]+m[4],m[1]*n[4]+m[3]*n[5]+m[5]];
+  const NA={[O.moveTo]:2,[O.lineTo]:2,[O.curveTo]:6,[O.curveTo2]:4,[O.curveTo3]:4,[O.closePath]:0,[O.rectangle]:4};
+  let best=null;
+  for(let pi=1;pi<=Math.min(doc.numPages,12);pi++){const page=await doc.getPage(pi);const ol=await page.getOperatorList();
+    let ctm=[1,0,0,1,0,0],cor='';const pilha=[],circ=[];let pend=null;
+    for(let k=0;k<ol.fnArray.length;k++){const fn=ol.fnArray[k],a=ol.argsArray[k];
+      if(fn===O.save)pilha.push([ctm,cor]);else if(fn===O.restore){const s=pilha.pop();if(s){ctm=s[0];cor=s[1];}}
+      else if(fn===O.transform)ctm=mul(ctm,a);
+      else if(fn===O.paintFormXObjectBegin&&a&&a[0]){pilha.push([ctm,cor]);ctm=mul(ctm,a[0]);}else if(fn===O.paintFormXObjectEnd){const s=pilha.pop();if(s){ctm=s[0];cor=s[1];}}
+      else if(fn===O.setFillRGBColor||fn===O.setFillColor)cor=String(a&&a[0]!=null?(typeof a[0]==='string'?a[0]:[...a].join(',')):'');
+      else if(fn===O.constructPath){pend=null;const ops=a[0],ar=a[1];let i=0,nc=0,ok=true,x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+        for(const op of ops){const n=NA[op];if(n==null){ok=false;break;}if(op===O.curveTo||op===O.curveTo2||op===O.curveTo3)nc++;else if(op===O.lineTo||op===O.rectangle)ok=false;
+          for(let j=0;j<n;j+=2){const x=ar[i+j],y=ar[i+j+1];if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}i+=n;}
+        const w=x1-x0,h=y1-y0;if(ok&&nc>=4&&nc<=8&&w>0&&Math.abs(w-h)<0.15*w){const cx=(x0+x1)/2,cy=(y0+y1)/2,sc=Math.sqrt(Math.abs(ctm[0]*ctm[3]-ctm[1]*ctm[2]));
+          pend={x:ctm[0]*cx+ctm[2]*cy+ctm[4],y:ctm[1]*cx+ctm[3]*cy+ctm[5],r:w/2*sc};}}
+      else if(pend&&(fn===O.fill||fn===O.eoFill||fn===O.fillStroke||fn===O.eoFillStroke||fn===O.stroke||fn===O.closeStroke)){pend.cor=cor;pend.f=fn!==O.stroke&&fn!==O.closeStroke;circ.push(pend);pend=null;}
+      else if(fn!==O.setGState&&fn!==O.setLineWidth&&fn!==O.setStrokeRGBColor&&fn!==O.setStrokeColor&&fn!==O.setLineCap&&fn!==O.setLineJoin&&fn!==O.setMiterLimit)pend=null;}
+    if(circ.length<3)continue;
+    const tc=await page.getTextContent();const textos=tc.items.map(t=>t.str).join(' ');const titulo=((tc.items.find(t=>/POL\s*[-_]?\s*\d+/i.test(t.str))||{}).str||'').replace(/^.*?(?=POL)/i,'').trim();
+    const rot=tc.items.map(t=>({s:t.str.trim(),x:t.transform[4]+(t.width||0)/2,y:t.transform[5]+(t.height||0)/2})).filter(t=>/^[A-Za-z]{0,3}[-_]?\d{1,4}[A-Za-z]?$/.test(t.s));
+    // grupos de bolinhas do mesmo tamanho e cor: o grupo dos furos é o que tem mais números ao lado
+    const grp={};circ.forEach(c=>{const g=c.cor+'|'+c.f+'|'+Math.round(Math.log(c.r)*8);(grp[g]=grp[g]||[]).push(c);});
+    for(const fs of Object.values(grp)){if(fs.length<3)continue;const nn=vizMed(fs);
+      const perto=r=>{let m=null,d=Infinity;fs.forEach(f=>{const q=Math.hypot(f.x-r.x,f.y-r.y);if(q<d){d=q;m=f;}});return{f:m,d};};
+      const cand=rot.filter(r=>perto(r).d<0.7*nn);if(cand.length<fs.length*0.3)continue;
+      // desvio típico do número em relação à bolinha (o número fica sempre do mesmo lado)
+      const md=v=>v.sort((a,b)=>a-b)[v.length>>1];const ox=md(cand.map(r=>r.x-perto(r).f.x)),oy=md(cand.map(r=>r.y-perto(r).f.y));
+      const pares=[];cand.forEach(r=>fs.forEach((f,j)=>{const d=Math.hypot(r.x-ox-f.x,r.y-oy-f.y);if(d<0.5*nn)pares.push({r,j,d});}));pares.sort((a,b)=>a.d-b.d);
+      const usoR=new Set(),id=fs.map(()=>null);pares.forEach(p=>{if(usoR.has(p.r)||id[p.j]!=null)return;usoR.add(p.r);id[p.j]=p.r.s;});
+      const nota=id.filter(v=>v!=null).length;if(!best||nota>best.nota)best={nota,fs,id,pi,page,nn,textos,titulo};}}
+  if(!best||best.nota<3)throw new Error('Não achei as bolinhas dos furos com o número ao lado nesse PDF. Se for o PDF da temporização (com tempos), use "Ler PDF da temporização".');
+  const {fs,id,page,nn}=best;
+  // furo sem número no desenho: ganha S1, S2… para o usuário renomear
+  let s=0;const usados=new Set(id.filter(Boolean));const ids=id.map(v=>{if(v!=null&&v!=='')return v;do s++;while(usados.has('S'+s));return 'S'+s;});
+  const rep=Object.entries(ids.reduce((a,v)=>{a[v]=(a[v]||0)+1;return a;},{})).filter(([,n])=>n>1).map(r=>r[0]);
+  // posições em pixels da página (sem fundo: no PDF só há as bolinhas e os números, que o app já desenha)
+  const vp=page.getViewport({scale:3});const P=fs.map(f=>vp.convertToViewportPoint(f.x,f.y));
+  const x0=Math.min(...P.map(p=>p[0])),y0=Math.min(...P.map(p=>p[1]));
+  const holes=fs.map((f,i)=>{const h=novoFuro(ids[i],P[i][0]-x0,P[i][1]-y0,null);if(!id[i])h.obsCroqui='sem número no PDF';return h;});
+  // ordem natural dos números (0, 1, 2… 10)
+  holes.sort((a,b)=>String(a.id).localeCompare(String(b.id),'pt',{numeric:true}));
+  const T=best.textos;const tit=best.titulo.slice(0,40);
+  const info={pol:(T.match(/POL\s*[-_]?\s*(\d+[A-Za-z]?)/i)||[])[1]||'',banco:(T.match(/\bB\s*(\d{3,4})\b/)||T.match(/BANCO\s*(\d{3,4})/i)||[])[1]||'',
+    mina:/HORIZ/i.test(T)?'HZT':/PICO/i.test(T)?'Pico':/TAMAND/i.test(T)?'TAM':/AB[OÓ]BORA/i.test(T)?'ABO':''};
+  const sem=ids.filter((v,i)=>!id[i]).length;
+  return{holes,nome:tit||file.name.replace(/\.pdf$/i,''),info,
+    resumo:`croqui em PDF (página ${best.pi}) · posições iguais ao desenho`+(sem?` · ${sem} sem número (S1…)`:'')+(rep.length?` · ⚠️ número repetido: ${rep.slice(0,5).join(', ')}`:'')};
+}
+async function croquiPdfFluxo(file){
+  file=file||await pickFile('.pdf');if(!file)return null;
+  try{busy('Lendo o croqui em PDF…');const r=await lerCroquiPdf(file);busy();return r;}
+  catch(e){busy();console.error(e);toast(e.message&&e.message.length<200?e.message:'Não consegui ler o PDF',6000);return null;}
 }
 async function pdfTemposFluxo(destino){ // destino: polígono existente (encaixa tempos) ou null (devolve dados para novo polígono)
   const file=await pickFile('.pdf');if(!file)return null;
