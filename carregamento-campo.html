@@ -719,7 +719,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-25.4';
+const APP_VER='2026-11-25.5';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -767,12 +767,57 @@ function novoFuro(id,x,y,prof,line,n){return{id:String(id),x,y,line:line||null,n
 
 
 /* ===== Projeto de carregamento (valores do plano de fogo, informados pelo usuário) ===== */
-const PROJ_PADRAO={diam:'',afast:null,espac:null,dens:null,prod:'',kg:null,decks:1,tampao:null,booster:null,brinel:null,detTipo:'',detQtd:null,tolKg:10,tolProf:0.5,tolCam:3};
+const PROJ_PADRAO={diam:'',afast:null,espac:null,dens:null,prod:'',kg:null,decks:1,tampao:null,banc:null,subf:null,densRocha:null,booster:null,brinel:null,detTipo:'',detQtd:null,tolKg:10,tolProf:0.5,tolCam:3};
 const projDe=p=>Object.assign({},PROJ_PADRAO,p.proj||{});
 const DIAMS=['3"','3 1/2"','4"','4 1/2"','5"','5 1/2"','6"','6 1/2"','7"','7 7/8"','9 7/8"'];
 const diamTxt=d=>{d=String(d??'').trim();if(!d)return'';return /["”]|pol/i.test(d)?d:d+'"';};
 // linha curta do plano de fogo: diâmetro, malha, produto, densidade
-function planoTxt(p){const pr=projDe(p);return[pr.diam?'Ø '+diamTxt(pr.diam):'',pr.afast!=null||pr.espac!=null?'malha '+fmt(pr.afast,1)+' x '+fmt(pr.espac,1)+' m':'',pr.prod||'',pr.dens!=null?'dens. '+fmt(pr.dens,2)+' g/cm³':'',pr.kg!=null?fmt(pr.kg)+' kg/furo':'',pr.tampao!=null?'tampão '+fmt(pr.tampao,1)+' m':''].filter(Boolean).join(' · ');}
+function planoTxt(p){const pr=projDe(p);return[pr.diam?'Ø '+diamTxt(pr.diam):'',pr.afast!=null||pr.espac!=null?'malha '+fmt(pr.afast,1)+' x '+fmt(pr.espac,1)+' m':'',pr.prod||'',pr.dens!=null?'dens. '+fmt(pr.dens,2)+' g/cm³':'',pr.kg!=null?fmt(pr.kg)+' kg/furo':'',pr.tampao!=null?'tampão '+fmt(pr.tampao,1)+' m':'',pr.banc!=null?'bancada '+fmt(pr.banc,1)+' m':'',pr.subf!=null?'subf. '+fmt(pr.subf,1)+' m':''].filter(Boolean).join(' · ');}
+// diâmetro em polegadas: '6 1/2"', '7 7/8', '165 mm' (>30 = mm)
+function diamPol(d){d=String(d??'').replace(/["”]|pol\.?|in/gi,' ').trim();if(!d)return null;const mm=/mm/i.test(d);d=d.replace(/mm/i,'').trim();
+  let m=d.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/),v;if(m)v=+m[1]+m[2]/m[3];else if((m=d.match(/^(\d+)\s*\/\s*(\d+)$/)))v=m[1]/m[2];else v=num(d);
+  if(v==null||!(v>0))return null;return mm||v>30?v/25.4:v;}
+/* Contas do desmonte: só indicadores tirados dos valores do plano e do que foi lançado (não sugere carga) */
+function contasDesmonte(p,prIn){
+  const pr=prIn||projDe(p),area=pr.afast!=null&&pr.espac!=null?pr.afast*pr.espac:null,subf=pr.subf||0;
+  const alt=prof=>pr.banc!=null?pr.banc:(prof!=null?Math.max(0,prof-subf):null);
+  const at=p.holes.filter(h=>h.status!=='perdido'&&h.status!=='nao');
+  const P={n:at.length,m:0,mN:0,vol:0,volN:0,kg:0,kgN:0,col:0,colKg:0},E={n:0,m:0,mN:0,vol:0,volN:0,kg:0,col:0,colKg:0};
+  at.forEach(h=>{const pp=h.profProj,kp=kgProj(p,h);
+    if(pp!=null){P.m+=pp;P.mN++;}
+    const ap=alt(pp);if(area!=null&&ap!=null){P.vol+=area*ap;P.volN++;}
+    if(kp!=null){P.kg+=kp;P.kgN++;if(pp!=null&&pr.tampao!=null&&pp>pr.tampao){P.col+=pp-pr.tampao;P.colKg+=kp;}}
+    const ke=holeKg(h);if(!(ke>0))return;E.n++;E.kg+=ke;
+    const pe=h.profMed!=null?h.profMed:pp;if(pe!=null){E.m+=pe;E.mN++;}
+    const ae=alt(pe);if(area!=null&&ae!=null){E.vol+=area*ae;E.volN++;}
+    const tp=h.tampao!=null?h.tampao:pr.tampao;if(pe!=null&&tp!=null&&pe>tp){E.col+=pe-tp;E.colKg+=ke;}});
+  const fin=(X,kgOk)=>{const vol=X.volN?X.vol:null,t=vol!=null&&pr.densRocha!=null?vol*pr.densRocha:null,kg=kgOk?X.kg:null;
+    return{n:X.n,m:X.mN?X.m:null,vol,t,kg,rc:vol&&kg?kg/vol:null,rcT:t&&kg?kg/t:null,pe:vol&&X.mN?X.m/vol:null,volFuro:X.volN?X.vol/X.volN:null,
+      kgFuro:kg!=null&&X.n?kg/X.n:null,col:X.col&&X.n?X.col/X.n:null,lin:X.col?X.colKg/X.col:null};};
+  const d=diamPol(pr.diam),lin=d&&pr.dens!=null?Math.PI/4*Math.pow(d*0.0254,2)*pr.dens*1000:null;
+  const rp=fin(P,P.kgN>0),re=fin(E,E.n>0);if(rp.kgFuro!=null&&P.kgN)rp.kgFuro=P.kg/P.kgN;
+  return{area,lin,dPol:d,proj:rp,exec:re,temAlt:pr.banc!=null||p.holes.some(h=>h.profProj!=null||h.profMed!=null)};
+}
+function contasHtml(p,prIn,curto){
+  const c=contasDesmonte(p,prIn),pr=prIn||projDe(p);
+  if(c.area==null&&c.lin==null)return`<p class="mut" style="margin:0">Informe a malha (afastamento e espaçamento) para ver volume e razão de carga.</p>`;
+  const L=[['Área por furo (A × E)',c.area!=null?fmt(c.area,2)+' m²':'–',null],
+    ['Volume por furo',c.proj.volFuro!=null?fmt(c.proj.volFuro,1)+' m³':'–',c.exec.volFuro!=null?fmt(c.exec.volFuro,1)+' m³':'–'],
+    ['Volume desmontado',c.proj.vol!=null?fmt(c.proj.vol)+' m³':'–',c.exec.vol!=null?fmt(c.exec.vol)+' m³':'–'],
+    ...(pr.densRocha!=null?[['Massa desmontada',c.proj.t!=null?fmt(c.proj.t)+' t':'–',c.exec.t!=null?fmt(c.exec.t)+' t':'–']]:[]),
+    ['Furos',fmt(c.proj.n),fmt(c.exec.n)+' carreg.'],
+    ['Metros perfurados',c.proj.m!=null?fmt(c.proj.m,1)+' m':'–',c.exec.m!=null?fmt(c.exec.m,1)+' m':'–'],
+    ['Perfuração específica',c.proj.pe!=null?fmt(c.proj.pe,3)+' m/m³':'–',c.exec.pe!=null?fmt(c.exec.pe,3)+' m/m³':'–'],
+    ['Explosivo total',c.proj.kg!=null?fmt(c.proj.kg)+' kg':'–',c.exec.kg!=null?fmt(c.exec.kg)+' kg':'–'],
+    ['Carga média por furo',c.proj.kgFuro!=null?fmt(c.proj.kgFuro,1)+' kg':'–',c.exec.kgFuro!=null?fmt(c.exec.kgFuro,1)+' kg':'–'],
+    ['<b>Razão de carga</b>',c.proj.rc!=null?'<b>'+fmt(c.proj.rc,3)+' kg/m³</b>':'–',c.exec.rc!=null?'<b>'+fmt(c.exec.rc,3)+' kg/m³</b>':'–'],
+    ...(pr.densRocha!=null?[['Razão de carga (massa)',c.proj.rcT!=null?fmt(c.proj.rcT*1000,0)+' g/t':'–',c.exec.rcT!=null?fmt(c.exec.rcT*1000,0)+' g/t':'–']]:[]),
+    ['Coluna de carga média (prof. − tampão)',c.proj.col!=null?fmt(c.proj.col,1)+' m':'–',c.exec.col!=null?fmt(c.exec.col,1)+' m':'–'],
+    ['Razão linear (kg / m de coluna)',c.lin!=null?fmt(c.lin,1)+' kg/m <span class="mut">(Ø × dens.)</span>':(c.proj.lin!=null?fmt(c.proj.lin,1)+' kg/m':'–'),c.exec.lin!=null?fmt(c.exec.lin,1)+' kg/m':'–']];
+  const rows=curto?L.filter(r=>!/^Furos|Área|Perfuração/.test(r[0])):L;
+  return`<table><thead><tr><th></th><th class="n">Projeto</th><th class="n">Executado</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r[0]}</td><td class="n">${r[1]}</td><td class="n">${r[2]==null?'':r[2]}</td></tr>`).join('')}</tbody></table>
+  <p class="mut" style="margin:6px 0 0">Volume = A × E × ${pr.banc!=null?'altura da bancada ('+fmt(pr.banc,1)+' m)':'(profundidade'+(pr.subf?' − subfuração '+fmt(pr.subf,1)+' m':'')+')'}. Executado conta só os furos com carga lançada, com a profundidade medida quando houver.${c.exec.n&&c.exec.n<c.proj.n?' Os totais executados fecham quando todos os furos forem lançados.':''}</p>`;
+}
 const kgProj=(p,h)=>h.cargaProj!=null?h.cargaProj:projDe(p).kg;
 // classifica o furo comparando executado x projeto
 function desvio(p,h){
@@ -807,6 +852,9 @@ function editProjeto(p){
   <div class="row"><div><label>Malha: afastamento (m)</label><input id="pjAf" inputmode="decimal" value="${v(pr.afast)}" placeholder="ex.: 4,0"></div><div><label>Malha: espaçamento (m)</label><input id="pjEs" inputmode="decimal" value="${v(pr.espac)}" placeholder="ex.: 4,5"></div></div>
   <div class="row"><div><label>Densidade do produto (g/cm³)</label><input id="pjDe" inputmode="decimal" value="${v(pr.dens)}" placeholder="ex.: 1,15"></div><div><label>Carga por furo (kg)</label><input id="pjKg" inputmode="decimal" value="${pr.kg??''}"></div></div>
   <div class="row"><div><label>Decks</label><select id="pjDk">${[1,2,3].map(n=>`<option ${pr.decks==n?'selected':''}>${n}</option>`).join('')}</select></div><div><label>Tampão (m)</label><input id="pjTa" inputmode="decimal" value="${pr.tampao??''}"></div></div>
+  <div class="row"><div><label>Altura da bancada (m)</label><input id="pjBa" inputmode="decimal" value="${v(pr.banc)}" placeholder="vazio = usa a profundidade"></div><div><label>Subfuração (m)</label><input id="pjSf" inputmode="decimal" value="${v(pr.subf)}" placeholder="ex.: 1,0"></div></div>
+  <div class="row"><div><label>Densidade da rocha (t/m³)</label><input id="pjDr" inputmode="decimal" value="${v(pr.densRocha)}" placeholder="ex.: 2,7"></div><div></div></div>
+  <div class="card" style="margin:10px 0 0;padding:10px"><h2 style="margin:0 0 6px">🧮 Contas do desmonte</h2><div id="pjContas"></div></div>
   <p class="mut" style="margin:10px 0 0"><b>Acessórios por furo</b> (o operador não lança: entram sozinhos em cada furo carregado)</p>
   <div class="row"><div><label>Booster por furo</label><input id="pjBo" inputmode="numeric" value="${pr.booster??''}"></div><div><label>Brinel por furo</label><input id="pjBr" inputmode="numeric" value="${pr.brinel??''}"></div></div>
   <div class="row"><div><label>Detonador (DVT)</label><select id="pjDt">${opts(DETS,pr.detTipo,'—')}</select></div><div><label>Detonadores por furo</label><input id="pjDq" inputmode="numeric" value="${pr.detQtd??''}"></div></div>
@@ -815,7 +863,10 @@ function editProjeto(p){
   <p class="mut">Furo com carga diferente (ex.: borda, com água): abra o furo e preencha "Carga de projeto deste furo".</p>
   <div class="btns"><button class="btn pri" id="pjSave">Salvar projeto</button></div>`);
   $('#pjClose').onclick=closeSheet;
-  $('#pjSave').onclick=()=>{p.proj={diam:$('#pjDi').value.trim(),afast:num($('#pjAf').value),espac:num($('#pjEs').value),dens:densNum($('#pjDe').value),prod:$('#pjProd').value,kg:num($('#pjKg').value),decks:+$('#pjDk').value,tampao:num($('#pjTa').value),booster:num($('#pjBo').value),brinel:num($('#pjBr').value),detTipo:$('#pjDt').value,detQtd:num($('#pjDq').value),tolKg:num($('#pjTk').value)??10,tolProf:num($('#pjTp').value)??0.5,tolCam:num($('#pjTc').value)??3};
+  const lerPj=()=>({diam:$('#pjDi').value.trim(),afast:num($('#pjAf').value),espac:num($('#pjEs').value),dens:densNum($('#pjDe').value),prod:$('#pjProd').value,kg:num($('#pjKg').value),decks:+$('#pjDk').value,tampao:num($('#pjTa').value),banc:num($('#pjBa').value),subf:num($('#pjSf').value),densRocha:num($('#pjDr').value),booster:num($('#pjBo').value),brinel:num($('#pjBr').value),detTipo:$('#pjDt').value,detQtd:num($('#pjDq').value),tolKg:num($('#pjTk').value)??10,tolProf:num($('#pjTp').value)??0.5,tolCam:num($('#pjTc').value)??3});
+  const contasVivo=()=>{const pv=lerPj(),o=p.proj;p.proj=pv;try{$('#pjContas').innerHTML=contasHtml(p,Object.assign({},PROJ_PADRAO,pv));}finally{p.proj=o;}};
+  ['#pjDi','#pjAf','#pjEs','#pjDe','#pjKg','#pjTa','#pjBa','#pjSf','#pjDr'].forEach(s=>$(s).addEventListener('input',contasVivo));contasVivo();
+  $('#pjSave').onclick=()=>{p.proj={diam:$('#pjDi').value.trim(),afast:num($('#pjAf').value),espac:num($('#pjEs').value),dens:densNum($('#pjDe').value),prod:$('#pjProd').value,kg:num($('#pjKg').value),decks:+$('#pjDk').value,tampao:num($('#pjTa').value),banc:num($('#pjBa').value),subf:num($('#pjSf').value),densRocha:num($('#pjDr').value),booster:num($('#pjBo').value),brinel:num($('#pjBr').value),detTipo:$('#pjDt').value,detQtd:num($('#pjDq').value),tolKg:num($('#pjTk').value)??10,tolProf:num($('#pjTp').value)??0.5,tolCam:num($('#pjTc').value)??3};
     markP(p.id);save();closeSheet();if(view==='cam')renderCam();else renderPoly();toast('Plano de fogo salvo');};
 }
 
@@ -1740,6 +1791,7 @@ async function imprimir(p){
     ${planoTxt(p)?`<p><b>Plano de fogo:</b> ${esc(planoTxt(p))}</p>`:''}${amostras(p).length?`<p><b>Amostras de densidade:</b> ${amostras(p).map(a=>esc(new Date(a.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' '+(a.cam?camCurto(a.cam)+' ':'')+leituras(a).map(v=>fmt(v,2)).join('/'))).join(' · ')} — média ${fmt(mediaDens(amostras(p)),2)} g/cm³</p>`:''}<h2>Resumo</h2>${T([[r.total,r.st.carregado,r.st.pendente,r.st.repasse,r.st.perdido,r.st.nao,r.agua,fmt(r.kg)+' kg',fmt(r.pmMed,1)+' / '+fmt(r.ppMed,1)+' m']],['Furos','Carregados','Pendentes','Repasse','Perdidos','Não carregar','Com água','Total lançado','Prof. média med./proj.'])}
     <h2>Consumo lançado</h2>${T([...Object.entries(r.prod).map(([k,v])=>[esc(k),fmt(v)+' kg']),['Booster',fmt(r.booster)+' un'],['Brinel',fmt(r.brinel)+' un'],...Object.entries(r.det).map(([k,v])=>[esc(k),fmt(v)+' un'])],['Item','Quantidade'])}`;
     if(pj.kg!=null||p.holes.some(x=>x.cargaProj!=null)){const lanc=cf.n.ok+cf.n.abaixo+cf.n.acima;h+=`<h2>Projeto x executado</h2>${T([[fmt(cf.kgProj)+' kg',fmt(cf.kgExec)+' kg',cf.kgProj?fmt((cf.kgExec-cf.kgProj)/cf.kgProj*100,1)+'%':'–',`${cf.n.ok}/${lanc}`,cf.n.abaixo,cf.n.acima,cf.profBaixa]],['Carga projeto','Executado','Diferença',`Na tolerância (±${fmt(pj.tolKg,0)}%)`,'Abaixo','Acima','Prof. abaixo'])}`;}
+    if(pj.afast!=null&&pj.espac!=null)h+=`<h2>Contas do desmonte</h2>${contasHtml(p)}`;
     if(cams.length)h+=`<h2>Caminhões</h2>${T(cams.map(c=>{const d=(p.cams||{})[c]||{};const kl=Object.values(r.cam[c]||{}).reduce((a,b)=>a+b,0);const cd=camDif(p,c,kl);return[esc(c),esc(d.nf||(p.nfs||{})[c]||''),fmt(num(d.kgNF)),fmt(num(d.kgRet)),fmt(kl),cd?cd.txt:'–',esc(d.dens||''),esc(d.temp||''),esc((d.opers&&d.opers.length>1?d.opers.join(', '):d.oper)||''),esc([d.ini,d.fim].filter(Boolean).join(' – '))];}),['Caminhão','NF','kg NF','Retorno','Lançado','Diferença','Dens.','Temp.','Operador','Horário'])}`;
     const ac=acessRows(p,r);if(ac.length)h+=`<h2>Acessórios</h2>${T(ac.map(a=>[esc(a.n),fmt(a.ret),fmt(a.apl),fmt(a.dev),a.ret==null?'–':'<b>'+fmt(a.saldo)+'</b>']),['Item','Retirado','Aplicado','Devolvido','Saldo'])}`;
     if(tz.com.length)h+=`<h2>Temporização (importada)</h2><p>Furos com tempo ${tz.com.length}/${tz.ativos} · ${fmt(tz.t0)} a ${fmt(tz.t1)} ms · detonadores com tempo ${tz.dets}${p.dvtProg!=null?' · DVT programado '+p.dvtProg:''}${tz.rep.length?' · tempos repetidos: '+tz.rep.length:''}</p>`;
@@ -3409,11 +3461,12 @@ async function planWBarra(){const box=$('#planWBox');const p=cur();if(!box||!p)r
 function tabConf(p){
   const pr=projDe(p);
   if(pr.kg==null&&!p.holes.some(h=>h.cargaProj!=null)){
-    $('#tabBox').innerHTML=`${planoTxt(p)?`<div class="hint" style="margin:0 0 10px"><b>Plano de fogo:</b> ${esc(planoTxt(p))}</div>`:''}<div class="card empty">Ainda não há carga de projeto para este polígono.<br><br><button class="btn pri" id="cfNew">Informar plano de fogo</button></div>`;$('#cfNew').onclick=()=>editProjeto(p);return;}
+    $('#tabBox').innerHTML=`${planoTxt(p)?`<div class="hint" style="margin:0 0 10px"><b>Plano de fogo:</b> ${esc(planoTxt(p))}</div>`:''}<div class="card empty">Ainda não há carga de projeto para este polígono.<br><br><button class="btn pri" id="cfNew">Informar plano de fogo</button></div>${pr.afast!=null&&pr.espac!=null?`<div class="card"><h2>🧮 Contas do desmonte</h2>${contasHtml(p)}</div>`:''}`;$('#cfNew').onclick=()=>editProjeto(p);return;}
   const r=conferencia(p);const lanc=r.n.ok+r.n.abaixo+r.n.acima;const dif=r.kgProj?(r.kgExec-r.kgProj)/r.kgProj*100:null;
   let h=`<div class="hint" style="margin:0 0 10px"><b>Plano de fogo:</b> ${esc(planoTxt(p))||'—'}</div><div class="kpis"><div class="kpi"><b>${lanc?fmt(r.n.ok/lanc*100,0)+'%':'–'}</b><span>furos dentro da tolerância (±${fmt(pr.tolKg,0)}%)</span></div><div class="kpi"><b>${r.n.abaixo}</b><span>abaixo do projeto</span></div><div class="kpi"><b>${r.n.acima}</b><span>acima do projeto</span></div><div class="kpi"><b>${r.n.sem}</b><span>sem carga lançada</span></div></div>
   <div class="card" style="margin-top:12px"><h2>Carga total</h2><table><tbody><tr><td>Projeto (furos a carregar)</td><td class="n">${fmt(r.kgProj)} kg</td></tr><tr><td>Executado (lançado)</td><td class="n"><b>${fmt(r.kgExec)} kg</b></td></tr><tr><td>Diferença</td><td class="n">${dif==null?'–':(dif>=0?'+':'')+fmt(dif,1)+'%'}</td></tr></tbody></table>
   <p class="mut">A diferença total só fecha quando todos os furos estiverem lançados.</p></div>
+  <div class="card"><h2>🧮 Contas do desmonte</h2>${contasHtml(p)}</div>
   <div class="card"><h2>Outros pontos</h2><table><tbody><tr><td>Profundidade abaixo do projeto (> ${fmt(pr.tolProf,1)} m)</td><td class="n">${r.profBaixa}</td></tr>${pr.tampao!=null?`<tr><td>Tampão diferente do projeto (> 0,5 m)</td><td class="n">${r.tampDif}</td></tr>`:''}${pr.booster!=null?`<tr><td>Booster diferente do projeto</td><td class="n">${r.boosterDif}</td></tr>`:''}${(()=>{const l=amostras(p);if(!l.length)return'';const m=mediaDens(l);const fora=pr.dens!=null?l.filter(a=>leituras(a).some(v=>Math.abs(v-pr.dens)>0.05)).length:null;return `<tr><td>Amostras de densidade (${l.length}) · média</td><td class="n">${fmt(m,2)} g/cm³</td></tr>${fora!=null?`<tr><td>Amostras diferentes do plano (> 0,05 g/cm³)</td><td class="n">${fora}</td></tr>`:''}`;})()}<tr><td>Perdidos / não carregar</td><td class="n">${r.n.fora}</td></tr></tbody></table></div>`;
   if(r.lista.length)h+=`<div class="card" style="padding:4px 8px;overflow:auto"><h2 style="margin:10px 6px">Furos fora da tolerância</h2><table><thead><tr><th>Furo</th><th class="n">Projeto</th><th class="n">Exec.</th><th class="n">Desvio</th><th>Cam.</th></tr></thead><tbody>${r.lista.sort((a,b)=>Math.abs(b[1].d)-Math.abs(a[1].d)).map(([x,dv])=>`<tr class="click" data-i="${p.holes.indexOf(x)}"><td><b>${esc(x.id)}</b></td><td class="n">${fmt(kgProj(p,x))}</td><td class="n">${fmt(holeKg(x))}</td><td class="n" style="color:${DV[dv.c].c};font-weight:700">${dv.d>0?'+':''}${fmt(dv.d,0)}%</td><td>${esc(camsTxt(x))}</td></tr>`).join('')}</tbody></table></div>`;
   h+=`<div class="btns"><button class="btn" id="cfEd">Editar projeto</button><button class="btn" id="cfMap">Ver no mapa</button></div>`;
@@ -3560,6 +3613,10 @@ function relatorio(p,modo){
     if(lanc)L.push(`• Dentro da tolerância (±${fmt(pj.tolKg,0)}%): ${cf.n.ok}/${lanc} furos`);
     if(cf.n.abaixo)L.push(`• Abaixo do projeto: ${cf.n.abaixo} furo(s)`);if(cf.n.acima)L.push(`• Acima do projeto: ${cf.n.acima} furo(s)`);
     if(cf.profBaixa)L.push(`• Profundidade abaixo do projeto: ${cf.profBaixa} furo(s)`);}
+  {const c=contasDesmonte(p);if(c.area!=null&&(c.proj.vol!=null||c.exec.vol!=null)){const pe=(a,b,u,d)=>`projeto ${a!=null?fmt(a,d)+' '+u:'–'} | executado ${b!=null?fmt(b,d)+' '+u:'–'}`;L.push('');L.push('🧮 *Contas do desmonte*');
+    L.push(`• Volume: ${pe(c.proj.vol,c.exec.vol,'m³',0)}`);if(pj.densRocha!=null)L.push(`• Massa: ${pe(c.proj.t,c.exec.t,'t',0)}`);
+    L.push(`• Razão de carga: ${pe(c.proj.rc,c.exec.rc,'kg/m³',3)}`);L.push(`• Metros perfurados: ${pe(c.proj.m,c.exec.m,'m',1)}`);
+    if(c.lin!=null||c.exec.lin!=null)L.push(`• Razão linear: ${pe(c.lin!=null?c.lin:c.proj.lin,c.exec.lin,'kg/m',1)}`);}}
   const tz=analiseTempo(p);
   if(tz.com.length){L.push('');L.push('⏱️ *Temporização*');L.push(`• Furos com tempo: ${tz.com.length}/${tz.ativos}${tz.sem.length?' | sem tempo: '+tz.sem.length:''}`);
     L.push(`• Tempos: ${fmt(tz.t0)} a ${fmt(tz.t1)} ms`);if(tz.rep.length)L.push(`• Tempos repetidos: ${tz.rep.map(([t,v])=>`${fmt(t)} ms (${v.map(x=>x.id).join(', ')})`).join('; ')}`);
