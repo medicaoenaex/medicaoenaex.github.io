@@ -259,6 +259,7 @@ header h1 .logo svg{width:24px;height:24px}
 #opMap.add{cursor:crosshair}
 .dsg{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 40px;gap:6px;align-items:center;margin-top:8px}.dsg b{font-size:14px}.dsc{min-height:46px;border-radius:10px;background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.25);color:#cfd8e3;font-size:18px;font-weight:800}.dsc .dsv{display:block;font-size:22px;font-weight:900;color:#ffb27a;line-height:1.1}.dsc .dsp{display:block;font-size:12px;font-weight:600;color:var(--mut)}.dsmed{font-size:30px;font-weight:900;color:#ffb27a;font-family:"Orbitron",ui-monospace,monospace;text-shadow:0 0 10px rgba(255,140,60,.4)}.dsc.on{border-style:solid;border-color:rgba(255,177,31,.5);color:#fff}
 .dsl{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.dschip{background:rgba(255,255,255,.06);border:1px solid var(--line);color:#fff;border-radius:999px;padding:8px 12px;font-size:15px}
+.ag{display:flex;flex-direction:column;gap:6px}.agm{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--mut,#7d8a99);margin:6px 0 0}.agr{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-left:6px solid var(--c);border-radius:12px;padding:8px 10px;cursor:pointer;background:var(--card,#fff)}.agr .agn{min-width:64px;font-weight:800;font-size:18px;color:var(--c)}.agr .agd{flex:1;min-width:0;font-size:13px}.agr .agd b{font-size:14px}.agr .agk{text-align:right;font-size:12px;white-space:nowrap}.agr .agk b{display:block;font-size:18px}.agst{display:inline-block;font-size:11px;font-weight:700;border-radius:8px;padding:1px 6px;color:#fff;background:#5b6676}.agst.on{background:#1f9d55;animation:agp 1.6s infinite}@keyframes agp{50%{opacity:.55}}
 .avg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.avp{border:1px solid var(--line);border-radius:12px;padding:8px;cursor:pointer;background:var(--card,#fff)}.avt{display:flex;justify-content:space-between;align-items:baseline}.avt span{font-weight:800;color:#ff6a13}.avm{background:#1d2530;border-radius:8px;margin:6px 0;aspect-ratio:4/3;display:flex}.avm svg{width:100%;height:100%}.avc{display:flex;flex-wrap:wrap;gap:4px 8px;font-size:12px;margin:4px 0}.avc i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:3px;vertical-align:-1px}
 .dsft{grid-column:1/-1;display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:-2px 0 6px}.dsth{display:flex;gap:6px;flex-wrap:wrap}.dsth img{width:54px;height:54px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,.25);cursor:pointer}
 .opnms{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:46vh;overflow:auto}.opnms .btn{min-height:56px;font-size:17px;font-weight:800}
@@ -427,7 +428,7 @@ const FK=(pid,fid)=>pid+'\u0001'+fid;
 function markP(id){SY().dp[id]=Date.now();syncLogo();}
 function markF(pid,fid){SY().df[FK(pid,fid)]=Date.now();syncLogo();}
 function markAll(p){markP(p.id);p.holes.forEach(h=>markF(p.id,h.id));}
-function markDel(p){const y=SY();y.del=y.del||{};y.del[p.id]=polyDoc(p);y.dp[p.id]=Date.now();Object.keys(y.df).forEach(k=>{if(k.startsWith(p.id+'\u0001'))delete y.df[k];});syncLogo();}
+function markDel(p){const y=SY();y.del=y.del||{};y.del[p.id]=polyDoc(p);y.dp[p.id]=Date.now();Object.keys(y.df).forEach(k=>{if(k.startsWith(p.id+'\u0001'))delete y.df[k];});if(y.fb)Object.keys(y.fb).forEach(k=>{if(k.startsWith(p.id+'\u0001'))delete y.fb[k];});syncLogo();}
 const GEO=['id','x','y','line','n','profProj','obsCroqui','cargaProj','tempo','tempos'];
 const DYN=['status','profMed','agua','aguaM','decks','booster','brinel','detTipo','detQtd','tampao','caminhao','obs','cond','lotes','hist','ts','por','dens','oper'];
 const PK=['lotes','cams','acess','check','situ','geo','pos','detAt','bg','wpp','dsam'];
@@ -444,6 +445,37 @@ function mapaDoc(doc){const m={};Object.keys(doc||{}).forEach(k=>{const v=doc[k]
 function mudancas(pid,doc){const y=SY();y.ph=y.ph||{};const base=y.ph[pid],cur=mapaDoc(doc);
   const ks=base?[...new Set([...Object.keys(base),...Object.keys(cur)])].filter(k=>base[k]!==cur[k]):Object.keys(cur);
   return ks.map(k=>k.split('\u0001'));}
+// ===== furo lançado por vários caminhões ao mesmo tempo =====
+// Cada celular guarda como estava o furo na última vez que falou com a base (fb). Ao enviar, manda só os campos que
+// ELE mudou (mud) e os caminhões cujos decks ELE mexeu (dk). A base junta: o deck de outro caminhão nunca é apagado.
+const JF_FORA=['decks','hist','ts','por'];
+function furoSig(d){const s={};DYN.forEach(k=>{if(!JF_FORA.includes(k))s[k]=hsh(d[k]??null);});const g={};
+  (d.decks||[]).forEach((x,i)=>{if(!deckTemCarga(x))return;const c=x.cam||d.caminhao||'';(g[c]=g[c]||[]).push([i,x.prod||'',num(x.kg)]);});
+  Object.keys(g).forEach(c=>s['\u0002'+c]=hsh(g[c]));return s;}
+let _jfBlank=null;const jfBlank=()=>_jfBlank||(_jfBlank=furoSig(furoDoc(novoFuro('_',0,0))));
+function guardaBase(k,doc){const y=SY();y.fb=y.fb||{};const s=furoSig(doc||{}),B=jfBlank(),o={};Object.keys(s).forEach(q=>{if(s[q]!==B[q])o[q]=s[q];});if(Object.keys(o).length)y.fb[k]=o;else delete y.fb[k];}
+function difFuro(k,doc){const y=SY();const b=Object.assign({},jfBlank(),(y.fb||{})[k]||{}),c=furoSig(doc);const mud=[],dk=[];
+  new Set([...Object.keys(b),...Object.keys(c)]).forEach(q=>{if(b[q]===c[q])return;if(q[0]==='\u0002')dk.push(q.slice(1));else mud.push(q);});return{mud,dk};}
+// mesma regra da função "carregamento" da base (supabase/carregamento-index.ts): ex = versão da base, inc = do celular
+function juntaFuro(ex,inc,mud,dk){
+  ex=ex||{};inc=inc||{};mud=mud||[];dk=dk||[];const d=JSON.parse(JSON.stringify(ex));
+  const tem=x=>!!x&&((num(x.kg)||0)>0||!!x.prod);
+  mud.forEach(f=>{if(!['decks','caminhao','hist','ts','por'].includes(f)&&f in inc)d[f]=inc[f];});
+  let cam=mud.includes('caminhao')?(inc.caminhao??''):(ex.caminhao??'');
+  if(dk.length){const nor=o=>(Array.isArray(o.decks)?o.decks:[]).map(x=>tem(x)?Object.assign({},x,{cam:x.cam||o.caminhao||''}):Object.assign({},x));
+    const E=nor(ex),I=nor(inc),res=[];
+    E.forEach((x,i)=>{if(tem(x)&&!dk.includes(x.cam))res[i]=x;});
+    // deck deste celular fica no número que ele lançou; se outro caminhão já ocupou esse deck, quem lançou antes fica embaixo (deck menor)
+    const te0=+ex.ts||0,ti0=+inc.ts||0;
+    I.forEach((x,i)=>{if(!tem(x)||!dk.includes(x.cam))return;if(res[i]&&ti0<te0){res.splice(i,0,x);return;}let j=i;while(res[j])j++;res[j]=x;});
+    for(let i=0;i<res.length;i++)if(!res[i])res[i]={prod:'',kg:null};
+    while(res.length&&!tem(res[res.length-1]))res.pop();
+    const cs=res.filter(tem).map(x=>x.cam).filter(Boolean);if(cs.length&&!cs.includes(cam))cam=cs[0];
+    res.forEach(x=>{if(!x.cam||x.cam===cam)delete x.cam;});d.decks=res;}
+  d.caminhao=cam;
+  const vis=new Set();d.hist=[...(ex.hist||[]),...(inc.hist||[])].filter(x=>{if(!x)return false;const q=JSON.stringify([x.ts,x.t,x.por]);if(vis.has(q))return false;vis.add(q);return true;}).sort((a,b)=>(a.ts||0)-(b.ts||0)).slice(-20);
+  const te=+ex.ts||0,ti=+inc.ts||0;d.ts=Math.max(te,ti)||null;d.por=ti>=te?(inc.por??ex.por??null):(ex.por??null);
+  return d;}
 let syncT=null,syncing=false,syncMsg='';
 function syncLogo(){clearTimeout(syncT);if(SY().token)syncT=setTimeout(syncNow,2500);}
 function pendentes(){const y=SY();return Object.keys(y.dp).length+Object.keys(y.df).length;}
@@ -458,11 +490,11 @@ async function syncNow(){
   syncing=true;const t0=Date.now();
   try{
     const polys=Object.keys(y.dp).map(id=>{const p=S.polys.find(x=>x.id===id);if(p){const doc=polyDoc(p);return{id,doc,mud:mudancas(id,doc)};}if(y.del&&y.del[id])return{id,doc:y.del[id],excluido:true};return null;}).filter(Boolean);
-    const furos=[];Object.keys(y.df).forEach(k=>{const [pid,fid]=k.split('\u0001');const p=S.polys.find(x=>x.id===pid);const h=p&&p.holes.find(q=>q.id===fid);if(h){const doc=furoDoc(h);if(h.ts&&!doc.por)doc.por=h.por=meuNome();furos.push({poly_id:pid,furo_id:fid,doc,ts:h.ts||1});}});
+    const furos=[];Object.keys(y.df).forEach(k=>{const [pid,fid]=k.split('\u0001');const p=S.polys.find(x=>x.id===pid);const h=p&&p.holes.find(q=>q.id===fid);if(h){const doc=furoDoc(h);if(h.ts&&!doc.por)doc.por=h.por=meuNome();const df=difFuro(k,doc);furos.push({poly_id:pid,furo_id:fid,doc,ts:h.ts||1,mud:df.mud,dk:df.dk});}});
     const d=await api({acao:'sync',token:y.token,desde:y.desde||null,polys,furos});
     // limpa só o que foi enviado e não mudou de novo durante o envio
     Object.keys(y.dp).forEach(k=>{if(y.dp[k]<=t0){delete y.dp[k];if(y.del)delete y.del[k];}});
-    Object.keys(y.df).forEach(k=>{if(y.df[k]<=t0)delete y.df[k];});
+    Object.keys(y.df).forEach(k=>{if(y.df[k]<=t0){delete y.df[k];const f=furos.find(q=>FK(q.poly_id,q.furo_id)===k);if(f)guardaBase(k,f.doc);}});
     aplicarRemoto(d);setTimeout(nuvemArquivos,300);
     y.desde=d.agora;y.ultima=Date.now();if(d.usuario)y.nome=d.usuario.nome;syncMsg='';
     save();
@@ -490,10 +522,15 @@ function aplicarRemoto(d){
   });
   (d.furos||[]).forEach(rf=>{
     const p=S.polys.find(x=>x.id===rf.poly_id);if(!p)return;const h=p.holes.find(q=>q.id===rf.furo_id);if(!h)return;
-    const k=FK(rf.poly_id,rf.furo_id);if(y.df[k]&&(h.ts||0)>rf.ts)return;
-    if((rf.ts||0)<(h.ts||0))return;
-    const antes=JSON.stringify(alertasFuro(p,h));
-    DYN.forEach(f=>{if(rf.doc&&f in rf.doc)h[f]=rf.doc[f];});if(!h.decks)h.decks=[];if(!h.status)h.status='pendente';
+    const k=FK(rf.poly_id,rf.furo_id);const antes=JSON.stringify(alertasFuro(p,h));
+    if(y.df[k]){ // tenho alteração ainda não enviada: junto a da base com a minha (o que eu mexi fica, o resto vem da base)
+      const loc=furoDoc(h),df=difFuro(k,loc),m=juntaFuro(rf.doc||{},loc,df.mud,df.dk);
+      DYN.forEach(f=>{if(f in m)h[f]=m[f];});guardaBase(k,rf.doc||{});
+    }else{
+      if((rf.ts||0)<(h.ts||0))return;
+      DYN.forEach(f=>{if(rf.doc&&f in rf.doc)h[f]=rf.doc[f];});guardaBase(k,rf.doc||{});
+    }
+    if(!h.decks)h.decks=[];if(!h.status)h.status='pendente';
     if(y.desde&&rf.doc&&rf.doc.por&&rf.doc.por!==meuNome()){const a=alertasFuro(p,h);if(a.length&&JSON.stringify(a)!==antes)avisosRem.push(`POL ${p.pol} furo ${h.id} (${rf.doc.por}): ${a[0]}`);}
     mudou=true;
   });
@@ -562,6 +599,7 @@ function renderHome(){
   if(S.polys.length>1)h+=`<div class="row" style="margin-bottom:10px;gap:6px"><input id="hq" placeholder="Buscar POL, mina, banco…" value="${esc(homeQ)}"><select id="hs">${[['','Todas as situações'],...Object.entries(SITU).map(([k,v])=>[k,v.n])].map(([k,t])=>`<option value="${k}" ${homeSitu===k?'selected':''}>${t}</option>`).join('')}</select></div>`;
   if(S.polys.length&&!ps.length)h+=`<div class="card empty">Nenhum polígono neste filtro.</div>`;
   if(!S.polys.length)h+=`<div class="card empty">Nenhum polígono ainda.<br>Toque em <b>+ Novo polígono</b> para gerar a malha de furos ou colar a lista do croqui.</div>`;
+  h+=`<div id="agoraBox">${agoraHTML()}</div>`;
   h+=aoVivoHTML();
   ps.forEach(p=>{const t=p.holes.length,c=p.holes.filter(x=>x.status==='carregado').length;
     h+=`<div class="card poly" data-id="${p.id}"><div style="flex:1"><b>POL ${esc(p.pol)}</b> · ${esc(p.mina)}${p.cava?' / '+esc(p.cava):''}${p.banco?' · Banco '+esc(p.banco):''}<div class="mut">${brDate(p.data)} · ${c}/${t} carregados${p.resp?' · '+esc(p.resp):''} <span class="chip" style="background:${SITU[situDe(p)].c}">${SITU[situDe(p)].n}</span></div><div class="bar"><i style="width:${t?c/t*100:0}%"></i></div></div><div class="ring" style="--p:${t?Math.round(c/t*100):0}"><span>${t?Math.round(c/t*100):0}%</span></div></div>`;});
@@ -576,10 +614,29 @@ function renderHome(){
   $('#bkp').onclick=()=>exportBox('Backup','backup-carregamento-'+today()+'.json',JSON.stringify(S),'application/json');
   $('#rst').onclick=restoreBox;bindSyncBox();bindVozCard();
   if($('#painel'))bindPainel();
+  bindAgora();
   document.querySelectorAll('.avp').forEach(el=>el.onclick=()=>{mapScroll.x=mapScroll.y=0;pincel=null;selMode=false;selSet.clear();gpsStop();S.cur=el.dataset.id;save();tab='mapa';corPor='caminhao';go('poly');});
   if($('#hq')){$('#hq').oninput=e=>{homeQ=e.target.value;const pos=e.target.selectionStart;renderHome();const n=$('#hq');n.focus();try{n.setSelectionRange(pos,pos);}catch(_){}};$('#hs').onchange=e=>{homeSitu=e.target.value;renderHome();};}
 }
 let homeQ='',homeSitu='';
+// ===== Carregando agora: cada caminhão, em que polígono/mina está, quantos furos e o último lançamento =====
+const AGORA_MIN=30; // até 30 min do último furo = "carregando"; depois = "parado"
+function agoraDados(){const hj=today(),m={};
+  S.polys.forEach(p=>p.holes.forEach(h=>{if(h.status!=='carregado'||!h.ts||diaDe(h.ts)!==hj)return;
+    camsDoFuro(h).forEach(cm=>{const kg=(h.decks||[]).length?(h.decks||[]).reduce((s,d)=>s+(deckTemCarga(d)&&deckCam(h,d)===cm?(num(d.kg)||0):0),0):0;
+      const c=m[cm]=m[cm]||{cam:cm,polys:{},n:0,kg:0,last:0};const e=c.polys[p.id]=c.polys[p.id]||{p,n:0,kg:0,last:0};
+      e.n++;e.kg+=kg;e.last=Math.max(e.last,h.ts);c.n++;c.kg+=kg;c.last=Math.max(c.last,h.ts);});}));
+  return Object.values(m).map(c=>{const ps=Object.values(c.polys).sort((a,b)=>b.last-a.last);return Object.assign(c,{ps,agora:ps[0]});}).sort((a,b)=>b.last-a.last);}
+const agoraKg=kg=>kg>=1000?fmt(kg/1000,1)+' t':fmt(kg)+' kg';
+const agoraHa=ts=>{const mi=Math.max(0,Math.round((Date.now()-ts)/6e4));return mi<1?'agora':mi<60?`há ${mi} min`:`há ${Math.floor(mi/60)}h${String(mi%60).padStart(2,'0')}`;};
+function agoraHTML(){const cs=agoraDados();if(!cs.length)return'';
+  const polys=new Set(cs.map(c=>c.agora.p.id)),minas=new Set(cs.map(c=>(c.agora.p.mina||'').trim().toUpperCase()));const ativos=cs.filter(c=>Date.now()-c.last<=AGORA_MIN*6e4).length;
+  const grupos={};cs.forEach(c=>{const k=(c.agora.p.mina||'Sem mina').trim();(grupos[k]=grupos[k]||[]).push(c);});
+  return `<div class="card"><h2 style="margin-bottom:2px">🚚 Carregando agora</h2><p class="mut" style="margin:0 0 6px">${cs.length} ${cs.length>1?'caminhões':'caminhão'} hoje · ${ativos} carregando · ${polys.size} polígono${polys.size>1?'s':''} · ${minas.size} mina${minas.size>1?'s':''}. Toque para abrir o polígono na cor do caminhão.</p><div class="ag">${Object.entries(grupos).map(([mina,lista])=>`<div class="agm">⛏ ${esc(mina)}</div>${lista.map(c=>{const a=c.agora,q=a.p,on=Date.now()-c.last<=AGORA_MIN*6e4;const op=((q.cams||{})[c.cam]||{}).oper;
+    const outros=c.ps.slice(1).map(e=>`POL ${esc(e.p.pol)}${(e.p.mina||'')!==(q.mina||'')?' ('+esc(e.p.mina||'')+')':''} ${e.n}`).join(' · ');
+    return `<div class="agr" data-id="${q.id}" style="--c:${camCor(c.cam)}"><div class="agn">${esc(camCurto(c.cam)||c.cam)}</div><div class="agd"><b>POL ${esc(q.pol)}</b>${q.banco?' · B'+esc(q.banco):''}${q.cava?' · '+esc(q.cava):''} <span class="agst ${on?'on':''}">${on?'carregando':'parado'}</span><div class="mut">${op?'👷 '+esc(String(op).split(' ').slice(0,2).join(' '))+' · ':''}último furo ${new Date(a.last).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} (${agoraHa(a.last)})</div>${outros?`<div class="mut" style="font-size:11px">também hoje: ${outros}</div>`:''}</div><div class="agk"><b>${a.n}</b>furo${a.n>1?'s':''}${a.kg?'<br>'+agoraKg(a.kg):''}</div></div>`;}).join('')}`).join('')}</div></div>`;}
+function bindAgora(){document.querySelectorAll('.agr').forEach(el=>el.onclick=()=>{mapScroll.x=mapScroll.y=0;pincel=null;selMode=false;selSet.clear();gpsStop();S.cur=el.dataset.id;save();tab='mapa';corPor='caminhao';go('poly');});}
+setInterval(()=>{if(view==='home'&&$('#agoraBox')&&$('#sheet').classList.contains('hidden')){$('#agoraBox').innerHTML=agoraHTML();bindAgora();}},60000);
 // ===== Ao vivo: todos os polígonos em carregamento lado a lado (croqui pequeno, cor por caminhão) =====
 function aoVivoMini(p){if(!p.holes.length)return'';const g=geom(p,true),r=g.r;
   return `<svg viewBox="0 0 ${g.W} ${g.H}" preserveAspectRatio="xMidYMid meet">${p.holes.map(h=>`<circle cx="${g.X(h.x)}" cy="${g.Y(h.y)}" r="${r}" fill="${operCor(h)}"/>`).join('')}</svg>`;}
@@ -661,7 +718,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-24.11';
+const APP_VER='2026-11-25.1';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -2649,7 +2706,7 @@ function editHole(i,voz,vozTxt){
 /* ----- Planilha de carregamento (Excel) — ida e volta ----- */
 const PL_COLS=[['Furo','id',8],['Status','status',14],['Prof. projeto (m)','profProj',11],['Prof. medida (m)','profMed',11],['Água','agua',10],['Coluna água (m)','aguaM',10],
   ['Produto deck 1','p1',14],['kg deck 1','k1',9],['Caminhão deck 1','c1',12],['Produto deck 2','p2',14],['kg deck 2','k2',9],['Caminhão deck 2','c2',12],['Produto deck 3','p3',14],['kg deck 3','k3',9],['Caminhão deck 3','c3',12],['Total kg','tot',10],
-  ['Booster (un)','booster',9],['Brinel (un)','brinel',9],['Detonador','detTipo',13],['Qtd det.','detQtd',8],['Tampão (m)','tampao',9],['Densidade (g/cm³)','dens',10],['Caminhão','caminhao',12],['Tempo (ms)','tempo',10],['Observação','obs',28],['Condição','cond',20],['Lote produto','lp',12],['Lote booster','lb',12],['Lote detonador','ld',12],['Operador','oper',16],['Lançado por','por',14],['Data/hora','ts',17]];
+  ['Booster (un)','booster',9],['Brinel (un)','brinel',9],['Detonador','detTipo',13],['Qtd det.','detQtd',8],['Tampão (m)','tampao',9],['Densidade (g/cm³)','dens',10],['Caminhão','caminhao',12],['Tempo (ms)','tempo',10],['Observação','obs',28],['Condição','cond',20],['Lote produto','lp',12],['Lote booster','lb',12],['Lote detonador','ld',12],['Operador','oper',16],['Lançado por','por',14],['Data/hora','ts',17],['POL','pol',8],['Mina','mina',14]];
 const AGUA_N={seca:'Seca',umida:'Úmida',agua:'Com água'};
 const stDeNome=t=>{t=String(t||'').trim().toLowerCase();return Object.keys(ST).find(k=>ST[k].n.toLowerCase()===t)||(t.startsWith('carreg')?'carregado':t.startsWith('pend')?'pendente':t.startsWith('rep')?'repasse':t.startsWith('perd')?'perdido':t.startsWith('não')||t.startsWith('nao')?'nao':null);};
 const aguaDeNome=t=>{t=String(t||'').trim().toLowerCase();return t.startsWith('com')||t==='agua'||t==='água'?'agua':t.startsWith('úm')||t.startsWith('um')?'umida':t?'seca':null;};
@@ -2669,7 +2726,7 @@ async function exportarPlanilhaSimples(p){
     const col=k=>PL_COLS.findIndex(c=>c[1]===k)+1;const L=c=>ws.getColumn(c).letter;
     p.holes.forEach((h,i)=>{const r=H+1+i;const d=[0,1,2].map(k=>h.decks[k]||{});
       const v={id:h.id,status:ST[h.status].n,profProj:h.profProj,profMed:h.profMed,agua:AGUA_N[h.agua]||'Seca',aguaM:h.aguaM,p1:d[0].prod||null,k1:num(d[0].kg),c1:deckTemCarga(d[0])&&deckCam(h,d[0])||null,p2:d[1].prod||null,k2:num(d[1].kg),c2:deckTemCarga(d[1])&&deckCam(h,d[1])||null,p3:d[2].prod||null,k3:num(d[2].kg),c3:deckTemCarga(d[2])&&deckCam(h,d[2])||null,
-        booster:num(h.booster),brinel:num(h.brinel),detTipo:h.detTipo||null,detQtd:num(h.detQtd),tampao:num(h.tampao),dens:h.dens??null,caminhao:h.caminhao||null,tempo:h.tempos&&h.tempos.length>1?h.tempos.join('/'):(h.tempo??null),obs:h.obs||null,oper:h.oper||null,cond:(h.cond||[]).join(', ')||null,lp:h.lotes?.prod||null,lb:h.lotes?.booster||null,ld:h.lotes?.det||null,por:h.por||null,ts:h.ts?new Date(h.ts):null};
+        booster:num(h.booster),brinel:num(h.brinel),detTipo:h.detTipo||null,detQtd:num(h.detQtd),tampao:num(h.tampao),dens:h.dens??null,caminhao:h.caminhao||null,tempo:h.tempos&&h.tempos.length>1?h.tempos.join('/'):(h.tempo??null),obs:h.obs||null,oper:h.oper||null,cond:(h.cond||[]).join(', ')||null,lp:h.lotes?.prod||null,lb:h.lotes?.booster||null,ld:h.lotes?.det||null,por:h.por||null,ts:h.ts?new Date(h.ts):null,pol:p.pol||null,mina:p.mina||null};
       PL_COLS.forEach(([,k],c)=>{const cell=ws.getCell(r,c+1);if(k==='tot')cell.value={formula:`IF(SUM(${L(col('k1'))}${r},${L(col('k2'))}${r},${L(col('k3'))}${r})=0,"",SUM(${L(col('k1'))}${r},${L(col('k2'))}${r},${L(col('k3'))}${r}))`};else if(v[k]!=null&&v[k]!=='')cell.value=v[k];});
       ws.getCell(r,col('ts')).numFmt='dd/mm/yyyy hh:mm';ws.getCell(r,col('id')).font={bold:true};
       [['status',0,5],['agua',1,3],['p1',2,PRODUTOS.length],['p2',2,PRODUTOS.length],['p3',2,PRODUTOS.length],['detTipo',3,DETS.length],['caminhao',4,camList.length],['c1',4,camList.length],['c2',4,camList.length],['c3',4,camList.length]].forEach(([k,c,n])=>{ws.getCell(r,col(k)).dataValidation={type:'list',allowBlank:true,formulae:[rng(c,n)],showErrorMessage:true,errorTitle:'Valor inválido',error:'Escolha um item da lista'};});
@@ -2693,6 +2750,12 @@ async function exportarPlanilhaSimples(p){
     for(let c=2;c<=3+PRODUTOS.length+1;c++){const Lc=rs.getColumn(c).letter;rs.getCell(rt,c).value={formula:`SUM(${Lc}${R0+1}:${Lc}${rt-1})`};rs.getCell(rt,c).font={bold:true};rs.getCell(rt,c).numFmt='#,##0';}
     const r2=rt+2;rs.getCell(r2,1).value='Status';rs.getCell(r2,2).value='Furos';[rs.getCell(r2,1),rs.getCell(r2,2)].forEach(c=>{c.font={bold:true,color:{argb:'FFFFFFFF'}};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF102A43'}};});
     Object.values(ST).forEach((v,i)=>{rs.getCell(r2+1+i,1).value=v.n;rs.getCell(r2+1+i,2).value={formula:`COUNTIF(${rr('status')},A${r2+1+i})`};});
+    // Carregando agora: todos os caminhões do dia, em que polígono/mina estão (todos os polígonos do aparelho)
+    const ag=wb.addWorksheet('Carregando agora');ag.getCell('A1').value=`Carregando agora – ${brDate(today())} ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;ag.getCell('A1').font={bold:true,size:14,color:{argb:'FF102A43'}};
+    const agH=['Caminhão','Mina','POL','Banco','Furos hoje','kg hoje','Último furo','Operador','Situação'];agH.forEach((t,c)=>{const cell=ag.getCell(3,c+1);cell.value=t;cell.font={bold:true,color:{argb:'FFFFFFFF'}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF102A43'}};ag.getColumn(c+1).width=[12,16,8,8,10,10,17,18,12][c];});
+    let agR=4;agoraDados().forEach(c=>c.ps.forEach((e,i)=>{const q=e.p;const row=[c.cam,q.mina||'',q.pol||'',q.banco||'',e.n,Math.round(e.kg)||null,new Date(e.last),((q.cams||{})[c.cam]||{}).oper||'',i?'também hoje':(Date.now()-c.last<=AGORA_MIN*6e4?'carregando':'parado')];
+      row.forEach((v,j)=>{if(v!==''&&v!=null)ag.getCell(agR,j+1).value=v;});ag.getCell(agR,7).numFmt='dd/mm/yyyy hh:mm';ag.getCell(agR,1).font={bold:true,color:{argb:'FF'+camCor(c.cam).slice(1).toUpperCase()}};agR++;}));
+    if(agR===4)ag.getCell('A4').value='Nenhum furo carregado hoje.';
     const li=wb.addWorksheet('Listas',{state:'hidden'});
     [['Status',Object.values(ST).map(v=>v.n)],['Água',Object.values(AGUA_N)],['Produto',PRODUTOS],['Detonador',DETS],['Caminhão',camList]].forEach(([n,arr],c)=>{li.getCell(1,c+1).value=n;arr.forEach((v,r)=>li.getCell(r+2,c+1).value=v);});
     wb.views=[{activeTab:0,firstSheet:0,visibility:'visible'}];
@@ -2743,7 +2806,9 @@ function modFuros(p,cam){
   if(!cam)return p.holes.slice();
   return p.holes.filter(h=>camsDoFuro(h).includes(cam)&&(h.decks||[]).some(d=>deckCam(h,d)===cam&&deckTemCarga(d))).sort((a,b)=>(a.ts||0)-(b.ts||0));
 }
-const modKgs=(h,cam)=>(h.decks||[]).filter(d=>deckTemCarga(d)&&(!cam||deckCam(h,d)===cam)).slice(0,3).map(d=>num(d.kg));
+// Carga 1/2/3 = número do deck no furo. Na aba de um caminhão, o deck de outro caminhão fica em branco
+// (ex.: 1138 no 1º deck e 1145 no 2º: na aba do 1145 o kg vai em Carga 2, não em Carga 1).
+const modKgs=(h,cam)=>[0,1,2].map(i=>{const d=(h.decks||[])[i];return deckTemCarga(d)&&(!cam||deckCam(h,d)===cam)?num(d.kg):null;});
 const modProd=(p,cam)=>{const c={};p.holes.forEach(h=>(h.decks||[]).forEach(d=>{if(d.prod&&(!cam||deckCam(h,d)===cam))c[d.prod]=(c[d.prod]||0)+1;}));return Object.keys(c).sort((a,b)=>c[b]-c[a])[0]||projDe(p).prod||'';};
 const modCasa=(lista,v)=>{if(v==null||v==='')return '';const t=String(v).toLowerCase();return lista.find(x=>String(x).toLowerCase()===t)??lista.find(x=>String(x).toLowerCase().startsWith(t)||t.startsWith(String(x).toLowerCase()))??v;};
 
@@ -2777,52 +2842,57 @@ async function exportarPlanilha(p){
     <div class="row"><div><label>Alt. banco (m)</label><input id="mdAlt" inputmode="decimal" value="${esc(E.alt??'')}"></div><div><label>Dens. explosivo</label><input id="mdDens" inputmode="decimal" value="${esc(E.dens??'')}"></div></div>
     <div class="row"><div><label>Afast. (m)</label><input id="mdAf" inputmode="decimal" value="${esc(E.afast??'')}"></div><div><label>Espaç. (m)</label><input id="mdEs" inputmode="decimal" value="${esc(E.espac??'')}"></div></div>
     <div class="row"><div><label>Tampão programado (m)</label><input id="mdTp" inputmode="decimal" value="${esc(pr.tampao??'')}"></div><div></div></div>
+    <div id="mdOutBox">${(()=>{const os=S.polys.filter(q=>q.id!==p.id&&q.holes.length&&(situDe(q)==='aberto'||q.data===p.data));if(!os.length)return'';const pre=new Set(Array.isArray(E.outros)?E.outros:[]);
+      return `<label>Outros polígonos / minas na mesma planilha (cada caminhão de cada polígono ganha a sua aba)</label><div style="display:flex;flex-direction:column;gap:4px">${os.map(q=>`<label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" class="mdPk" value="${q.id}" style="width:auto" ${pre.has(q.id)?'checked':''}><b>POL ${esc(q.pol)}</b> · ${esc(q.mina||'')}${q.banco?' · B'+esc(q.banco):''} <span class="mut">${camsPoly(q).map(c=>`<span style="color:${camCor(c)}">●</span>${esc(camCurto(c))}`).join(' ')||'sem caminhão ainda'}</span></label>`).join('')}</div>`;})()}</div>
     <div class="row" id="mdPBox"><div><label>CARREG.2 (outro polígono do dia)</label><select id="mdP2">${optsP(E.p2)}</select></div><div><label>CARREG.3</label><select id="mdP3">${optsP(E.p3)}</select></div></div>
     <p class="mut" id="mdTxt"></p>
     <div class="hint" id="mdSim" style="margin-top:8px">👥 <b>Várias pessoas preenchendo ao mesmo tempo:</b> salve a planilha no OneDrive/SharePoint e abra no Excel (todos editam juntos). Num computador com Chrome ou Edge, abra o app e use ⋯ → <b>Acompanhar planilha</b> no arquivo da pasta do OneDrive: o que cada um digitar entra no app e vai para os celulares da equipe pela base online. <b>Dois caminhões?</b> Gere uma planilha para cada um e acompanhe as duas (＋ Acompanhar outra planilha): o app lê cada uma e só aplica o que mudou nela.</div>
     <div class="btns"><button class="btn" id="mdOld">Planilha simples do app</button>${planWPode()&&window.showSaveFilePicker?`<button class="btn" id="mdGo">Só gerar</button><button class="btn pri" id="mdGoW">📗 Gerar e acompanhar ao vivo</button>`:`<button class="btn pri" id="mdGo">Gerar planilha</button>`}</div>
     ${planWPode()&&window.showSaveFilePicker?`<p class="mut"><b>Gerar e acompanhar ao vivo:</b> salve a planilha na pasta do OneDrive/SharePoint e abra no Excel com o Salvamento Automático ligado. Cada furo digitado aparece no croqui na cor do caminhão em poucos segundos, aqui e nos celulares da equipe. Deixe esta aba do app aberta.</p>`:''}`);
   const ckd=()=>[...document.querySelectorAll('.mdCk')].filter(x=>x.checked).map(x=>x.value);
+  const outSel=()=>[...document.querySelectorAll('.mdPk')].filter(x=>x.checked).map(x=>S.polys.find(q=>q.id===x.value)).filter(Boolean);
   const atualiza=()=>{const c=$('#mdCam').value;const todos=c==='*';
-    $('#mdCamsBox').style.display=todos?'':'none';$('#mdPBox').style.display=todos?'none':'';
-    if(todos){const cs=ckd();const nf=cs.reduce((s,k)=>s+modFuros(p,k).length,0);$('#mdN').textContent=`· ${cs.length} caminhão(ões) · ${nf} furo(s) já lançados`;
+    $('#mdCamsBox').style.display=todos?'':'none';$('#mdPBox').style.display=todos?'none':'';$('#mdOutBox').style.display=todos?'':'none';
+    if(todos){const cs=ckd();const nf=cs.reduce((s,k)=>s+modFuros(p,k).length,0);const no=outSel().length;$('#mdN').textContent=`· ${cs.length} caminhão(ões) · ${nf} furo(s) já lançados${no?` · + ${no} outro(s) polígono(s)`:''}`;
       $('#mdTxt').innerHTML=`Cada caminhão ganha a sua aba no modelo (CARREG.1, CARREG.2, CARREG.3, e o app cria CARREG.4, 5… se precisar), com a UMB no cabeçalho e os furos que ela já carregou, na ordem em que foram lançados. As linhas vazias são para continuar preenchendo no Excel: o que for digitado em cada aba volta para o app no caminhão daquela aba.`;}
-    else{$('#mdN').textContent=`· CARREG.1 · ${modFuros(p,c).length} furo(s)`;$('#mdTxt').innerHTML=c?'Vão para a planilha só os furos com carga desse caminhão, na ordem em que foram lançados (Carga 1/2/3 = decks dele). CARREG.2 e 3 podem levar outros polígonos do dia.':'Todos os furos do polígono numa aba só (Carga 1/2/3 = decks do furo, de qualquer caminhão).';}};
+    else{$('#mdN').textContent=`· CARREG.1 · ${modFuros(p,c).length} furo(s)`;$('#mdTxt').innerHTML=c?'Vão para a planilha só os furos com carga desse caminhão, na ordem em que foram lançados (Carga 1/2/3 = nº do deck no furo; deck de outro caminhão fica em branco). CARREG.2 e 3 podem levar outros polígonos do dia.':'Todos os furos do polígono numa aba só (Carga 1/2/3 = decks do furo, de qualquer caminhão).';}};
   atualiza();
-  document.querySelectorAll('.mdCk').forEach(x=>x.onchange=atualiza);
+  document.querySelectorAll('.mdCk,.mdPk').forEach(x=>x.onchange=atualiza);
   $('#mdCam').onchange=()=>{const v2=$('#mdP2').value,v3=$('#mdP3').value;$('#mdP2').innerHTML=optsP(v2);$('#mdP3').innerHTML=optsP(v3);atualiza();};
   $('#mdX').onclick=closeSheet;$('#mdOld').onclick=()=>{closeSheet();exportarPlanilhaSimples(p);};
   $('#mdTroca').onclick=async()=>{const v=await modeloEscolher();if(v){closeSheet();exportarPlanilha(p);}};
   const gerar=async aoVivo=>{
     // ao vivo: pergunta onde salvar ANTES de montar (o navegador só deixa abrir essa janela logo após o toque)
-    let fh=null;if(aoVivo){try{fh=await window.showSaveFilePicker({suggestedName:`PC_US-VGR_${$('#mdCam').value==='*'?'todas-UMB':($('#mdCam').value||'todos').replace(/\s+/g,'')}_POL${p.pol}_${$('#mdData').value||today()}.xlsx`,types:[{description:'Planilha Excel',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]});}catch(e){return;}}
+    let fh=null;if(aoVivo){try{fh=await window.showSaveFilePicker({suggestedName:`PC_US-VGR_${$('#mdCam').value==='*'?'todas-UMB':($('#mdCam').value||'todos').replace(/\s+/g,'')}_POL${[p,...($('#mdCam').value==='*'?outSel():[])].map(q=>q.pol).join('-')}_${$('#mdData').value||today()}.xlsx`,types:[{description:'Planilha Excel',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]});}catch(e){return;}}
     const g=id=>$(id).value.trim();const nn=id=>num(g(id));const diamV=(()=>{const v=g('#mdDiam');const o=L.diam.find(x=>String(x)===v);return o!==undefined?o:(num(v)??v);})();
     const tec={lito:g('#mdLito'),expl:g('#mdExpl'),diam:diamV,alt:nn('#mdAlt'),dens:nn('#mdDens'),afast:nn('#mdAf'),espac:nn('#mdEs')};
     const sel=g('#mdCam'),todos=sel==='*',data=g('#mdData')||today(),operador=g('#mdOp'),auxiliar=g('#mdAux');
     const lista=todos?ckd():[];if(todos&&!lista.length){toast('Marque pelo menos um caminhão');return;}
     const cam=todos?'':sel;
-    p.enaex=Object.assign({},p.enaex||{},tec,{p2:g('#mdP2'),p3:g('#mdP3'),cam,modo:todos?'todos':'um'});
+    const outros=todos?outSel():[];
+    p.enaex=Object.assign({},p.enaex||{},tec,{p2:g('#mdP2'),p3:g('#mdP3'),cam,modo:todos?'todos':'um',outros:outros.map(q=>q.id)});
     if(g('#mdBanco')!==String(p.banco||''))p.banco=g('#mdBanco');
     const tp=nn('#mdTp');if(tp!=null&&tp!==pr.tampao){p.proj=Object.assign({},p.proj||{},{tampao:tp});}
     S.enaex=Object.assign({},S.enaex||{},tec,{operador,auxiliar,cam,modo:todos?'todos':'um'},todos?{cams:lista}:{});markP(p.id);save();
     let blocos;
-    if(todos)blocos=lista.map(c=>({p,tec,cam:c,furos:modFuros(p,c),sempre:true}));
+    if(todos){blocos=lista.map(c=>({p,tec,cam:c,furos:modFuros(p,c),sempre:true}));
+      outros.forEach(q=>camsPoly(q).forEach(c=>blocos.push({p:q,tec:Object.assign({},tec,q.enaex||{}),cam:c,furos:modFuros(q,c),sempre:true})));}
     else{const polys=[p,...[g('#mdP2'),g('#mdP3')].map(id=>S.polys.find(q=>q.id===id)).filter(Boolean)];
       blocos=polys.map(q=>({p:q,tec:Object.assign({},tec,q===p?{}:(q.enaex||{})),cam,furos:modFuros(q,cam),sempre:q===p}));}
     closeSheet();busy('Montando a planilha no modelo…');
     try{const r=await preencherModelo(m,{cam,todos,data,operador,auxiliar,blocos,dataModelo:L.dataModelo});busy();
       if(r.sobrou)toast(`⚠️ ${r.sobrou} furo(s) não couberam nas abas CARREG do modelo`,5000);
-      if(fh){busy('Salvando e ligando o acompanhamento…');try{await planSalvarEAcompanhar(p,fh,r.blob);busy();}catch(e){busy();console.error(e);toast('Não consegui salvar nesse lugar. Feche o arquivo no Excel e tente de novo.',4500);}return;}
-      entregarPlanilha(r.blob,`PC_US-VGR_${todos?'todas-UMB':(cam||'todos').replace(/\s+/g,'')}_POL${p.pol}_${data}.xlsx`);
+      if(fh){busy('Salvando e ligando o acompanhamento…');try{await planSalvarEAcompanhar(p,fh,r.blob,outros);busy();}catch(e){busy();console.error(e);toast('Não consegui salvar nesse lugar. Feche o arquivo no Excel e tente de novo.',4500);}return;}
+      entregarPlanilha(r.blob,`PC_US-VGR_${todos?'todas-UMB':(cam||'todos').replace(/\s+/g,'')}_POL${[p,...outros].map(q=>q.pol).join('-')}_${data}.xlsx`);
     }catch(e){busy();console.error(e);toast(e.message&&/internet/.test(e.message)?e.message:'Não consegui gerar a planilha no modelo');}
   };
   $('#mdGo').onclick=()=>gerar(false);if($('#mdGoW'))$('#mdGoW').onclick=()=>gerar(true);
 }
 // grava a planilha no arquivo escolhido e já começa a acompanhar (mesmo mecanismo do ⋯ → Acompanhar planilha)
-async function planSalvarEAcompanhar(p,fh,blob){
+async function planSalvarEAcompanhar(p,fh,blob,outros){
   const wr=await fh.createWritable();await wr.write(blob);await wr.close();
-  const w={fh,nome:fh.name,last:0,snap:{}};const r=await planWLer(w,p);
-  w.last=r.f.lastModified;w.snap=planSnap(r.linhas);w.lido=Date.now();planWStart(p.id,w);
+  for(const q of [p,...(outros||[])]){const w={fh,nome:fh.name,last:0,snap:{}};const r=await planWLer(w,q);
+    w.last=r.f.lastModified;w.snap=planSnap(r.linhas);w.lido=Date.now();planWStart(q.id,w);}
   setCorPor('caminhao');tab='mapa';renderPoly();
   openSheet(`<h3>📗 Acompanhando ao vivo<button class="btn sm" id="awOk">Ok</button></h3>
     <p>A planilha <b>${esc(fh.name)}</b> foi salva e o app está de olho nela.</p>
@@ -2920,7 +2990,7 @@ async function preencherModelo(m,cfg){
   gravar('xl/workbook.xml',wbDoc);
   for(const r of wbRels)if(/pivotCacheDefinition$/.test(r.type)&&zip.file(r.target)){const d=await ler(r.target);d.documentElement.setAttribute('refreshOnLoad','1');gravar(r.target,d);}
   for(const a of abas){if(!a.arq||!zip.file(a.arq)||!docs[a.arq])continue;const d=docs[a.arq].doc;for(const v of d.getElementsByTagNameNS(XNS,'sheetView')){if(a.nome==='CARREG.1')v.setAttribute('tabSelected','1');else v.removeAttribute('tabSelected');}gravar(a.arq,d);}
-  await marcaInfo(zip,ler,gravar,{app:'carregamento-campo',v:2,cam:cfg.cam||'',todos:!!cfg.todos,abas:usadas,cams:camAbas,snap:snapAbas,exportado:new Date().toISOString()});
+  await marcaInfo(zip,ler,gravar,{app:'carregamento-campo',v:3,cam:cfg.cam||'',todos:!!cfg.todos,abas:usadas,cams:camAbas,snap:snapAbas,exportado:new Date().toISOString()});
   const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6},mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   return {blob,sobrou,usadas};
 }
@@ -3032,7 +3102,15 @@ function planLerModelo(p,X,wb,forcar){
       const ob=tx(cel(s,MOD_COL.obs+r));if(ob||prim)w.nv.obs=ob;
       const kgs=['k1','k2','k3'].map(k=>num(cel(s,MOD_COL[k]+r)));
       const dk=w.decks;
-      if(cam){const meus=dk.filter(d=>deckTemCarga(d)&&deckCam(w,d)===cam);dk.forEach(d=>{if(deckTemCarga(d))d.cam=deckCam(w,d);});
+      if(cam&&(+mi.v||0)>=3){ // planilha nova: a coluna diz o nº do deck
+        const res=dk.map(d=>deckTemCarga(d)?Object.assign({},d,{cam:deckCam(w,d)}):Object.assign({},d));const meus=res.filter(d=>deckTemCarga(d)&&d.cam===cam);
+        kgs.forEach((kg,j)=>{const at=res[j];
+          if(kg){for(let i=res.length;i<j;i++)res[i]={prod:'',kg:null};res[j]={prod:(at&&deckTemCarga(at)&&at.cam===cam&&at.prod)||prodApp||(meus[0]&&meus[0].prod)||(at&&at.prod)||'',kg,cam};}
+          else if(at&&deckTemCarga(at)&&at.cam===cam)res[j]={prod:'',kg:null};});
+        while(res.length&&!deckTemCarga(res[res.length-1]))res.pop();
+        const hc=w.caminhao||((res.find(deckTemCarga)||{}).cam)||cam;const tmp=normCams({caminhao:hc,decks:res});w.decks=tmp.decks;w.caminhao=tmp.caminhao;
+        if(w.decks.some(deckTemCarga)&&!w.decks.some(d=>deckTemCarga(d)&&deckCam(w,d)===w.caminhao)){w.caminhao=(w.decks.find(d=>deckTemCarga(d)&&d.cam)||{}).cam||w.caminhao;const t2=normCams({caminhao:w.caminhao,decks:w.decks.map(d=>deckTemCarga(d)?Object.assign({},d,{cam:d.cam||hc}):d)});w.decks=t2.decks;}}
+      else if(cam){const meus=dk.filter(d=>deckTemCarga(d)&&deckCam(w,d)===cam);dk.forEach(d=>{if(deckTemCarga(d))d.cam=deckCam(w,d);});
         const novos=kgs.map((kg,j)=>kg?{prod:(meus[j]&&meus[j].prod)||prodApp||(meus[0]&&meus[0].prod)||'',kg,cam}:null).filter(Boolean);
         // troca os decks deste caminhão no mesmo lugar (a ordem dos decks do furo não muda)
         let k=0;const decks=[];dk.forEach(d=>{if(!deckTemCarga(d))return;if(d.cam===cam){if(k<novos.length)decks.push(novos[k++]);}else decks.push(d);});
