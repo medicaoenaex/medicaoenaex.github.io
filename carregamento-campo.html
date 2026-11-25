@@ -719,7 +719,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-25.3';
+const APP_VER='2026-11-25.4';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1073,21 +1073,28 @@ function furosNaFoto(im,area){
     const dat=cx.getImageData(0,0,W,H).data,s=notaFuros(dat,W,H,R0);
     const dentro=area&&area.length>=3?(x,y)=>noPoli(x/k+bx0,y/k+by0,area):null;
     const vals=[];for(let y=0;y<H;y+=2)for(let x=0;x<W;x+=2)if(!dentro||dentro(x,y))vals.push(s[y*W+x]);vals.sort((a,b)=>a-b);if(vals.length<50)continue;
-    const T=0.35*vals[Math.floor(vals.length*0.99)];
-    let P=picosFuros(s,W,H,Math.round(1.3*R0),T,dentro);if(P.length<6)continue;
-    const nn=nnDist(P);const so=[...nn].sort((a,b)=>a-b),med=so[so.length>>1];
-    const reg=nn.filter(v=>v>0.75*med&&v<1.35*med).length/nn.length; // malha regular
-    const raz=med/R0; // espaçamento / raio do furo (furo de verdade: ~2,5 a 6)
-    const forca=P.reduce((a,q)=>a+q.v,0)/P.length/(T/0.35);
-    if(raz<3||raz>8)continue; // pico colado no outro = textura, não furo
-    const nota=reg*reg*forca*Math.sqrt(P.length);
-    if(!best||nota>best.nota)best={nota,k,W,H,dat,R0,P:P.map(q=>({x:q.x/k+bx0,y:q.y/k+by0,sx:q.x,sy:q.y,v:q.v})),d0:med/k};}
+    const p99=vals[Math.floor(vals.length*0.99)];if(!(p99>0))continue;
+    const P0=picosFuros(s,W,H,Math.round(1.3*R0),0.35*p99,dentro);
+    // corte do pico: o chão com textura dá muito pico fraco; tenta cortes mais altos e fica com o que forma malha
+    for(const fr of [0.35,0.5,0.65,0.8]){
+      const P=fr===0.35?P0:P0.filter(q=>q.v>fr*p99);if(P.length<6)continue;
+      const nn=nnDist(P);const so=[...nn].sort((a,b)=>a-b),med=so[so.length>>1];
+      const reg=nn.filter(v=>v>0.75*med&&v<1.35*med).length/nn.length; // malha regular
+      const raz=med/R0; // espaçamento / raio do furo (furo de verdade: ~2,5 a 6)
+      const forca=P.reduce((a,q)=>a+q.v,0)/P.length/p99;
+      if(raz<3||raz>8)continue; // pico colado no outro = textura, não furo
+      const nota=reg**4*forca*Math.pow(P.length,0.35); // malha regular pesa mais que quantidade (chão com textura dá muito pico)
+      if(!best||nota>best.nota)best={nota,k,W,H,dat,R0,P:P.map(q=>({x:q.x/k+bx0,y:q.y/k+by0,sx:q.x,sy:q.y,v:q.v})),d0:med/k,fr,Rf,P0};}}
   if(!best)return{furos:[],sp:0};
   const {k,W,H,dat}=best,R=best.R0;let P=best.P;
   // espaçamento da malha pelo 2º vizinho (furo duplo engana o 1º vizinho)
   const viz2=Q=>Q.map((a,i)=>{let m1=Infinity,m2=Infinity;Q.forEach((b,j)=>{if(i===j)return;const d=Math.hypot(a.x-b.x,a.y-b.y);if(d<m1){m2=m1;m1=d;}else if(d<m2)m2=d;});return m2;});
   const mediana=v=>{const o=[...v].filter(isFinite).sort((a,b)=>a-b);return o.length?o[o.length>>1]:0;};
   let d0=Math.max(best.d0,0.75*mediana(viz2(P)));
+  // 1a) furo mais fraco que o corte escolhido entra se cair no lugar da malha (vizinho dos furos fortes, sem furo em cima)
+  if(best.fr>0.35){const cand=best.P0.map(q=>({x:q.x/k+bx0,y:q.y/k+by0,sx:q.x,sy:q.y,v:q.v})).sort((a,b)=>b.v-a.v);
+    for(let it=0;it<2;it++)cand.forEach(q=>{if(q.ok)return;let perto=false,viz=0;for(const o of P){const d=Math.hypot(o.x-q.x,o.y-q.y);if(d<0.6*d0){perto=true;break;}if(d>0.7*d0&&d<1.4*d0)viz++;}
+      if(!perto&&viz>=2){q.ok=true;P.push(q);}});}
   // 1) furo duplo: dois picos a menos de ~meio espaçamento são o mesmo furo; fica o mais forte
   const juntar=(Q,lim)=>{const out=[];[...Q].sort((a,b)=>b.v-a.v).forEach(q=>{if(!out.some(o=>Math.hypot(o.x-q.x,o.y-q.y)<lim))out.push(q);});return out;};
   for(let it=0;it<3;it++){P=juntar(P,0.55*d0);const nd=mediana(nnDist(P));if(!nd||Math.abs(nd-d0)<0.02*d0)break;d0=Math.max(d0*0.9,nd);}
