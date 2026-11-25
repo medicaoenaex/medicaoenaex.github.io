@@ -719,7 +719,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-25.5';
+const APP_VER='2026-11-25.6';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1113,15 +1113,18 @@ function notaFuros(d,W,H,R){const n=W*H,q=new Float32Array(n),dk=new Float32Arra
   for(let i=0;i<n;i++){const r=d[i*4],g=d[i*4+1],b=d[i*4+2],l=(r+g+b)/3;dk[i]=255-l;q[i]=(b-r)+0.5*(255-l);}
   const a=borrar(q,W,H,0.6*R),b=borrar(q,W,H,1.8*R),c=borrar(dk,W,H,0.25*R),e=borrar(dk,W,H,0.8*R),s=new Float32Array(n);
   for(let i=0;i<n;i++)s[i]=(a[i]-b[i])+0.5*(c[i]-e[i]);return s;}
+// contraste local: furo fraco numa parte da foto (terra vermelha, sombra) conta tanto quanto furo forte em outra parte
+function contrasteLocal(s,W,H,R){const n=W*H,a=new Float32Array(n);let tot=0;for(let i=0;i<n;i++){a[i]=Math.max(0,s[i]);tot+=a[i];}
+  const m=borrar(a,W,H,5*R),c=0.25*tot/n+1e-6,o=new Float32Array(n);for(let i=0;i<n;i++)o[i]=s[i]/(m[i]+c);return o;}
 // im: Image; area: [[x,y],...] em px da foto (opcional). Devolve furos em px da foto.
 function furosNaFoto(im,area){
   const IW=im.naturalWidth,IH=im.naturalHeight;
   let bx0=0,by0=0,bx1=IW,by1=IH;if(area&&area.length>=3){bx0=Math.max(0,Math.min(...area.map(p=>p[0]))-10);by0=Math.max(0,Math.min(...area.map(p=>p[1]))-10);bx1=Math.min(IW,Math.max(...area.map(p=>p[0]))+10);by1=Math.min(IH,Math.max(...area.map(p=>p[1]))+10);}
-  const aw=bx1-bx0,ah=by1-by0;const R0=6.5;let best=null;
+  const aw=bx1-bx0,ah=by1-by0;const R0=6.5;let best=null;const cands=[];
   for(const Rf of [2.5,3.5,5,6.5,9,12,16,22,30]){ // raio do furo suposto, em px da foto
     const k=R0/Rf;if(aw*k>2600||ah*k>2600||aw*k<40||ah*k<40)continue;
     const W=Math.round(aw*k),H=Math.round(ah*k);const c=document.createElement('canvas');c.width=W;c.height=H;const cx=c.getContext('2d');cx.drawImage(im,bx0,by0,aw,ah,0,0,W,H);
-    const dat=cx.getImageData(0,0,W,H).data,s=notaFuros(dat,W,H,R0);
+    const dat=cx.getImageData(0,0,W,H).data,s=contrasteLocal(notaFuros(dat,W,H,R0),W,H,R0);
     const dentro=area&&area.length>=3?(x,y)=>noPoli(x/k+bx0,y/k+by0,area):null;
     const vals=[];for(let y=0;y<H;y+=2)for(let x=0;x<W;x+=2)if(!dentro||dentro(x,y))vals.push(s[y*W+x]);vals.sort((a,b)=>a-b);if(vals.length<50)continue;
     const p99=vals[Math.floor(vals.length*0.99)];if(!(p99>0))continue;
@@ -1135,7 +1138,11 @@ function furosNaFoto(im,area){
       const forca=P.reduce((a,q)=>a+q.v,0)/P.length/p99;
       if(raz<3||raz>8)continue; // pico colado no outro = textura, não furo
       const nota=reg**4*forca*Math.pow(P.length,0.35); // malha regular pesa mais que quantidade (chão com textura dá muito pico)
-      if(!best||nota>best.nota)best={nota,k,W,H,dat,R0,P:P.map(q=>({x:q.x/k+bx0,y:q.y/k+by0,sx:q.x,sy:q.y,v:q.v})),d0:med/k,fr,Rf,P0};}}
+      cands.push({nota,reg,n:P.length,k,W,H,dat,R0,P,d0:med/k,fr,Rf,P0});}}
+  // fica com a leitura de malha mais regular; troca pela que acha muito mais furos se a malha dela for quase tão regular
+  if(cands.length){const mx=Math.max(...cands.map(c=>c.nota)),top=cands.find(c=>c.nota===mx),mais=cands.filter(c=>c.nota>=0.6*mx&&c.reg>=0.68).sort((a,b)=>b.n-a.n)[0];
+    best=mais&&mais.n>=1.4*top.n?mais:top; // só troca se achar bem mais furos (foto com furo forte numa parte e fraco na outra)
+    best.P=best.P.map(q=>({x:q.x/best.k+bx0,y:q.y/best.k+by0,sx:q.x,sy:q.y,v:q.v}));}
   if(!best)return{furos:[],sp:0};
   const {k,W,H,dat}=best,R=best.R0;let P=best.P;
   // espaçamento da malha pelo 2º vizinho (furo duplo engana o 1º vizinho)
@@ -1145,7 +1152,7 @@ function furosNaFoto(im,area){
   // 1a) furo mais fraco que o corte escolhido entra se cair no lugar da malha (vizinho dos furos fortes, sem furo em cima)
   if(best.fr>0.35){const cand=best.P0.map(q=>({x:q.x/k+bx0,y:q.y/k+by0,sx:q.x,sy:q.y,v:q.v})).sort((a,b)=>b.v-a.v);
     for(let it=0;it<2;it++)cand.forEach(q=>{if(q.ok)return;let perto=false,viz=0;for(const o of P){const d=Math.hypot(o.x-q.x,o.y-q.y);if(d<0.6*d0){perto=true;break;}if(d>0.7*d0&&d<1.4*d0)viz++;}
-      if(!perto&&viz>=2){q.ok=true;P.push(q);}});}
+      if(!perto&&viz>=2){q.ok=true;q.duv=true;P.push(q);}});}
   // 1) furo duplo: dois picos a menos de ~meio espaçamento são o mesmo furo; fica o mais forte
   const juntar=(Q,lim)=>{const out=[];[...Q].sort((a,b)=>b.v-a.v).forEach(q=>{if(!out.some(o=>Math.hypot(o.x-q.x,o.y-q.y)<lim))out.push(q);});return out;};
   for(let it=0;it<3;it++){P=juntar(P,0.55*d0);const nd=mediana(nnDist(P));if(!nd||Math.abs(nd-d0)<0.02*d0)break;d0=Math.max(d0*0.9,nd);}
@@ -1155,26 +1162,37 @@ function furosNaFoto(im,area){
   const lum=(x,y)=>{const i=(y*W+x)*4;return(dat[i]+dat[i+1]+dat[i+2])/3;};
   const LV=[];for(let y=0;y<H;y+=3)for(let x=0;x<W;x+=3)LV.push(lum(x,y));LV.sort((a,b)=>a-b);
   const claro=Math.max(185,LV[Math.floor(LV.length*0.985)]+8);
-  const medir=q=>{let br=0,bn=0,mn=1e9,mx=q.sx,my=q.sy,dS=0,dN=0;
+  const medir=q=>{let br=0,bn=0,mn=1e9,mx=q.sx,my=q.sy,dS=0,dN=0;const rv=[];
     for(let yy=Math.max(1,Math.floor(q.sy-1.4*R));yy<=Math.min(H-2,Math.ceil(q.sy+1.4*R));yy++)for(let xx=Math.max(1,Math.floor(q.sx-1.4*R));xx<=Math.min(W-2,Math.ceil(q.sx+1.4*R));xx++){
       const d=Math.hypot(xx-q.sx,yy-q.sy),l=lum(xx,yy);if(d<=0.6*R){bn++;if(l>=claro)br++;}
       if(d<=1.4*R){let m=0;for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)m+=lum(xx+a,yy+b);if(m/9<mn){mn=m/9;mx=xx;my=yy;}}
-      if(d>=0.8*R&&d<=1.4*R){dS+=l;dN++;}}
-    q.claro=bn?br/bn:0;q.dot=dN&&mn<1e9?dS/dN-mn:0;q.px=mx;q.py=my;return q;}; // dot: o furo tem um ponto preto no meio da mancha; px,py: onde está o ponto
+      if(d>=0.8*R&&d<=1.4*R){dS+=l;dN++;rv.push(l);}}
+    rv.sort((a,b)=>a-b);q.claro=bn?br/bn:0;q.dot=dN&&mn<1e9?dS/dN-mn:0;q.iso=rv.length&&mn<1e9?rv[Math.floor(rv.length*0.15)]-mn:0;q.px=mx;q.py=my;return q;}; // iso: ponto preto isolado (risco de pneu e trinca são compridos: a volta também é escura) // dot: o furo tem um ponto preto no meio da mancha; px,py: onde está o ponto
   P.forEach(medir);
   P=P.filter(q=>q.claro<=0.3);
   // 3b) mancha cinza sem o ponto preto do furo = sombra, pó, pedra (se a foto mostra o ponto)
   const dm=mediana(P.map(q=>q.dot));if(dm>=15)P=P.filter(q=>q.dot>=0.5*dm);
   // 4) furo de verdade está na malha: tem vizinhos na distância da malha
   for(let it=0;it<3;it++){const nn=nnDist(P);P=P.filter((q,i)=>nn[i]<1.8*d0&&P.filter(o=>{if(o===q)return false;const d=Math.hypot(o.x-q.x,o.y-q.y);return d>0.5*d0&&d<2.2*d0;}).length>=2);}
-  // 5) malha da bancada (espaçamento x afastamento): onde dois furos achados, um de cada lado, mandam ter um furo no meio, aceita a marca mais fraca que estiver ali
-  if(P.length>=6){const pega=new Set(P);const cand=best.P0.map(q=>({x:q.x/k+bx0,y:q.y/k+by0,sx:q.x,sy:q.y,v:q.v})).map(medir)
-      .filter(q=>q.claro<=0.3&&(!(dm>=15)||q.dot>=0.22*dm)).sort((a,b)=>b.dot-a.dot);
-    for(let it=0;it<3;it++){let novo=0;cand.forEach(q=>{if(pega.has(q))return;if(P.some(o=>Math.hypot(o.x-q.x,o.y-q.y)<0.55*d0||Math.hypot(o.px/k+bx0-(q.px/k+bx0),o.py/k+by0-(q.py/k+by0))<0.4*d0))return;
-      const V=P.filter(o=>{const d=Math.hypot(o.x-q.x,o.y-q.y);return d>0.6*d0&&d<1.6*d0;});let ok=false;
+  // 5) malha da bancada (espaçamento x afastamento; vizinho a um passo da malha, o centro da quadra no quincôncio fica a ~0,7 e não conta): onde dois furos achados, um de cada lado, mandam ter um furo no meio, aceita a marca mais fraca que estiver ali
+  // candidatos: picos mais fracos e pontos pretos bem marcados (furo sem mancha em volta, comum em terra vermelha)
+  const pretos=[];if(dm>=15){const m3=new Float32Array(W*H);for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){let m=0;for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)m+=lum(x+a,y+b);m3[y*W+x]=m/9;}
+    const r=Math.max(2,Math.round(0.8*R)),dentro=area&&area.length>=3?(x,y)=>noPoli(x/k+bx0,y/k+by0,area):null;
+    for(let y=r+1;y<H-r-1;y++)for(let x=r+1;x<W-r-1;x++){const v=m3[y*W+x];let mn=true;for(let yy=y-r;yy<=y+r&&mn;yy++)for(let xx=x-r;xx<=x+r;xx++){const z=m3[yy*W+xx];if(z<v||(z===v&&(yy<y||(yy===y&&xx<x)))){mn=false;break;}}
+      if(mn&&(!dentro||dentro(x,y)))pretos.push(medir({x:x/k+bx0,y:y/k+by0,sx:x,sy:y,v:0}));}}
+  const isoM=mediana(P.map(q=>q.iso||0));
+  if(P.length>=6){const pega=new Set(P);const cand=best.P0.map(q=>medir({x:q.x/k+bx0,y:q.y/k+by0,sx:q.x,sy:q.y,v:q.v}))
+      .filter(q=>q.claro<=0.3&&(!(dm>=15)||q.dot>=0.22*dm)).concat(pretos.filter(q=>q.claro<=0.1&&q.dot>=0.5*dm&&q.iso>=0.6*isoM)).sort((a,b)=>b.dot-a.dot);
+    for(let it=0;it<10;it++){let novo=0;cand.forEach(q=>{if(pega.has(q))return;if(P.some(o=>Math.hypot(o.x-q.x,o.y-q.y)<0.55*d0||Math.hypot(o.px/k+bx0-(q.px/k+bx0),o.py/k+by0-(q.py/k+by0))<0.4*d0))return;
+      const V=P.filter(o=>{const d=Math.hypot(o.x-q.x,o.y-q.y);return d>0.85*d0&&d<1.5*d0;});let ok=false;
       for(let i=0;i<V.length&&!ok;i++)for(let j=i+1;j<V.length;j++){const a=V[i],b=V[j],ab=Math.hypot(a.x-b.x,a.y-b.y);
         if(ab>1.4*d0&&ab<3.2*d0&&Math.hypot((a.x+b.x)/2-q.x,(a.y+b.y)/2-q.y)<0.22*d0){ok=true;break;}}
-      if(ok){P.push(q);pega.add(q);novo++;}});if(!novo)break;}}
+      // segue a fileira: dois furos em linha mandam ter o próximo na mesma distância (precisa de mais um vizinho confirmando)
+      if(!ok&&V.length>=2)for(const a of V){if(ok)break;for(const b of P){if(b===a)continue;const ab=Math.hypot(a.x-b.x,a.y-b.y);if(ab<0.85*d0||ab>1.5*d0)continue;
+        if(Math.hypot(2*a.x-b.x-q.x,2*a.y-b.y-q.y)<0.2*d0){ok=true;break;}}}
+      if(!ok&&!q.v&&q.dot>=0.8*dm&&q.iso>=0.8*isoM&&V.length>=1)ok=true; // ponto preto bem marcado e isolado: basta um vizinho na distância da malha
+      if(ok){q.duv=true;P.push(q);pega.add(q);novo++;}});if(!novo)break;}
+  }
   // o círculo vai para o ponto preto do furo (o centro da mancha nem sempre é o furo)
   {const c=document.createElement('canvas');c.width=aw;c.height=ah;const g=c.getContext('2d');g.drawImage(im,bx0,by0,aw,ah,0,0,aw,ah);const D=g.getImageData(0,0,aw,ah).data;
     const L=(x,y)=>{const i=(y*aw+x)*4;return D[i]+D[i+1]+D[i+2];};const rr=Math.max(3,Math.round(Math.min(1.7*R/k,0.52*d0))),pr=Math.max(1,Math.round(0.15*R/k));
@@ -1183,7 +1201,11 @@ function furosNaFoto(im,area){
         let m=0;for(let a=-pr;a<=pr;a++)m+=L(x+a,y)+L(x,y+a);sum+=L(x,y);n++;if(m<mn){mn=m;mx=x;my=y;}}
       let perto=false;const cr=3*pr+2;for(let y=Math.max(0,my-cr);y<=Math.min(ah-1,my+cr)&&!perto;y++)for(let x=Math.max(0,mx-cr);x<=Math.min(aw-1,mx+cr);x++)if(L(x,y)>=3*claro){perto=true;break;} // janela escura de carro não é furo
       if(n&&!perto&&mn/(4*pr+2)<0.75*sum/n){q.x=mx+bx0;q.y=my+by0;}});} // só move se o ponto for bem mais escuro que a volta
-  return{furos:P.map(q=>({x:q.x,y:q.y})),sp:d0};}
+  // duvidoso (laranja na tela): completado pela malha, fraco, perto de coisa clara (máquina) ou colado na borda da área
+  const vm2=mediana(P.map(q=>q.v||0)),dm2=mediana(P.map(q=>q.dot||0));
+  const borda=(x,y)=>{if(!area||area.length<3)return false;for(let i=0,j=area.length-1;i<area.length;j=i++){const [x1,y1]=area[j],[x2,y2]=area[i],dx=x2-x1,dy=y2-y1,L2=dx*dx+dy*dy||1,t=Math.max(0,Math.min(1,((x-x1)*dx+(y-y1)*dy)/L2));if(Math.hypot(x1+t*dx-x,y1+t*dy-y)<0.4*d0)return true;}return false;};
+  P.forEach(q=>{if((q.v||0)<0.5*vm2||(q.dot||0)<0.4*dm2||(q.claro||0)>0||borda(q.x,q.y))q.duv=true;});
+  return{furos:P.map(q=>({x:q.x,y:q.y,duv:!!q.duv})),sp:d0};}
 // numera em sequência pela malha: acha as linhas de furos (fileiras), da esquerda para a direita; em cada fileira, de cima para baixo (1, 2, 3…)
 function numerarFuros(P,sp){if(!P.length)return P;
   const n=P.length;if(!sp){sp=n>1?[...nnDist(P)].sort((a,b)=>a-b)[n>>1]:20;}
@@ -1236,8 +1258,8 @@ async function fotoDroneFluxo(){
       if(area.length){g.strokeStyle='#22d3ee';g.lineWidth=2;g.beginPath();area.forEach(([x,y],i)=>i?g.lineTo(x*z,y*z):g.moveTo(x*z,y*z));if(passo!=='area'||area.length>2)g.closePath();g.stroke();
         if(passo==='area')area.forEach(([x,y])=>{g.fillStyle='#22d3ee';g.beginPath();g.arc(x*z,y*z,5,0,7);g.fill();});}
       const r=Math.max(4,(sp||16)*0.28*z);g.font=`bold ${Math.max(10,Math.round(r*1.3))}px system-ui,sans-serif`;
-      F.forEach(q=>{g.lineWidth=2;g.strokeStyle='#fde047';g.beginPath();g.arc(q.x*z,q.y*z,r,0,7);g.stroke();g.fillStyle='#000';g.fillText(q.n,q.x*z+r+1,q.y*z-r+1);g.fillStyle='#fff';g.fillText(q.n,q.x*z+r,q.y*z-r);});
-      $('#fdN').textContent=passo==='area'?`${area.length} ponto(s)`:`${F.length} furos`;};
+      F.forEach(q=>{g.lineWidth=q.duv?3:2;g.strokeStyle=q.duv?'#f97316':'#fde047';g.setLineDash(q.duv?[4,3]:[]);g.beginPath();g.arc(q.x*z,q.y*z,r,0,7);g.stroke();g.setLineDash([]);g.fillStyle='#000';g.fillText(q.n,q.x*z+r+1,q.y*z-r+1);g.fillStyle='#fff';g.fillText(q.n,q.x*z+r,q.y*z-r);});
+      $('#fdN').innerHTML=passo==='area'?`${area.length} ponto(s)`:`${F.length} furos`+(F.some(q=>q.duv)?` · <b style="color:#f97316">${F.filter(q=>q.duv).length} para conferir</b>`:'');};
     const botoes=()=>{
       if(passo==='area'){$('#fdTx').innerHTML='1) Toque nos <b>cantos da área dos furos</b>, contornando o polígono. Depois toque em <b>Procurar furos</b>.';
         $('#fdB').innerHTML=`<button class="btn" id="fdU">Desfazer ponto</button><button class="btn pri" id="fdGo">Procurar furos</button>`;
@@ -1245,7 +1267,7 @@ async function fotoDroneFluxo(){
         $('#fdGo').onclick=()=>{if(area.length<3){toast('Toque em pelo menos 3 cantos da área');return;}busy('Procurando os furos…');
           setTimeout(()=>{try{const R=furosNaFoto(im,area);F=R.furos;sp=R.sp;numerarFuros(F,sp);}catch(e){console.error(e);F=[];}busy();
             if(!F.length)toast('Não achei furos nessa área. Tente contornar de novo.',4000);passo='edit';botoes();desenha();},30);};}
-      else{$('#fdTx').innerHTML='2) Confira. <b>Toque num círculo</b> para tirar um furo errado, ou <b>toque onde falta</b> para pôr um furo. A numeração é refeita sozinha.';
+      else{$('#fdTx').innerHTML='2) Confira. <b style="color:#fde047">Amarelo</b> = furo claro na foto. <b style="color:#f97316">Laranja tracejado</b> = duvidoso (fraco, completado pela linha da malha, perto de máquina ou da borda): olhe um por um. <b>Toque num círculo</b> para tirar, <b>toque onde falta</b> para pôr. A numeração é refeita sozinha.';
         $('#fdB').innerHTML=`<button class="btn" id="fdA">Refazer a área</button><button class="btn pri" id="fdOk">Usar estes furos</button>`;
         $('#fdA').onclick=()=>{passo='area';area=[];F=[];botoes();desenha();};
         $('#fdOk').onclick=()=>{if(!F.length){toast('Nenhum furo marcado');return;}closeSheet();
