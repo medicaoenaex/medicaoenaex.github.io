@@ -719,7 +719,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-25.2';
+const APP_VER='2026-11-25.3';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1070,7 +1070,7 @@ function furosNaFoto(im,area){
   for(const Rf of [2.5,3.5,5,6.5,9,12,16,22,30]){ // raio do furo suposto, em px da foto
     const k=R0/Rf;if(aw*k>2600||ah*k>2600||aw*k<40||ah*k<40)continue;
     const W=Math.round(aw*k),H=Math.round(ah*k);const c=document.createElement('canvas');c.width=W;c.height=H;const cx=c.getContext('2d');cx.drawImage(im,bx0,by0,aw,ah,0,0,W,H);
-    const s=notaFuros(cx.getImageData(0,0,W,H).data,W,H,R0);
+    const dat=cx.getImageData(0,0,W,H).data,s=notaFuros(dat,W,H,R0);
     const dentro=area&&area.length>=3?(x,y)=>noPoli(x/k+bx0,y/k+by0,area):null;
     const vals=[];for(let y=0;y<H;y+=2)for(let x=0;x<W;x+=2)if(!dentro||dentro(x,y))vals.push(s[y*W+x]);vals.sort((a,b)=>a-b);if(vals.length<50)continue;
     const T=0.35*vals[Math.floor(vals.length*0.99)];
@@ -1081,18 +1081,66 @@ function furosNaFoto(im,area){
     const forca=P.reduce((a,q)=>a+q.v,0)/P.length/(T/0.35);
     if(raz<3||raz>8)continue; // pico colado no outro = textura, não furo
     const nota=reg*reg*forca*Math.sqrt(P.length);
-    if(!best||nota>best.nota)best={nota,k,P:P.map(q=>({x:q.x/k+bx0,y:q.y/k+by0,v:q.v})),d0:med/k};}
+    if(!best||nota>best.nota)best={nota,k,W,H,dat,R0,P:P.map(q=>({x:q.x/k+bx0,y:q.y/k+by0,sx:q.x,sy:q.y,v:q.v})),d0:med/k};}
   if(!best)return{furos:[],sp:0};
-  let P=best.P;const d0=best.d0;
-  for(let it=0;it<3;it++){const nn=nnDist(P);P=P.filter((q,i)=>nn[i]<1.8*d0&&P.filter(o=>o!==q&&Math.hypot(o.x-q.x,o.y-q.y)<2.2*d0).length>=2);}
+  const {k,W,H,dat}=best,R=best.R0;let P=best.P;
+  // espaçamento da malha pelo 2º vizinho (furo duplo engana o 1º vizinho)
+  const viz2=Q=>Q.map((a,i)=>{let m1=Infinity,m2=Infinity;Q.forEach((b,j)=>{if(i===j)return;const d=Math.hypot(a.x-b.x,a.y-b.y);if(d<m1){m2=m1;m1=d;}else if(d<m2)m2=d;});return m2;});
+  const mediana=v=>{const o=[...v].filter(isFinite).sort((a,b)=>a-b);return o.length?o[o.length>>1]:0;};
+  let d0=Math.max(best.d0,0.75*mediana(viz2(P)));
+  // 1) furo duplo: dois picos a menos de ~meio espaçamento são o mesmo furo; fica o mais forte
+  const juntar=(Q,lim)=>{const out=[];[...Q].sort((a,b)=>b.v-a.v).forEach(q=>{if(!out.some(o=>Math.hypot(o.x-q.x,o.y-q.y)<lim))out.push(q);});return out;};
+  for(let it=0;it<3;it++){P=juntar(P,0.55*d0);const nd=mediana(nnDist(P));if(!nd||Math.abs(nd-d0)<0.02*d0)break;d0=Math.max(d0*0.9,nd);}
+  // 2) mancha fraca demais perto dos furos típicos = textura, não furo
+  const vm=mediana(P.map(q=>q.v));P=P.filter(q=>q.v>=0.4*vm);
+  // 3) pico em cima de coisa clara (carro, caminhonete, placa) não é furo
+  const lum=(x,y)=>{const i=(y*W+x)*4;return(dat[i]+dat[i+1]+dat[i+2])/3;};
+  const LV=[];for(let y=0;y<H;y+=3)for(let x=0;x<W;x+=3)LV.push(lum(x,y));LV.sort((a,b)=>a-b);
+  const claro=Math.max(185,LV[Math.floor(LV.length*0.985)]+8);
+  P.forEach(q=>{let br=0,bn=0,mn=1e9,dS=0,dN=0;const x0=Math.round(q.sx),y0=Math.round(q.sy);
+    for(let yy=Math.max(1,Math.floor(q.sy-1.4*R));yy<=Math.min(H-2,Math.ceil(q.sy+1.4*R));yy++)for(let xx=Math.max(1,Math.floor(q.sx-1.4*R));xx<=Math.min(W-2,Math.ceil(q.sx+1.4*R));xx++){
+      const d=Math.hypot(xx-q.sx,yy-q.sy),l=lum(xx,yy);if(d<=0.6*R){bn++;if(l>=claro)br++;
+        let m=0;for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++)m+=lum(xx+a,yy+b);if(m/9<mn)mn=m/9;}
+      else if(d>=0.8*R&&d<=1.4*R){dS+=l;dN++;}}
+    q.claro=bn?br/bn:0;q.dot=dN&&mn<1e9?dS/dN-mn:0;}); // dot: o furo tem um ponto preto no meio da mancha
+  P=P.filter(q=>q.claro<=0.3);
+  // 3b) mancha cinza sem o ponto preto do furo = sombra, pó, pedra (se a foto mostra o ponto)
+  const dm=mediana(P.map(q=>q.dot));if(dm>=15)P=P.filter(q=>q.dot>=0.5*dm);
+  // 4) furo de verdade está na malha: tem vizinhos na distância da malha
+  for(let it=0;it<3;it++){const nn=nnDist(P);P=P.filter((q,i)=>nn[i]<1.8*d0&&P.filter(o=>{if(o===q)return false;const d=Math.hypot(o.x-q.x,o.y-q.y);return d>0.5*d0&&d<2.2*d0;}).length>=2);}
   return{furos:P.map(q=>({x:q.x,y:q.y})),sp:d0};}
-// numera pela posição: faixas ao longo do lado maior do polígono (da esquerda para a direita), dentro da faixa de cima para baixo
+// numera em sequência pela malha: acha as linhas de furos (fileiras), da esquerda para a direita; em cada fileira, de cima para baixo (1, 2, 3…)
 function numerarFuros(P,sp){if(!P.length)return P;
-  const mx=P.reduce((a,q)=>a+q.x,0)/P.length,my=P.reduce((a,q)=>a+q.y,0)/P.length;
+  const n=P.length;if(!sp){sp=n>1?[...nnDist(P)].sort((a,b)=>a-b)[n>>1]:20;}
+  const mx=P.reduce((a,q)=>a+q.x,0)/n,my=P.reduce((a,q)=>a+q.y,0)/n;
   let sxx=0,syy=0,sxy=0;P.forEach(q=>{const dx=q.x-mx,dy=q.y-my;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;});
-  const ang=0.5*Math.atan2(2*sxy,sxx-syy);let ux=Math.cos(ang),uy=Math.sin(ang);if(ux<0){ux=-ux;uy=-uy;}
-  const w=0.7*(sp||20);const L=P.map(q=>({q,a:(q.x-mx)*ux+(q.y-my)*uy,b:-(q.x-mx)*uy+(q.y-my)*ux}));const a0=Math.min(...L.map(o=>o.a));
-  L.forEach(o=>o.f=Math.floor((o.a-a0)/w));L.sort((p,r)=>(p.f-r.f)||(p.b-r.b));L.forEach((o,i)=>o.q.n=i+1);return P;}
+  const angL=n>2?0.5*Math.atan2(2*sxy,sxx-syy):0; // lado maior do polígono
+  // direções da malha: ângulos dos vizinhos próximos (mod 180°)
+  const NB=36,hist=new Float32Array(NB),V=[];
+  P.forEach((a,i)=>P.forEach((b,j)=>{if(j<=i)return;const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d<1.5*sp&&d>0.3*sp){let t=Math.atan2(dy,dx);if(t<0)t+=Math.PI;if(t>=Math.PI)t-=Math.PI;V.push({t,d});hist[Math.floor(t/Math.PI*NB)%NB]+=1;}}));
+  const hs=Array.from(hist,(v,i)=>v+0.5*(hist[(i+1)%NB]+hist[(i+NB-1)%NB])),hmax=Math.max(...hs);
+  let angC=angL+Math.PI/2,bestS=-1; // fileira: direção da malha mais atravessada ao lado maior
+  if(hmax>0)hs.forEach((v,i)=>{if(v<0.4*hmax||v<hs[(i+1)%NB]||v<hs[(i+NB-1)%NB])return;
+    const sum=V.filter(o=>{let dd=Math.abs(o.t-(i+0.5)/NB*Math.PI);dd=Math.min(dd,Math.PI-dd);return dd<Math.PI/NB*1.5;});
+    const t=Math.atan2(sum.reduce((a,o)=>a+Math.sin(2*o.t),0),sum.reduce((a,o)=>a+Math.cos(2*o.t),0))/2;
+    const sc=Math.abs(Math.sin(t-angL))*(0.5+0.5*v/hmax);if(sc>bestS){bestS=sc;angC=t;}});
+  let ux=Math.cos(angC),uy=Math.sin(angC);if(Math.abs(uy)>0.3?uy<0:ux<0){ux=-ux;uy=-uy;} // u: ao longo da fileira, para baixo
+  let vx=-uy,vy=ux;if(Math.abs(vx)>0.3?vx<0:vy<0){vx=-vx;vy=-vy;} // v: de uma fileira para a outra (esquerda -> direita)
+  const L=P.map(q=>({q,u:(q.x-mx)*ux+(q.y-my)*uy,v:(q.x-mx)*vx+(q.y-my)*vy,dn:-1,up:-1}));
+  // liga cada furo ao próximo de baixo na mesma fileira (aceita fileira torta)
+  const ED=[];L.forEach((a,i)=>L.forEach((b,j)=>{if(i===j)return;const du=b.u-a.u,dv=b.v-a.v,d=Math.hypot(du,dv);if(du<=0||d>1.8*sp)return;const ang=Math.atan2(Math.abs(dv),du);if(ang>0.6)return;ED.push({i,j,c:d*(1+2*ang)});}));
+  ED.sort((a,b)=>a.c-b.c).forEach(e=>{if(L[e.i].dn<0&&L[e.j].up<0){L[e.i].dn=e.j;L[e.j].up=e.i;}});
+  const ch=[];L.forEach((o,i)=>{if(o.up>=0)return;const c=[];let k=i,g=0;while(k>=0&&g++<=n){c.push(L[k]);k=L[k].dn;}ch.push({c,v:c.reduce((a,o)=>a+o.v,0)/c.length,u:c[0].u});});
+  // pedaços da mesma fileira (furo faltando ou fileira torta) se juntam à fileira mais próxima que não ocupa o mesmo trecho
+  ch.forEach(c=>{c.u0=c.c[0].u;c.u1=c.c[c.c.length-1].u;});ch.sort((a,b)=>b.c.length-a.c.length||a.v-b.v);
+  const grp=[];ch.forEach(c=>{let bg=null,bd=Infinity;
+    grp.forEach(g=>{if(g.cs.some(o=>c.u0<o.u1+0.3*sp&&o.u0<c.u1+0.3*sp))return; // já tem furo nesse trecho
+      let vv=g.v,du=Infinity;g.cs.forEach(o=>o.c.forEach(z=>{const e=Math.min(Math.abs(z.u-c.u0),Math.abs(z.u-c.u1));if(e<du){du=e;vv=z.v;}}));
+      const d=Math.abs((c.u0<g.cs[0].u0?c.c[c.c.length-1].v:c.c[0].v)-vv);if(d<0.75*sp&&du<3*sp&&d<bd){bd=d;bg=g;}});
+    if(bg)bg.cs.push(c);else grp.push({v:c.v,cs:[c]});});
+  grp.sort((a,b)=>a.v-b.v);
+  let num=1;grp.forEach(g=>g.cs.sort((a,b)=>a.u0-b.u0).forEach(c=>c.c.forEach(o=>o.q.n=num++)));
+  return P;}
 // tela: marca a área na foto, o app acha os furos, a pessoa tira/põe e confirma. Devolve dados para o polígono novo.
 async function fotoDroneFluxo(){
   const file=await pickFile('image/*');if(!file)return null;
@@ -1125,7 +1173,7 @@ async function fotoDroneFluxo(){
         $('#fdB').innerHTML=`<button class="btn" id="fdA">Refazer a área</button><button class="btn pri" id="fdOk">Usar estes furos</button>`;
         $('#fdA').onclick=()=>{passo='area';area=[];F=[];botoes();desenha();};
         $('#fdOk').onclick=()=>{if(!F.length){toast('Nenhum furo marcado');return;}closeSheet();
-          fim({holes:F.map(q=>novoFuro(String(q.n),q.x,q.y,null)),bg:{url:img.url,w:IW,h:IH},nome:file.name.replace(/\.[^.]+$/,''),resumo:`furos achados na foto do drone (${F.length}, conferidos)`});};}};
+          fim({holes:[...F].sort((a,b)=>a.n-b.n).map(q=>novoFuro(String(q.n),q.x,q.y,null)),bg:{url:img.url,w:IW,h:IH},nome:file.name.replace(/\.[^.]+$/,''),resumo:`furos achados na foto do drone (${F.length}, conferidos)`});};}};
     c.onclick=e=>{const rc=c.getBoundingClientRect(),x=(e.clientX-rc.left)/z,y=(e.clientY-rc.top)/z;
       if(passo==='area'){area.push([x,y]);desenha();return;}
       const lim=Math.max(6,(sp||16)*0.45);let bi=-1,bd=Infinity;F.forEach((q,i)=>{const d=Math.hypot(q.x-x,q.y-y);if(d<bd){bd=d;bi=i;}});
