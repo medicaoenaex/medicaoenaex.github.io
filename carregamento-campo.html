@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Carregamento de Campo</title>
+<link rel="manifest" href="carregamento.webmanifest"><link rel="icon" type="image/png" href="carregamento-icon-192.png"><link rel="apple-touch-icon" href="carregamento-apple-touch-icon.png"><meta name="apple-mobile-web-app-title" content="Carregamento"><meta name="application-name" content="Carregamento"><meta name="theme-color" content="#070b12">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#f3f5f7;--card:#fff;--ink:#14202b;--mut:#5d6b78;--line:#d6dde3;--pri:#0b5cad;--pri2:#e6f0fa;--ok:#1f9d55;--warn:#f08c00;--bad:#d64545;--r:12px}
@@ -749,7 +750,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-26.1';
+const APP_VER='2026-11-26.2';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -767,7 +768,7 @@ async function guardarParaOffline(){try{if(navigator.onLine===false||!('caches' 
   const url=location.origin+location.pathname;const r=await fetch(url,{cache:'no-cache'});if(!r.ok)return;const t=await r.clone().text();if(!/const APP_VER=/.test(t))return;
   for(const k of ks){const c=await caches.open(k);if(!(await c.match(url)))await c.put(url,new Response(t,{headers:{'content-type':'text/html; charset=utf-8'}}));
     // bibliotecas da planilha (modelo Enaex) também ficam guardadas para gerar sem sinal
-    for(const lb of ['lib/jszip.min.js','lib/exceljs.min.js','lib/xlsx.full.min.js']){try{const lu=new URL(lb,location.href).href;if(!(await c.match(lu))){const lr=await fetch(lu);if(lr.ok)await c.put(lu,lr);}}catch(_){}}}}catch(e){}}
+    for(const lb of ['lib/jszip.min.js','lib/exceljs.min.js','lib/xlsx.full.min.js','carregamento.webmanifest','carregamento-icon-192.png','carregamento-icon-512.png','carregamento-icon-maskable-512.png','carregamento-apple-touch-icon.png']){try{const lu=new URL(lb,location.href).href;if(!(await c.match(lu))){const lr=await fetch(lu);if(lr.ok)await c.put(lu,lr);}}catch(_){}}}}catch(e){}}
 async function atualizarApp(){
   const bt=$('#novaVerOk');if(bt){bt.disabled=true;bt.textContent='Baixando…';}
   const nome=location.pathname.split('/').pop()||'carregamento-campo.html';
