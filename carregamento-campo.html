@@ -261,7 +261,7 @@ header h1 .logo svg{width:24px;height:24px}
 #opMap.add{cursor:crosshair}
 .dsg{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 40px;gap:6px;align-items:center;margin-top:8px}.dsg b{font-size:14px}.dsc{min-height:46px;border-radius:10px;background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.25);color:#cfd8e3;font-size:18px;font-weight:800}.dsc .dsv{display:block;font-size:22px;font-weight:900;color:#ffb27a;line-height:1.1}.dsc .dsp{display:block;font-size:12px;font-weight:600;color:var(--mut)}.dsmed{font-size:30px;font-weight:900;color:#ffb27a;font-family:"Orbitron",ui-monospace,monospace;text-shadow:0 0 10px rgba(255,140,60,.4)}.dsc.on{border-style:solid;border-color:rgba(255,177,31,.5);color:#fff}
 .dsl{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.dschip{background:rgba(255,255,255,.06);border:1px solid var(--line);color:#fff;border-radius:999px;padding:8px 12px;font-size:15px}
-.ag{display:flex;flex-direction:column;gap:6px}.agm{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--mut,#7d8a99);margin:6px 0 0}.agr{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-left:6px solid var(--c);border-radius:12px;padding:8px 10px;cursor:pointer;background:var(--card,#fff)}.agr .agn{min-width:64px;font-weight:800;font-size:18px;color:var(--c)}.agr .agd{flex:1;min-width:0;font-size:13px}.agr .agd b{font-size:14px}.agr .agk{text-align:right;font-size:12px;white-space:nowrap}.agr .agk b{display:block;font-size:18px}.agst{display:inline-block;font-size:11px;font-weight:700;border-radius:8px;padding:1px 6px;color:#fff;background:#5b6676}.agst.on{background:#1f9d55;animation:agp 1.6s infinite}@keyframes agp{50%{opacity:.55}}
+.ag{display:flex;flex-direction:column;gap:6px}.agm{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--mut,#7d8a99);margin:6px 0 0}.agr{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-left:6px solid var(--c);border-radius:12px;padding:8px 10px;cursor:pointer;background:var(--card,#fff)}.agr .agn{min-width:64px;font-weight:800;font-size:18px;color:var(--c)}.agr .agd{flex:1;min-width:0;font-size:13px}.agr .agd b{font-size:14px}.agr .agk{text-align:right;font-size:12px;white-space:nowrap}.agr .agk b{display:block;font-size:18px}.agst{display:inline-block;font-size:11px;font-weight:700;border-radius:8px;padding:1px 6px;color:#fff;background:#5b6676}.agst.on{background:#1f9d55;animation:agp 1.6s infinite}button.agst{border:0;cursor:pointer;font-family:inherit;padding:3px 8px}.agst.cs-rec{background:#e67700;animation:none}.agst.cs-fim{background:#343a40;animation:none}.agst.cs-ini{background:#1f9d55}.opst{display:flex;gap:6px;margin:8px 0 0}.opst button{flex:1;min-height:54px;font-size:15px;font-weight:800;border-radius:12px;border:2px solid var(--line);background:var(--card,#fff);color:inherit;line-height:1.15;padding:4px}.opst button small{display:block;font-size:11px;font-weight:600;opacity:.85}.opst button.on{color:#fff;border-color:transparent}.opst button.on.s-ini{background:#1f9d55}.opst button.on.s-rec{background:#e67700}.opst button.on.s-fim{background:#343a40}.csb{display:flex;flex-direction:column;gap:8px}.csb button{min-height:60px;font-size:18px;font-weight:800}@keyframes agp{50%{opacity:.55}}
 .avg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.avp{border:1px solid var(--line);border-radius:12px;padding:8px;cursor:pointer;background:var(--card,#fff)}.avt{display:flex;justify-content:space-between;align-items:baseline}.avt span{font-weight:800;color:#ff6a13}.avm{background:#1d2530;border-radius:8px;margin:6px 0;aspect-ratio:4/3;display:flex}.avm svg{width:100%;height:100%}.avc{display:flex;flex-wrap:wrap;gap:4px 8px;font-size:12px;margin:4px 0}.avc i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:3px;vertical-align:-1px}
 .dsft{grid-column:1/-1;display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:-2px 0 6px}.dsth{display:flex;gap:6px;flex-wrap:wrap}.dsth img{width:54px;height:54px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,.25);cursor:pointer}
 .opnms{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:46vh;overflow:auto}.opnms .btn{min-height:56px;font-size:17px;font-weight:800}
@@ -537,6 +537,7 @@ function aplicarRemoto(d){
     mudou=true;
   });
   if(avisosRem.length){notificar(avisosRem.length===1?'Furo fora do projeto':avisosRem.length+' furos fora do projeto',avisosRem.slice(0,4).join('\n'));avisosRem.length=0;}
+  if(mudou&&view==='poly'&&tab==='oper')opStAtualiza();
   if(mudou){if(view==='home')renderHome();else if(view==='cam'&&$('#sheet').classList.contains('hidden'))renderCam();else if(view==='poly'&&$('#sheet').classList.contains('hidden')&&!(tab==='oper'&&operSujo))renderPoly();}
 }
 function atualizaTelaSync(){const el=$('#syncBox');if(el)el.innerHTML=syncBoxHTML();bindSyncBox();}
@@ -623,21 +624,48 @@ function renderHome(){
 let homeQ='',homeSitu='';
 // ===== Carregando agora: cada caminhão, em que polígono/mina está, quantos furos e o último lançamento =====
 const AGORA_MIN=30; // até 30 min do último furo = "carregando"; depois = "parado"
+// ===== Status da operação do caminhão (o operador marca com 1 toque): Iniciada / Recarregar / Operação finalizada =====
+// fica em p.cams[cam].op = {s,ts,por} do polígono onde o caminhão está (sincroniza com a equipe pelo caminho cams/<caminhão>); vale o mais recente do dia
+const OPST={ini:{n:'Iniciada',i:'▶',c:'#1f9d55'},rec:{n:'Recarregar',i:'⛽',c:'#e67700'},fim:{n:'Operação finalizada',i:'🏁',c:'#343a40'}};
+const hm=ts=>new Date(ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+function camOpDe(cam){let b=null;S.polys.forEach(q=>{const o=((q.cams||{})[cam]||{}).op;if(o&&o.ts&&OPST[o.s]&&diaDe(o.ts)===today()&&(!b||o.ts>b.ts))b=Object.assign({p:q},o);});return b;}
+function camOpHist(cam){const l=[];S.polys.forEach(q=>(((q.cams||{})[cam]||{}).opH||[]).forEach(o=>{if(o&&o.ts&&OPST[o.s]&&diaDe(o.ts)===today()&&!l.some(x=>x.ts===o.ts&&x.s===o.s))l.push(o);}));return l.sort((a,b)=>a.ts-b.ts);}
+function camOpGrava(p,cam,s){if(!p||!cam||!OPST[s])return;p.cams=p.cams||{};const c=p.cams[cam]=p.cams[cam]||{};const o={s,ts:Date.now(),por:meuOper()||meuNome()||''};
+  c.op=o;c.opH=[...(c.opH||[]).filter(x=>x&&diaDe(x.ts)===today()),o].slice(-40);markP(p.id);save();toast(camCurto(cam)+': '+OPST[s].i+' '+OPST[s].n);}
+// status que aparece: o marcado pelo operador manda; "Recarregar" volta sozinho para carregando quando ele lança um furo depois
+function camEstado(cam,last){last=last||0;const o=camOpDe(cam);
+  if(o&&!(o.s==='rec'&&last>o.ts))return{k:o.s,txt:OPST[o.s].i+' '+OPST[o.s].n,on:o.s==='ini',desde:o.ts,man:true,por:o.por||''};
+  const on=!!last&&Date.now()-last<=AGORA_MIN*6e4;
+  if(o&&o.s==='rec')return{k:'ini',txt:on?'carregando':'parado',on,desde:last,man:false,volta:true};
+  return{k:'',txt:on?'carregando':'parado',on,desde:last,man:false};}
+// 3 botões do status na aba Operador (1 toque); atualiza sozinho quando outro celular muda, mesmo com o operador digitando
+function opStHTML(meu){const e=camEstado(meu,(agoraDados().find(c=>c.cam===meu)||{}).last);
+  return Object.entries(OPST).map(([k,v])=>`<button class="s-${k} ${(e.man||e.volta)&&e.k===k?'on':''}" data-ost="${k}">${v.i} ${k==='fim'?'Finalizada':v.n}${e.man&&e.k===k?`<small>desde ${hm(e.desde)}</small>`:e.volta&&k==='ini'?'<small>voltou</small>':''}</button>`).join('');}
+function opStBind(p,meu){document.querySelectorAll('[data-ost]').forEach(b=>b.onclick=()=>{const e=camEstado(meu,(agoraDados().find(c=>c.cam===meu)||{}).last);if(e.man&&e.k===b.dataset.ost){toast('Já está: '+OPST[e.k].n);return;}camOpGrava(p,meu,b.dataset.ost);opStAtualiza();});}
+function opStAtualiza(){const el=$('#opSt'),meu=(S.ui&&S.ui.meuCam)||'';const p=S.polys.find(x=>x.id===S.cur);if(!el||!meu||!p)return;el.innerHTML=opStHTML(meu);opStBind(p,meu);}
+function camStatusSheet(p,cam,depois){const e=camEstado(cam,(agoraDados().find(c=>c.cam===cam)||{}).last);const hs=camOpHist(cam);
+  openSheet(`<h3>${esc(camCurto(cam)||cam)} · status da operação<button class="btn sm" id="csX">Fechar</button></h3><p class="mut" style="margin:0 0 8px">Agora: <b>${esc(e.txt)}</b>${e.man?' desde '+hm(e.desde)+(e.por?' ('+esc(e.por)+')':''):''}</p>
+  <div class="csb">${Object.entries(OPST).map(([k,v])=>`<button class="btn ${e.man&&e.k===k?'pri':''}" data-cs="${k}" style="border-left:10px solid ${v.c}">${v.i} ${v.n}</button>`).join('')}</div>
+  ${hs.length?`<p class="mut" style="margin:10px 0 0">Hoje: ${hs.map(o=>hm(o.ts)+' '+OPST[o.s].i+' '+OPST[o.s].n).join(' · ')}</p>`:''}`);
+  $('#csX').onclick=closeSheet;document.querySelectorAll('[data-cs]').forEach(b=>b.onclick=()=>{camOpGrava(p,cam,b.dataset.cs);closeSheet();depois&&depois();});}
 function agoraDados(){const hj=today(),m={};
   S.polys.forEach(p=>p.holes.forEach(h=>{if(h.status!=='carregado'||!h.ts||diaDe(h.ts)!==hj)return;
     camsDoFuro(h).forEach(cm=>{const kg=(h.decks||[]).length?(h.decks||[]).reduce((s,d)=>s+(deckTemCarga(d)&&deckCam(h,d)===cm?(num(d.kg)||0):0),0):0;
       const c=m[cm]=m[cm]||{cam:cm,polys:{},n:0,kg:0,last:0};const e=c.polys[p.id]=c.polys[p.id]||{p,n:0,kg:0,last:0};
       e.n++;e.kg+=kg;e.last=Math.max(e.last,h.ts);c.n++;c.kg+=kg;c.last=Math.max(c.last,h.ts);});}));
-  return Object.values(m).map(c=>{const ps=Object.values(c.polys).sort((a,b)=>b.last-a.last);return Object.assign(c,{ps,agora:ps[0]});}).sort((a,b)=>b.last-a.last);}
+  S.polys.forEach(p=>Object.keys(p.cams||{}).forEach(cm=>{if(m[cm])return;const o=camOpDe(cm);if(!o)return;m[cm]={cam:cm,polys:{[o.p.id]:{p:o.p,n:0,kg:0,last:0}},n:0,kg:0,last:0};}));
+  const ref=c=>Math.max(c.last,(camOpDe(c.cam)||{}).ts||0);
+  return Object.values(m).map(c=>{const ps=Object.values(c.polys).sort((a,b)=>b.last-a.last);const o=camOpDe(c.cam);const ag=(!c.last&&o&&c.polys[o.p.id])||ps[0];return Object.assign(c,{ps,agora:ag,est:camEstado(c.cam,c.last)});}).sort((a,b)=>ref(b)-ref(a));}
 const agoraKg=kg=>kg>=1000?fmt(kg/1000,1)+' t':fmt(kg)+' kg';
 const agoraHa=ts=>{const mi=Math.max(0,Math.round((Date.now()-ts)/6e4));return mi<1?'agora':mi<60?`há ${mi} min`:`há ${Math.floor(mi/60)}h${String(mi%60).padStart(2,'0')}`;};
 function agoraHTML(){const cs=agoraDados();if(!cs.length)return'';
-  const polys=new Set(cs.map(c=>c.agora.p.id)),minas=new Set(cs.map(c=>(c.agora.p.mina||'').trim().toUpperCase()));const ativos=cs.filter(c=>Date.now()-c.last<=AGORA_MIN*6e4).length;
+  const polys=new Set(cs.map(c=>c.agora.p.id)),minas=new Set(cs.map(c=>(c.agora.p.mina||'').trim().toUpperCase()));const ativos=cs.filter(c=>c.est.on).length;const nRec=cs.filter(c=>c.est.k==='rec').length,nFim=cs.filter(c=>c.est.k==='fim').length;
   const grupos={};cs.forEach(c=>{const k=(c.agora.p.mina||'Sem mina').trim();(grupos[k]=grupos[k]||[]).push(c);});
-  return `<div class="card"><h2 style="margin-bottom:2px">🚚 Carregando agora</h2><p class="mut" style="margin:0 0 6px">${cs.length} ${cs.length>1?'caminhões':'caminhão'} hoje · ${ativos} carregando · ${polys.size} polígono${polys.size>1?'s':''} · ${minas.size} mina${minas.size>1?'s':''}. Toque para abrir o polígono na cor do caminhão.</p><div class="ag">${Object.entries(grupos).map(([mina,lista])=>`<div class="agm">⛏ ${esc(mina)}</div>${lista.map(c=>{const a=c.agora,q=a.p,on=Date.now()-c.last<=AGORA_MIN*6e4;const op=((q.cams||{})[c.cam]||{}).oper;
+  return `<div class="card"><h2 style="margin-bottom:2px">🚚 Carregando agora</h2><p class="mut" style="margin:0 0 6px">${cs.length} ${cs.length>1?'caminhões':'caminhão'} hoje · ${ativos} carregando${nRec?` · ${nRec} recarregando`:''}${nFim?` · ${nFim} finalizado${nFim>1?'s':''}`:''} · ${polys.size} polígono${polys.size>1?'s':''} · ${minas.size} mina${minas.size>1?'s':''}. Toque para abrir o polígono na cor do caminhão; toque no status para trocar.</p><div class="ag">${Object.entries(grupos).map(([mina,lista])=>`<div class="agm">⛏ ${esc(mina)}</div>${lista.map(c=>{const a=c.agora,q=a.p,e=c.est;const op=((q.cams||{})[c.cam]||{}).oper;
     const outros=c.ps.slice(1).map(e=>`POL ${esc(e.p.pol)}${(e.p.mina||'')!==(q.mina||'')?' ('+esc(e.p.mina||'')+')':''} ${e.n}`).join(' · ');
-    return `<div class="agr" data-id="${q.id}" style="--c:${camCor(c.cam)}"><div class="agn">${esc(camCurto(c.cam)||c.cam)}</div><div class="agd"><b>POL ${esc(q.pol)}</b>${q.banco?' · B'+esc(q.banco):''}${q.cava?' · '+esc(q.cava):''} <span class="agst ${on?'on':''}">${on?'carregando':'parado'}</span><div class="mut">${op?'👷 '+esc(String(op).split(' ').slice(0,2).join(' '))+' · ':''}último furo ${new Date(a.last).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} (${agoraHa(a.last)})</div>${outros?`<div class="mut" style="font-size:11px">também hoje: ${outros}</div>`:''}</div><div class="agk"><b>${a.n}</b>furo${a.n>1?'s':''}${a.kg?'<br>'+agoraKg(a.kg):''}</div></div>`;}).join('')}`).join('')}</div></div>`;}
-function bindAgora(){document.querySelectorAll('.agr').forEach(el=>el.onclick=()=>{mapScroll.x=mapScroll.y=0;pincel=null;selMode=false;selSet.clear();gpsStop();S.cur=el.dataset.id;save();tab='mapa';corPor='caminhao';go('poly');});}
+    return `<div class="agr" data-id="${q.id}" style="--c:${camCor(c.cam)}"><div class="agn">${esc(camCurto(c.cam)||c.cam)}</div><div class="agd"><b>POL ${esc(q.pol)}</b>${q.banco?' · B'+esc(q.banco):''}${q.cava?' · '+esc(q.cava):''} <button class="agst ${e.on?'on':''} ${e.k?'cs-'+e.k:''}" data-cst="${esc(c.cam)}" data-pid="${q.id}">${esc(e.txt)}${e.man?' '+hm(e.desde):''} ▾</button><div class="mut">${op?'👷 '+esc(String(op).split(' ').slice(0,2).join(' '))+' · ':''}${a.last?`último furo ${hm(a.last)} (${agoraHa(a.last)})`:'nenhum furo ainda'}${e.volta?' · voltou do recarregar':''}</div>${outros?`<div class="mut" style="font-size:11px">também hoje: ${outros}</div>`:''}</div><div class="agk"><b>${c.n}</b>furo${c.n===1?'':'s'}${c.kg?'<br>'+agoraKg(c.kg):''}</div></div>`;}).join('')}`).join('')}</div></div>`;}
+function bindAgora(){document.querySelectorAll('[data-cst]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();const p=S.polys.find(x=>x.id===b.dataset.pid);if(p)camStatusSheet(p,b.dataset.cst,()=>{if(view==='home')renderHome();});});
+  document.querySelectorAll('.agr').forEach(el=>el.onclick=()=>{mapScroll.x=mapScroll.y=0;pincel=null;selMode=false;selSet.clear();gpsStop();S.cur=el.dataset.id;save();tab='mapa';corPor='caminhao';go('poly');});}
 setInterval(()=>{if(view==='home'&&$('#agoraBox')&&$('#sheet').classList.contains('hidden')){$('#agoraBox').innerHTML=agoraHTML();bindAgora();}},60000);
 // ===== Ao vivo: todos os polígonos em carregamento lado a lado (croqui pequeno, cor por caminhão) =====
 function aoVivoMini(p){if(!p.holes.length)return'';const g=geom(p,true),r=g.r;
@@ -721,7 +749,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-25.8';
+const APP_VER='2026-11-26.1';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1966,6 +1994,8 @@ function wppTexto(p,o,D){
   const bg=num(o.bags);if(bg)L.push(`• ${fmt(bg)} Blastbags`);
   L.push('','*Frota utilizada:*','');
   Object.entries(D.frota).forEach(([c,ps])=>{const op=D.oper[c];Object.entries(ps).forEach(([pr,kg])=>L.push(`• ${c} - ${fmt(kg)}kg ${pr}${op?' - Op. '+op:''}`.trim()));});
+  const stc=Object.keys(p.cams||{}).map(c=>[c,camOpDe(c)]).filter(x=>x[1]);
+  if(stc.length){L.push('','*Status dos caminhões:*','');stc.forEach(([c,o])=>{const e=camEstado(c,(agoraDados().find(x=>x.cam===c)||{}).last);L.push(`• ${camWpp(c)} - ${e.man?OPST[e.k].n+' às '+hm(e.desde):'Carregando (voltou do recarregar)'}`);});}
   L.push('','Mina: '+(p.mina||''),'Operação: '+D.carr.length+' Furos','Impacto: '+(o.impacto||'Não'),'','*D+1:*','Data: '+brDate(o.d1data),'Mina: '+(o.d1mina||p.mina||''),'Operação: '+(o.d1op||''));
   return L.join('\n');}
 function resumoWpp(p){
@@ -2750,6 +2780,7 @@ function tabOper(p){
     <button class="btn oplm" data-m="${i}" aria-label="Mais opções do furo ${esc(h.id)}">⋯</button>${lim.length?`<div class="oplim">⛔ ${lim.map(x=>esc(x.t)).join(' · ')}</div>`:''}</div>`;};
   $('#tabBox').innerHTML=`<div class="card op">
   <div class="opbar"><button class="btn sm" id="opCam" style="border-left:6px solid ${camCor(meu)}">🚛 ${esc(camCurto(meu))} ▾</button><button class="btn sm ${meuOper()?'':'pri'}" id="opNome">👷 ${meuOper()?esc(meuOper().split(' ').slice(0,2).join(' ')):'Seu nome?'} ▾</button>${abertos.length>1?`<select id="opPol" style="flex:1">${abertos.map(x=>`<option value="${x.id}" ${x.id===p.id?'selected':''}>POL ${esc(x.pol)}</option>`).join('')}</select>`:''}<span class="mut" style="margin-left:auto"><b>${pend}</b> pendente${pend===1?'':'s'}</span></div>
+  <div class="opst" id="opSt">${opStHTML(meu)}</div>
   ${!SY().token?'<div class="hint" style="margin:8px 0 0">📴 Fora da equipe online: fica só neste celular. Entre na equipe na tela inicial para mandar ao responsável.</div>':''}
   <p class="mut" style="margin:8px 0 0">${planoTxt(p)?esc(planoTxt(p)):'Plano de fogo não informado'}</p>${areasLista(p).filter(a=>p.holes.some(h=>h.area===a.id)).map(a=>`<p class="mut" style="margin:2px 0 0"><em class="oparea" style="background:${areaCor(p,a.id)};margin:0 4px 0 0">${esc(a.nome||a.id)}</em>${esc(planoTxt(p,a.id))}</p>`).join('')}
   <div class="kpis" style="margin-top:8px"><div class="kpi"><b>${meus.length}</b><span>furos meus</span></div><div class="kpi"><b>${fmt(kgMeu)}</b><span>kg meus</span></div></div>
@@ -2765,6 +2796,7 @@ function tabOper(p){
   operSujo=false;
   $('#opCam').onclick=()=>{S.ui=Object.assign(S.ui||{},{meuCam:''});save();tabOper(p);};
   $('#opNome').onclick=()=>operNomeSheet(p,meu,()=>tabOper(p));
+  opStBind(p,meu);
   if($('#opPol'))$('#opPol').onchange=e=>{S.cur=e.target.value;save();renderPoly();};
   document.querySelectorAll('#opF button').forEach(b=>b.onclick=()=>{operFiltro=b.dataset.f;tabOper(p);});
   $('#dsNova').onclick=()=>amostraNova(p,meu,()=>tabOper(p));
@@ -3086,9 +3118,9 @@ async function exportarPlanilhaSimples(p){
     Object.values(ST).forEach((v,i)=>{rs.getCell(r2+1+i,1).value=v.n;rs.getCell(r2+1+i,2).value={formula:`COUNTIF(${rr('status')},A${r2+1+i})`};});
     // Carregando agora: todos os caminhões do dia, em que polígono/mina estão (todos os polígonos do aparelho)
     const ag=wb.addWorksheet('Carregando agora');ag.getCell('A1').value=`Carregando agora – ${brDate(today())} ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;ag.getCell('A1').font={bold:true,size:14,color:{argb:'FF102A43'}};
-    const agH=['Caminhão','Mina','POL','Banco','Furos hoje','kg hoje','Último furo','Operador','Situação'];agH.forEach((t,c)=>{const cell=ag.getCell(3,c+1);cell.value=t;cell.font={bold:true,color:{argb:'FFFFFFFF'}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF102A43'}};ag.getColumn(c+1).width=[12,16,8,8,10,10,17,18,12][c];});
-    let agR=4;agoraDados().forEach(c=>c.ps.forEach((e,i)=>{const q=e.p;const row=[c.cam,q.mina||'',q.pol||'',q.banco||'',e.n,Math.round(e.kg)||null,new Date(e.last),((q.cams||{})[c.cam]||{}).oper||'',i?'também hoje':(Date.now()-c.last<=AGORA_MIN*6e4?'carregando':'parado')];
-      row.forEach((v,j)=>{if(v!==''&&v!=null)ag.getCell(agR,j+1).value=v;});ag.getCell(agR,7).numFmt='dd/mm/yyyy hh:mm';ag.getCell(agR,1).font={bold:true,color:{argb:'FF'+camCor(c.cam).slice(1).toUpperCase()}};agR++;}));
+    const agH=['Caminhão','Mina','POL','Banco','Furos hoje','kg hoje','Último furo','Operador','Situação','Status desde','Status do dia'];agH.forEach((t,c)=>{const cell=ag.getCell(3,c+1);cell.value=t;cell.font={bold:true,color:{argb:'FFFFFFFF'}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF102A43'}};ag.getColumn(c+1).width=[12,16,8,8,10,10,17,18,22,12,48][c];});
+    let agR=4;agoraDados().forEach(c=>c.ps.forEach((e,i)=>{const q=e.p;const row=[c.cam,q.mina||'',q.pol||'',q.banco||'',e.n,Math.round(e.kg)||null,new Date(e.last),((q.cams||{})[c.cam]||{}).oper||'',i?'também hoje':c.est.txt,!i&&c.est.man?new Date(c.est.desde):null,i?'':camOpHist(c.cam).map(o=>hm(o.ts)+' '+OPST[o.s].n+(o.por?' ('+o.por+')':'')).join(' · ')];
+      row.forEach((v,j)=>{if(v!==''&&v!=null)ag.getCell(agR,j+1).value=v;});ag.getCell(agR,7).numFmt='dd/mm/yyyy hh:mm';ag.getCell(agR,10).numFmt='hh:mm';if(!e.last&&!i)ag.getCell(agR,7).value=null;ag.getCell(agR,1).font={bold:true,color:{argb:'FF'+camCor(c.cam).slice(1).toUpperCase()}};agR++;}));
     if(agR===4)ag.getCell('A4').value='Nenhum furo carregado hoje.';
     const li=wb.addWorksheet('Listas',{state:'hidden'});
     [['Status',Object.values(ST).map(v=>v.n)],['Água',Object.values(AGUA_N)],['Produto',PRODUTOS],['Detonador',DETS],['Caminhão',camList]].forEach(([n,arr],c)=>{li.getCell(1,c+1).value=n;arr.forEach((v,r)=>li.getCell(r+2,c+1).value=v);});
@@ -3793,7 +3825,7 @@ function relatorio(p,modo){
     L.push(`• Tempos: ${fmt(tz.t0)} a ${fmt(tz.t1)} ms`);if(tz.rep.length)L.push(`• Tempos repetidos: ${tz.rep.map(([t,v])=>`${fmt(t)} ms (${v.map(x=>x.id).join(', ')})`).join('; ')}`);
     L.push(`• Detonadores com tempo: ${tz.dets}${p.dvtProg!=null?' | DVT programado: '+p.dvtProg+(p.dvtProg===tz.dets?' ✔':' ⚠️'):''}`);}
   const cams=Object.keys(r.cam);
-  if(cams.length){L.push('');L.push('🚛 *Caminhões*');cams.forEach(c=>{const cd=camDif(p,c,Object.values(r.cam[c]).reduce((a,b)=>a+b,0));L.push(`• ${c} – ${Object.entries(r.cam[c]).map(([pr,kg])=>`${pr} ${fmt(kg)} kg`).join(' / ')}${(p.nfs||{})[c]?' – NF '+p.nfs[c]:''}${cd?` – NF x lançado ${cd.txt}${cd.ok?' ✔':' ⚠️'}`:''}`);});}
+  if(cams.length){L.push('');L.push('🚛 *Caminhões*');cams.forEach(c=>{const cd=camDif(p,c,Object.values(r.cam[c]).reduce((a,b)=>a+b,0));const eo=camOpDe(c)?camEstado(c,(agoraDados().find(x=>x.cam===c)||{}).last):null;L.push(`• ${c} – ${Object.entries(r.cam[c]).map(([pr,kg])=>`${pr} ${fmt(kg)} kg`).join(' / ')}${eo&&eo.man?' – '+OPST[eo.k].i+' '+OPST[eo.k].n+' '+hm(eo.desde):''}${(p.nfs||{})[c]?' – NF '+p.nfs[c]:''}${cd?` – NF x lançado ${cd.txt}${cd.ok?' ✔':' ⚠️'}`:''}`);});}
   const ac=acessRows(p,r).filter(a=>a.ret!=null);
   if(ac.length){L.push('');L.push('🧰 *Acessórios (saldo)*');ac.forEach(a=>L.push(`• ${a.n}: retirado ${fmt(a.ret)} | aplicado ${fmt(a.apl)} | devolvido ${fmt(a.dev||0)} | saldo ${fmt(a.saldo)}${a.saldo===0?' ✔':' ⚠️'}`));}
   const oc={};p.holes.forEach(h=>(h.cond||[]).forEach(c=>(oc[c]=oc[c]||[]).push(h.id)));
