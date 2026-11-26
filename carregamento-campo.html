@@ -750,7 +750,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-26.2';
+const APP_VER='2026-11-26.3';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1498,7 +1498,11 @@ let planFlash=null; // furos que acabaram de chegar da planilha (anel pulsando n
 function setCorPor(v){corPor=v;S.ui=Object.assign(S.ui||{},{corPor:v});save();}
 const nf=n=>n===1?'1 furo':n+' furos';
 function rotuloFuro(h){const kg=holeKg(h);return[camsTxt(h),kg?fmt(kg)+' kg':''].filter(Boolean);} // pincel = caminhão sendo marcado no mapa
-function geom(p,crop){
+function espacoFuros(p){ // espaçamento típico: 25% menor das distâncias ao vizinho mais perto (ignora furo duplicado/encostado)
+  const H=p.holes,N=H.length;if(N<2)return 4;const step=Math.max(1,Math.floor(N/400)),nn=[];
+  for(let a=0;a<N;a+=step){let d=Infinity;for(let b=0;b<N;b++){if(a===b)continue;const v=Math.hypot(H[a].x-H[b].x,H[a].y-H[b].y);if(v>0.01&&v<d)d=v;}if(isFinite(d))nn.push(d);}
+  if(!nn.length)return 4;nn.sort((u,v)=>u-v);return nn[Math.floor(nn.length*.25)];}
+function geom(p,crop,robusto){
   const bgOn=!!(p.bg&&p.bg.on!==false);const bgUrl=p.bg?(bgCache[p.id]||null):null;const useBg=bgOn&&!!bgUrl;
   const pts=p.holes.map(h=>[h.x,h.y]);
   if(useBg&&!crop){const m=p.bg.m;[[0,0],[p.bg.w,0],[0,p.bg.h],[p.bg.w,p.bg.h]].forEach(([u,v])=>pts.push([m[0]*u+m[2]*v+m[4],m[1]*u+m[3]*v+m[5]]));}
@@ -1506,7 +1510,7 @@ function geom(p,crop){
   const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
   let dmin=Infinity;const sm=p.holes.slice(0,250);
   for(let a=0;a<sm.length;a++)for(let b=a+1;b<sm.length;b++){const d=Math.hypot(sm[a].x-sm[b].x,sm[a].y-sm[b].y);if(d>0.01&&d<dmin)dmin=d;}
-  if(!isFinite(dmin))dmin=4;const r=dmin*(useBg?0.3:0.36),pad=r*(crop?4:2.2),off=r*1.8;
+  if(!isFinite(dmin))dmin=4;if(robusto)dmin=Math.max(dmin,espacoFuros(p)*0.8);const r=dmin*(useBg?0.3:0.36),pad=r*(crop?4:2.2),off=r*1.8;
   return{bgOn,bgUrl,useBg,minX,minY,r,pad,off,W:maxX-minX+pad*2+off,H:maxY-minY+pad*2,X:x=>x-minX+pad+off,Y:y=>y-minY+pad};
 }
 function corFuro(h){
@@ -1653,10 +1657,25 @@ function ligaSimulacao(p){
 }
 
 /* ----- Croqui em imagem (para WhatsApp / arquivo) ----- */
-async function croquiCanvas(p){
+function rotulosDoFuro(h){return rotulos?(corPor==='tempo'?(temTempo(h)?[(h.tempos&&h.tempos.length>1?h.tempos.map(v=>fmt(v)).join('/'):fmt(h.tempo))+' ms']:[]):rotuloFuro(h)):[];}
+function corRotulo(h,k){return corPor!=='tempo'&&k===0&&camsDoFuro(h).length===1?camCor(camsDoFuro(h)[0]):'#14202b';}
+async function fundoImg(g){return g.useBg?await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=g.bgUrl;}):null;}
+function desenhaFuros(x,p,g,im,vetor){ // mapa em unidades do polígono (o chamador já fez scale/translate/clip)
+    const r=g.r;
+    if(im){x.save();x.translate(g.pad+g.off-g.minX,g.pad-g.minY);const m=p.bg.m;x.transform(m[0],m[1],m[2],m[3],m[4],m[5]);x.globalAlpha=.95;x.drawImage(im,0,0,p.bg.w,p.bg.h);x.restore();}
+    p.holes.forEach(h=>{const cx=g.X(h.x),cy=g.Y(h.y);x.beginPath();x.arc(cx,cy,r,0,7);x.fillStyle=corFuro(h);x.globalAlpha=im?.88:1;x.fill();
+      {const cs=camsDoFuro(h);if(corPor==='caminhao'&&cs.length>1&&h.status!=='perdido'&&h.status!=='nao'){x.beginPath();x.moveTo(cx,cy-r);x.arc(cx,cy,r*.92,-Math.PI/2,Math.PI/2);x.closePath();x.fillStyle=camCor(cs[1]);x.fill();}}x.globalAlpha=1;
+      const ag=h.agua!=='seca';x.lineWidth=ag?r*.32:r*.12;x.strokeStyle=ag?'#1971c2':'#fff';x.stroke();
+      if(vetor)return; // números e rótulos vão como texto no PDF (nítidos em qualquer zoom)
+      const t=numFuro(h),em=Math.min(r*.8,1.8*r/(t.length*.58));x.font=`bold ${em}px system-ui,sans-serif`;x.textAlign='center';x.lineJoin='round';x.lineWidth=em*.14;x.strokeStyle='rgba(16,24,32,.8)';x.strokeText(t,cx,cy+em*.36);x.fillStyle='#fff';x.fillText(t,cx,cy+em*.36);
+      rotulosDoFuro(h).forEach((t,k)=>{const yy=cy+r*(1.5+k*.56);x.font=`bold ${r*.5}px system-ui,sans-serif`;x.lineWidth=r*.15;x.strokeStyle='#fff';x.strokeText(t,cx,yy);x.fillStyle=corRotulo(h,k);x.fillText(t,cx,yy);});});
+}
+function numFuro(h){return String(h.n!=null?h.n:h.id).slice(-4);}
+async function croquiCanvas(p,vetor){
     if(p.bg&&!(p.id in bgCache))await bgGet(p.id);
-    const g=geom(p,true),r=g.r;
-    const K=Math.min(2600/g.W,40/r,6000/g.H);           // px por unidade
+    const g=geom(p,true,true),r=g.r;
+    let K=Math.min(Math.max(2600/g.W,22/r),4200/g.W,40/r,6000/g.H);           // px por unidade (furo com raio ≥ 22 px quando cabe)
+    {const a=(Math.max(1100,g.W*K))*(g.H*K+600);if(a>15e6)K*=Math.sqrt(15e6/a);} // limite de memória do canvas no celular
     const res=resumo(p);
     const cams=camsPoly(p).sort();
     const legL=corPor==='tempo'?5:corPor==='caminhao'?Math.max(1,cams.length)+3:corPor==='desvio'?Object.keys(DV).length+2:corPor==='area'?areasLista(p).length+1:Object.keys(ST).length+1;
@@ -1667,14 +1686,8 @@ async function croquiCanvas(p){
     x.fillStyle='#fff';x.font='bold 40px system-ui,sans-serif';x.fillText(`Croqui de carregamento – POL ${p.pol}`,30,52);
     x.font='26px system-ui,sans-serif';x.fillText(`${p.mina}${p.cava?' / '+p.cava:''}${p.banco?' · Banco '+p.banco:''} · ${brDate(p.data)}${p.resp?' · '+p.resp:''} · ${corPor==='caminhao'?'cor por caminhão':corPor==='desvio'?'projeto x executado':corPor==='area'?'áreas do plano de fogo':corPor==='tempo'?'tempos de detonação':'cor por status'}`,30,92);
     x.save();x.translate(0,top);x.scale(K,K);x.beginPath();x.rect(0,0,g.W,g.H);x.clip();
-    if(g.useBg){const im=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=g.bgUrl;});
-      x.save();x.translate(g.pad+g.off-g.minX,g.pad-g.minY);const m=p.bg.m;x.transform(m[0],m[1],m[2],m[3],m[4],m[5]);x.globalAlpha=.95;x.drawImage(im,0,0,p.bg.w,p.bg.h);x.restore();}
-    p.holes.forEach(h=>{const cx=g.X(h.x),cy=g.Y(h.y);x.beginPath();x.arc(cx,cy,r,0,7);x.fillStyle=corFuro(h);x.globalAlpha=g.useBg?.88:1;x.fill();
-      {const cs=camsDoFuro(h);if(corPor==='caminhao'&&cs.length>1&&h.status!=='perdido'&&h.status!=='nao'){x.beginPath();x.moveTo(cx,cy-r);x.arc(cx,cy,r*.92,-Math.PI/2,Math.PI/2);x.closePath();x.fillStyle=camCor(cs[1]);x.fill();}}x.globalAlpha=1;
-      const ag=h.agua!=='seca';x.lineWidth=ag?r*.32:r*.12;x.strokeStyle=ag?'#1971c2':'#fff';x.stroke();
-      x.fillStyle='#fff';x.font=`bold ${r*.8}px system-ui,sans-serif`;x.textAlign='center';x.fillText(String(h.n!=null?h.n:h.id).slice(-4),cx,cy+r*.3);
-      if(rotulos)(corPor==='tempo'?(temTempo(h)?[(h.tempos&&h.tempos.length>1?h.tempos.map(v=>fmt(v)).join('/'):fmt(h.tempo))+' ms']:[]):rotuloFuro(h)).forEach((t,k)=>{const yy=cy+r*(1.5+k*.56);x.font=`bold ${r*.5}px system-ui,sans-serif`;x.lineWidth=r*.15;x.strokeStyle='#fff';x.strokeText(t,cx,yy);x.fillStyle=corPor!=='tempo'&&k===0&&camsDoFuro(h).length===1?camCor(camsDoFuro(h)[0]):'#14202b';x.fillText(t,cx,yy);});});
-    x.restore();x.textAlign='left';
+    const im=await fundoImg(g);desenhaFuros(x,p,g,im,vetor);
+    x.restore();x.textAlign='left';c.mapa={g,K,top,im};
     let y=top+Math.round(g.H*K)+30;x.fillStyle='#102a43';x.font='bold 28px system-ui,sans-serif';x.fillText('Legenda',30,y);y+=40;x.font='24px system-ui,sans-serif';
     const item=(cor,txt)=>{x.fillStyle=cor;x.beginPath();x.arc(46,y-8,13,0,7);x.fill();x.fillStyle='#14202b';x.fillText(txt,72,y);y+=44;};
     if(corPor==='caminhao'){
@@ -1693,31 +1706,70 @@ async function croquiCanvas(p){
 }
 /* ----- Croqui em PDF (A4 ou A3), gerado direto no celular ----- */
 function croquiPdfMenu(p){
-  let fol=(S.ui&&S.ui.pdfFolha)||'a4',cor=corPor==='caminhao'?'caminhao':'status';
+  let fol=(S.ui&&S.ui.pdfFolha)||'a4',cor=corPor==='caminhao'?'caminhao':'status',amp=!(S.ui&&S.ui.pdfAmp===false);
   const draw=()=>{openSheet(`<h3>Croqui em PDF<button class="btn sm" id="cpX">Fechar</button></h3>
     <p class="mut" style="margin:0 0 8px">Sai só o croqui: cabeçalho (mina, POL, data), o mapa com o croqui de fundo e a legenda. Funciona sem internet.</p>
+    <label>Números dos furos</label><div class="seg" id="cpA"><button data-a="1" class="${amp?'on':''}">Grandes (ampliadas)</button><button data-a="0" class="${amp?'':'on'}">Só 1 folha</button></div>
+    <p class="mut" style="margin:4px 0 8px;font-size:12px">Com muitos furos (ex.: foto do drone) a folha 1 mostra o mapa inteiro e as folhas seguintes mostram cada parte ampliada, com o número de cada furo bem legível.</p>
     <label>Tamanho da folha</label><div class="seg" id="cpF"><button data-f="a4" class="${fol==='a4'?'on':''}">A4</button><button data-f="a3" class="${fol==='a3'?'on':''}">A3</button></div>
     <label>Cores dos furos</label><div class="seg" id="cpC"><button data-c="status" class="${cor==='status'?'on':''}">Status</button><button data-c="caminhao" class="${cor==='caminhao'?'on':''}">Caminhão</button><button data-c="desvio" class="${cor==='desvio'?'on':''}">Projeto</button><button data-c="tempo" class="${cor==='tempo'?'on':''}">Tempo</button></div>
     <div class="btns"><button class="btn pri" id="cpGo" style="min-height:52px">📄 Gerar PDF ${fol.toUpperCase()}</button></div>`);
     $('#cpX').onclick=closeSheet;
     document.querySelectorAll('#cpF button').forEach(b=>b.onclick=()=>{fol=b.dataset.f;draw();});
     document.querySelectorAll('#cpC button').forEach(b=>b.onclick=()=>{cor=b.dataset.c;draw();});
-    $('#cpGo').onclick=()=>{S.ui=Object.assign(S.ui||{},{pdfFolha:fol});save();closeSheet();croquiPdf(p,fol,cor);};};
+    document.querySelectorAll('#cpA button').forEach(b=>b.onclick=()=>{amp=b.dataset.a==='1';draw();});
+    $('#cpGo').onclick=()=>{S.ui=Object.assign(S.ui||{},{pdfFolha:fol,pdfAmp:amp});save();closeSheet();croquiPdf(p,fol,cor,amp);};};
   draw();
 }
-async function croquiPdf(p,folha,cor){
+function pdfTxt(doc,t,x,y,em,fill,stroke,lw){ // texto com contorno (contorno embaixo, preenchimento por cima)
+  doc.setFontSize(em*2.835);doc.setLineWidth(lw);doc.setDrawColor(stroke);doc.setTextColor(stroke);doc.text(t,x,y,{align:'center',renderingMode:'stroke'});
+  doc.setTextColor(fill);doc.text(t,x,y,{align:'center',renderingMode:'fill'});}
+function pdfFuros(doc,p,g,toMM,s,box){ // números (e rótulos) dos furos como texto do PDF: nítidos em qualquer zoom
+  const r=g.r*s;doc.setFont('helvetica','bold');doc.setLineJoin('round');
+  p.holes.forEach(h=>{const [X,Y]=toMM(g.X(h.x),g.Y(h.y));if(box&&(X<box[0]||X>box[2]||Y<box[1]||Y>box[3]))return;
+    const t=numFuro(h),em=Math.min(r*.8,1.8*r/(t.length*.58));pdfTxt(doc,t,X,Y+em*.36,em,"#ffffff","#101820",em*.1);
+    rotulosDoFuro(h).forEach((t2,k)=>{const e2=r*.5;pdfTxt(doc,t2,X,Y+r*(1.5+k*.56),e2,corRotulo(h,k),'#ffffff',e2*.28);});});
+  doc.setTextColor(0);doc.setDrawColor(0);doc.setLineWidth(.2);}
+async function croquiPdf(p,folha,cor,ampliar){
   busy('Gerando PDF do croqui…');const antes=corPor;
   try{
     const jsPDF=await loadJsPdf();
-    if(cor)corPor=cor;let c;try{c=await croquiCanvas(p);}finally{corPor=antes;}
-    const land=c.width>=c.height;const doc=new jsPDF({orientation:land?'landscape':'portrait',unit:'mm',format:folha||'a4',compress:true});
+    if(cor)corPor=cor;
+    try{
+    const c=await croquiCanvas(p,true);const {g,top,K,im}=c.mapa;
+    const land=c.width>=c.height,fol=folha||'a4',ori=land?'landscape':'portrait';const doc=new jsPDF({orientation:ori,unit:'mm',format:fol,compress:true});
     const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),m=8;
-    const k=Math.min((W-2*m)/c.width,(H-2*m-5)/c.height);const w=c.width*k,h=c.height*k;
-    doc.addImage(c.toDataURL('image/jpeg',.92),'JPEG',(W-w)/2,m,w,h,undefined,'FAST');
-    doc.setFontSize(7);doc.setTextColor(120);doc.text(`Carregamento de Campo · POL ${p.pol} · gerado em ${new Date().toLocaleString('pt-BR')}`,m,H-4);
+    const k=Math.min((W-2*m)/c.width,(H-2*m-5)/c.height);const w=c.width*k,h=c.height*k,ox=(W-w)/2,oy=m;
+    doc.addImage(c.toDataURL('image/jpeg',.9),'JPEG',ox,oy,w,h,undefined,'FAST');
+    const s0=K*k,toMM0=(u,v)=>[ox+u*s0,oy+top*k+v*s0];pdfFuros(doc,p,g,toMM0,s0,null);
+    // folhas ampliadas: quando o furo sai pequeno na folha inteira, divide o mapa em partes com número legível (~2,5 mm)
+    const alvo=2.8,partes=[];
+    if(ampliar!==false&&g.r*s0<alvo*.8){
+      const hd=11,Aw=W-2*m,Ah=H-2*m-hd-5,ov=g.r*2;let s1=alvo/g.r,nx,ny;
+      for(let i=0;i<30;i++){nx=Math.max(1,Math.ceil(g.W*s1/Aw));ny=Math.max(1,Math.ceil(g.H*s1/Ah));if(nx*ny<=24)break;s1*=.9;}
+      const tw=g.W/nx,th=g.H/ny;s1=Math.min(Aw/(tw+2*ov),Ah/(th+2*ov));
+      for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const u0=i*tw,v0=j*th,n=p.holes.filter(hh=>{const u=g.X(hh.x),v=g.Y(hh.y);return u>=u0&&u<u0+tw&&v>=v0&&v<v0+th;}).length;if(n)partes.push({u0,v0,n});}
+      // quadros das partes na folha 1
+      partes.forEach((t,i)=>{const [a,b]=toMM0(t.u0,t.v0);doc.setDrawColor('#f08c00');doc.setLineWidth(.5);doc.setLineDashPattern([1.5,1],0);doc.rect(a,b,tw*s0,th*s0);doc.setLineDashPattern([],0);
+        doc.setFont('helvetica','bold');pdfTxt(doc,String(i+1),a+3,b+4.2,4,'#f08c00','#ffffff',.9);});
+      for(let i=0;i<partes.length;i++){const t=partes[i];busy(`Gerando PDF do croqui… parte ${i+1} de ${partes.length}`);
+        doc.addPage(fol,ori);
+        doc.setFillColor('#102a43');doc.rect(m,m,W-2*m,hd-2,'F');doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor('#ffffff');
+        doc.text(`Croqui POL ${p.pol} – parte ${i+1} de ${partes.length} (ampliada) · ${nf(t.n)}`,m+3,m+6);
+        doc.setFont('helvetica','normal');doc.setFontSize(8);doc.text('Legenda e mapa inteiro na folha 1',W-m-3,m+6,{align:'right'});
+        const U0=t.u0-ov,V0=t.v0-ov,UW=tw+2*ov,VH=th+2*ov,wm=UW*s1,hm=VH*s1,x1=m+(Aw-wm)/2,y1=m+hd+(Ah-hm)/2;
+        const PX=Math.min(8,3600/wm,3600/hm),cv=document.createElement('canvas');cv.width=Math.round(wm*PX);cv.height=Math.round(hm*PX);
+        const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);const q=s1*PX;x.save();x.scale(q,q);x.translate(-U0,-V0);x.beginPath();x.rect(0,0,g.W,g.H);x.clip();desenhaFuros(x,p,g,im,true);x.restore();
+        doc.addImage(cv.toDataURL('image/jpeg',.88),'JPEG',x1,y1,wm,hm,undefined,'FAST');cv.width=cv.height=1;
+        pdfFuros(doc,p,g,(u,v)=>[x1+(u-U0)*s1,y1+(v-V0)*s1],s1,[x1,y1,x1+wm,y1+hm]);
+        doc.setDrawColor('#f08c00');doc.setLineWidth(.4);doc.rect(x1,y1,wm,hm);
+        doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(120);doc.text(`Carregamento de Campo · POL ${p.pol} · parte ${i+1}/${partes.length}`,m,H-4);}
+      doc.setPage(1);}
+    doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(120);doc.text(`Carregamento de Campo · POL ${p.pol} · gerado em ${new Date().toLocaleString('pt-BR')}${partes.length?` · partes ampliadas nas folhas 2 a ${partes.length+1}`:''}`,m,H-4);
     doc.setProperties({title:`Croqui POL ${p.pol}`,subject:`${p.mina||''} ${brDate(p.data)}`});
     const blob=doc.output('blob');busy();
-    await entregarArquivo(blob,`croqui-POL${p.pol}-${p.data||today()}-${(folha||'a4').toUpperCase()}.pdf`,'application/pdf');
+    await entregarArquivo(blob,`croqui-POL${p.pol}-${p.data||today()}-${fol.toUpperCase()}.pdf`,'application/pdf');
+    }finally{corPor=antes;}
   }catch(e){corPor=antes;busy();console.error(e);toast(/internet|carregar/i.test(e&&e.message||'')?'Não consegui abrir o gerador de PDF. Abra o app uma vez com internet.':'Não consegui gerar o PDF');}
 }
 async function exportCroqui(p){
