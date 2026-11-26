@@ -750,7 +750,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-26.3';
+const APP_VER='2026-11-26.4';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1228,6 +1228,18 @@ function notaFuros(d,W,H,R){const n=W*H,q=new Float32Array(n),dk=new Float32Arra
 // contraste local: furo fraco numa parte da foto (terra vermelha, sombra) conta tanto quanto furo forte em outra parte
 function contrasteLocal(s,W,H,R){const n=W*H,a=new Float32Array(n);let tot=0;for(let i=0;i<n;i++){a[i]=Math.max(0,s[i]);tot+=a[i];}
   const m=borrar(a,W,H,5*R),c=0.25*tot/n+1e-6,o=new Float32Array(n);for(let i=0;i<n;i++)o[i]=s[i]/(m[i]+c);return o;}
+// direções das linhas de furo (malha da bancada): ângulos dos vizinhos que mais se repetem, com o passo de cada uma
+function linhasDaMalha(Q,d0){const NB=36,h=new Float32Array(NB),V=[];
+  Q.forEach((a,i)=>Q.forEach((b,j)=>{if(j<=i)return;const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d<0.7*d0||d>1.75*d0)return;let t=Math.atan2(dy,dx);if(t<0)t+=Math.PI;if(t>=Math.PI)t-=Math.PI;V.push({t,d});h[Math.floor(t/Math.PI*NB)%NB]++;}));
+  const hs=Array.from(h,(v,i)=>v+0.5*(h[(i+1)%NB]+h[(i+NB-1)%NB])),mx=Math.max(...hs,0);if(!mx)return[];
+  const pk=[];hs.forEach((v,i)=>{if(v>=0.35*mx&&v>=hs[(i+1)%NB]&&v>hs[(i+NB-1)%NB])pk.push({i,v});});pk.sort((a,b)=>b.v-a.v);
+  const out=[];for(const p of pk){if(out.length>=3)break;
+    const S=V.filter(o=>{let dd=Math.abs(o.t-(p.i+0.5)/NB*Math.PI);dd=Math.min(dd,Math.PI-dd);return dd<1.5*Math.PI/NB;});if(S.length<4)continue;
+    const t=Math.atan2(S.reduce((a,o)=>a+Math.sin(2*o.t),0),S.reduce((a,o)=>a+Math.cos(2*o.t),0))/2;
+    if(out.some(o=>{let dd=Math.abs(o.t-t);dd=Math.min(dd,Math.PI-dd);return dd<0.3;}))continue;
+    const ds=S.map(o=>o.d).sort((a,b)=>a-b),p25=ds[Math.floor(ds.length*0.25)],cur=ds.filter(d=>d<1.3*p25);
+    out.push({t,ux:Math.cos(t),uy:Math.sin(t),L:cur[cur.length>>1]});}
+  return out;}
 // im: Image; area: [[x,y],...] em px da foto (opcional). Devolve furos em px da foto.
 function furosNaFoto(im,area){
   const IW=im.naturalWidth,IH=im.naturalHeight;
@@ -1250,7 +1262,7 @@ function furosNaFoto(im,area){
       const forca=P.reduce((a,q)=>a+q.v,0)/P.length/p99;
       if(raz<3||raz>8)continue; // pico colado no outro = textura, não furo
       const nota=reg**4*forca*Math.pow(P.length,0.35); // malha regular pesa mais que quantidade (chão com textura dá muito pico)
-      cands.push({nota,reg,n:P.length,k,W,H,dat,R0,P,d0:med/k,fr,Rf,P0});}}
+      cands.push({nota,reg,n:P.length,k,W,H,dat,R0,P,d0:med/k,fr,Rf,P0,s});}}
   // fica com a leitura de malha mais regular; troca pela que acha muito mais furos se a malha dela for quase tão regular
   if(cands.length){const mx=Math.max(...cands.map(c=>c.nota)),top=cands.find(c=>c.nota===mx),mais=cands.filter(c=>c.nota>=0.6*mx&&c.reg>=0.68).sort((a,b)=>b.n-a.n)[0];
     best=mais&&mais.n>=1.4*top.n?mais:top; // só troca se achar bem mais furos (foto com furo forte numa parte e fraco na outra)
@@ -1305,19 +1317,117 @@ function furosNaFoto(im,area){
       if(!ok&&!q.v&&q.dot>=0.8*dm&&q.iso>=0.8*isoM&&V.length>=1)ok=true; // ponto preto bem marcado e isolado: basta um vizinho na distância da malha
       if(ok){q.duv=true;P.push(q);pega.add(q);novo++;}});if(!novo)break;}
   }
+  // 6) PONTO PRETO DO FURO na foto em tamanho cheio (na foto reduzida o ponto some e o furo sem mancha forte fica de fora)
+  const FW=aw,FH=ah,LU=new Float32Array(FW*FH),AM=new Uint8Array(FW*FH); // AM: amarelo de máquina (perfuratriz, caminhão)
+  {const c=document.createElement('canvas');c.width=FW;c.height=FH;const g=c.getContext('2d');g.drawImage(im,bx0,by0,aw,ah,0,0,aw,ah);const D=g.getImageData(0,0,FW,FH).data;for(let i=0;i<FW*FH;i++){const r=D[i*4],gg=D[i*4+1],b=D[i*4+2];LU[i]=(r+gg+b)/3;if(r>150&&gg>150&&b<0.6*gg)AM[i]=1;}}
+  const rd=Math.max(1,Math.round(0.16*R/k)),BM=(()=>{const I=new Float64Array((FW+1)*(FH+1));for(let y=0;y<FH;y++){let a=0;for(let x=0;x<FW;x++){a+=LU[y*FW+x];I[(y+1)*(FW+1)+x+1]=I[y*(FW+1)+x+1]+a;}}
+    const o=new Float32Array(FW*FH);for(let y=0;y<FH;y++)for(let x=0;x<FW;x++){const x0=Math.max(0,x-rd),x1=Math.min(FW,x+rd+1),y0=Math.max(0,y-rd),y1=Math.min(FH,y+rd+1);o[y*FW+x]=(I[y1*(FW+1)+x1]-I[y0*(FW+1)+x1]-I[y1*(FW+1)+x0]+I[y0*(FW+1)+x0])/((x1-x0)*(y1-y0));}return o;})();
+  const NA=24,anel=[];for(let i=0;i<NA;i++){const t=i/NA*2*Math.PI;anel.push([Math.cos(t),Math.sin(t)]);}
+  const r1=Math.max(3,2.6*rd),r2=Math.max(4.5,4.2*rd);
+  const ponto=(x,y)=>{ // c: quanto o ponto é mais escuro que a volta; iso: até o lado mais escuro da volta é mais claro (risco e trinca não passam)
+    const v=BM[y*FW+x],rv=[];for(const r of [r1,r2])for(const [cx,cy] of anel){const xx=Math.round(x+r*cx),yy=Math.round(y+r*cy);if(xx<0||yy<0||xx>=FW||yy>=FH)continue;rv.push(BM[yy*FW+xx]);}
+    if(rv.length<NA)return{c:0,iso:0,esp:99};rv.sort((a,b)=>a-b);const c=rv.reduce((a,b)=>a+b,0)/rv.length-v;return{c,iso:rv[Math.floor(rv.length*0.2)]-v,esp:(rv[Math.floor(rv.length*0.85)]-rv[Math.floor(rv.length*0.15)])/Math.max(1,c)};};
+  const pretoPerto=(x,y,r)=>{const cx=Math.round(x-bx0),cy=Math.round(y-by0);let mn=Infinity,mx=cx,my=cy;for(let yy=Math.max(0,cy-Math.ceil(r));yy<=Math.min(FH-1,cy+Math.ceil(r));yy++)for(let xx=Math.max(0,cx-Math.ceil(r));xx<=Math.min(FW-1,cx+Math.ceil(r));xx++){if((xx-cx)**2+(yy-cy)**2>r*r)continue;const v=BM[yy*FW+xx];if(v<mn){mn=v;mx=xx;my=yy;}}
+    return{x:mx,y:my,...ponto(mx,my)};};
+  P.forEach(q=>{const o=pretoPerto(q.x,q.y,0.3*d0);q.pc=o.c;q.pi=o.iso;q.pe=o.esp;q.pX=o.x+bx0;q.pY=o.y+by0;});
+  const cM=mediana(P.filter(q=>!q.duv).map(q=>q.pc)),iM=mediana(P.filter(q=>!q.duv).map(q=>q.pi));
+  const temPonto=cM>=18&&iM>=8; // a foto mostra o ponto preto dos furos
+  let PT=[];if(temPonto){const rs=Math.max(2,Math.round(0.22*d0)),thr=0.35*cM,dentroF=(x,y)=>!area||area.length<3||noPoli(x+bx0,y+by0,area);
+    const BG=new Float32Array(FW*FH);{const rb=Math.round(r2);const I=new Float64Array((FW+1)*(FH+1));for(let y=0;y<FH;y++){let a=0;for(let x=0;x<FW;x++){a+=LU[y*FW+x];I[(y+1)*(FW+1)+x+1]=I[y*(FW+1)+x+1]+a;}}
+      for(let y=0;y<FH;y++)for(let x=0;x<FW;x++){const x0=Math.max(0,x-rb),x1=Math.min(FW,x+rb+1),y0=Math.max(0,y-rb),y1=Math.min(FH,y+rb+1);BG[y*FW+x]=(I[y1*(FW+1)+x1]-I[y0*(FW+1)+x1]-I[y1*(FW+1)+x0]+I[y0*(FW+1)+x0])/((x1-x0)*(y1-y0));}}
+    for(let y=rs;y<FH-rs;y++)for(let x=rs;x<FW-rs;x++){const v=BM[y*FW+x];if(BG[y*FW+x]-v<thr)continue;let mn=true;
+      for(let yy=y-rs;yy<=y+rs&&mn;yy++)for(let xx=x-rs;xx<=x+rs;xx++){const z=BM[yy*FW+xx];if(z<v||(z===v&&(yy<y||(yy===y&&xx<x)))){mn=false;break;}}
+      if(!mn||!dentroF(x,y))continue;const o=ponto(x,y);if(o.c<0.4*cM||o.iso<0.4*iM||o.esp>0.65)continue; // esp alto: volta manchada (pedra, cascalho), não é furo
+      let nb=0,nt=0;const cr=Math.ceil(1.6*r2),lb=Math.min(250,claro+25);for(let yy=Math.max(0,y-cr);yy<=Math.min(FH-1,y+cr);yy++)for(let xx=Math.max(0,x-cr);xx<=Math.min(FW-1,x+cr);xx++){nt++;if(LU[yy*FW+xx]>=lb||AM[yy*FW+xx])nb++;} // carro/máquina: muito branco em volta (o pó claro do furo não chega a isso)
+      if(nb<0.06*nt)PT.push({x:x+bx0,y:y+by0,c:o.c,iso:o.iso,esp:o.esp});}}
+  // o furo já achado vai para o seu ponto preto (a mancha de pó nem sempre fica centrada no furo); cada ponto serve a um furo só
+  if(temPonto){const pares=[];P.forEach(q=>PT.forEach(t=>{const d=Math.hypot(t.x-q.x,t.y-q.y);if(d<0.45*d0&&t.c>=0.45*cM&&t.iso>=0.45*iM&&t.esp<=0.65)pares.push({q,t,d});}));
+    const usQ=new Set,usT=new Set;pares.sort((a,b)=>a.d-b.d).forEach(({q,t})=>{if(usQ.has(q)||usT.has(t))return;usQ.add(q);usT.add(t);Object.assign(q,{x:t.x,y:t.y,pX:t.x,pY:t.y,pc:t.c,pi:t.iso,pe:t.esp,ponto:true});});}
+  // furo novo pelo ponto preto: não pode ser o ponto de um furo que já está marcado
+  const livre=(x,y)=>!P.some(o=>Math.hypot(o.x-x,o.y-y)<0.55*d0&&(Math.hypot(o.pX-x,o.pY-y)<0.4*d0||Math.hypot(o.x-x,o.y-y)<0.4*d0));
+  const novoPonto=(t,extra)=>{const sx=Math.round((t.x-bx0)*k),sy=Math.round((t.y-by0)*k);const q=medir({x:t.x,y:t.y,sx:Math.min(W-2,Math.max(1,sx)),sy:Math.min(H-2,Math.max(1,sy)),v:best.s[Math.min(H-1,Math.max(0,sy))*W+Math.min(W-1,Math.max(0,sx))]});
+    Object.assign(q,{x:t.x,y:t.y,pX:t.x,pY:t.y,pc:t.c,pi:t.iso,pe:t.esp,duv:true,ponto:true,novo:true},extra||{});return q;};
+  // 7) LINHAS DE FURO da bancada: a malha tem 2 ou 3 direções fixas (espaçamento, afastamento e, no pé-de-galinha, a diagonal).
+  //    Segue cada linha de furo em furo; buraco na linha (passo dobrado) ou ponta da linha = lugar onde DEVE ter furo.
+  //    Só põe furo ali se a foto mostrar marca (ponto preto ou mancha) no lugar previsto. Sem marca, não põe nada.
+  //    Furo achado fora das linhas da malha fica laranja (duvidoso) para a pessoa olhar.
+  const LM=linhasDaMalha(P.filter(q=>!q.duv).length>=8?P.filter(q=>!q.duv):P,d0);
+  const apoio=q=>{let n=0;LM.forEach(dr=>[1,-1].forEach(sg=>{const ex=q.x+sg*dr.L*dr.ux,ey=q.y+sg*dr.L*dr.uy;if(P.some(o=>o!==q&&Math.hypot(o.x-ex,o.y-ey)<0.3*dr.L))n++;}));return n;};
+  if(LM.length&&P.length>=8){
+    const SM=best.s,dentroF=(x,y)=>!area||area.length<3||noPoli(x,y,area);
+    const vmC=mediana(P.filter(q=>!q.duv).map(q=>q.v||0))||mediana(P.map(q=>q.v||0)),dmC=mediana(P.filter(q=>!q.duv).map(q=>q.dot||0));
+    const pertoDe=(x,y,lim)=>P.some(o=>Math.hypot(o.x-x,o.y-y)<lim);
+    for(let it=0;it<4;it++){
+      const prev=[]; // lugares previstos pelas linhas {x,y,w}
+      const addPrev=(x,y,w)=>{if(!dentroF(x,y)||pertoDe(x,y,0.5*d0))return;const o=prev.find(o=>Math.hypot(o.x-x,o.y-y)<0.35*d0);if(o){o.w+=w;o.x=(o.x+x)/2;o.y=(o.y+y)/2;}else prev.push({x,y,w});};
+      LM.forEach(dr=>{const L=dr.L;
+        P.forEach(a=>{ // passo seguinte na linha, a partir de a (só para a frente)
+          let melhor=null,bc=Infinity;
+          for(const b of P){if(b===a)continue;const rx=b.x-a.x,ry=b.y-a.y,d=Math.hypot(rx,ry),f=d/L;if(f<0.7||f>3.35)continue;
+            const cs=(rx*dr.ux+ry*dr.uy)/d;if(cs<Math.cos(0.26))continue; // até ~15° de desvio
+            const nst=Math.round(f);if(Math.abs(f-nst)>0.3*(nst===1?1:0.8))continue;
+            const c=nst*10+Math.abs(f-nst)+(1-cs)*5;if(c<bc){bc=c;melhor={b,nst,rx,ry};}}
+          if(!melhor){ // ponta da linha: a linha vem de trás (2 furos atrás) e prevê 1 passo à frente
+            const atras=z=>P.find(b=>{if(b===z||b===a)return false;const rx=z.x-b.x,ry=z.y-b.y,d=Math.hypot(rx,ry),f=d/L;return f>0.75&&f<1.3&&(rx*dr.ux+ry*dr.uy)/d>Math.cos(0.22);});
+            const t1=atras(a),t2=t1&&atras(t1);if(t2)addPrev(2*a.x-t1.x,2*a.y-t1.y,1);
+            return;}
+          if(melhor.nst>1)for(let j=1;j<melhor.nst;j++)addPrev(a.x+melhor.rx*j/melhor.nst,a.y+melhor.ry*j/melhor.nst,2); // buraco na linha
+        });});
+      let novo=0;
+      prev.sort((a,b)=>b.w-a.w).forEach(pv=>{if(pertoDe(pv.x,pv.y,0.5*d0))return;
+        const forte=pv.w>=2; // previsto por buraco na linha ou por mais de uma linha
+        // a) ponto preto perto do lugar previsto
+        if(temPonto){const t=PT.filter(t=>Math.hypot(t.x-pv.x,t.y-pv.y)<0.28*d0&&t.c>=(forte?0.45:0.6)*cM&&t.iso>=(forte?0.45:0.6)*iM&&t.esp<=(forte?0.6:0.5)&&livre(t.x,t.y)).sort((a,b)=>b.c-a.c)[0];
+          if(t){P.push(novoPonto(t,{linha:true}));novo++;return;}
+          return;} // a foto mostra o ponto preto dos furos e aqui não tem: não põe nada
+        // b) mancha (pó da perfuração) perto do lugar previsto
+        const cx=(pv.x-bx0)*k,cy=(pv.y-by0)*k,rr=Math.max(2,0.28*d0*k);let bv=-Infinity,bx=cx,by=cy;
+        for(let y=Math.max(1,Math.floor(cy-rr));y<=Math.min(H-2,Math.ceil(cy+rr));y++)for(let x=Math.max(1,Math.floor(cx-rr));x<=Math.min(W-2,Math.ceil(cx+rr));x++){if((x-cx)**2+(y-cy)**2>rr*rr)continue;const v=SM[y*W+x];if(v>bv){bv=v;bx=x;by=y;}}
+        const q=medir({x:bx/k+bx0,y:by/k+by0,sx:bx,sy:by,v:bv});
+        if(pertoDe(q.x,q.y,0.5*d0)||q.claro>0.1)return;
+        const o=pretoPerto(q.x,q.y,0.3*d0);q.pc=o.c;q.pi=o.iso;q.pX=o.x+bx0;q.pY=o.y+by0;
+        const okV=bv>=(forte?0.3:0.45)*vmC,okD=!(dmC>=15)||q.dot>=(forte?0.35:0.5)*dmC;
+        if(okV&&okD){q.duv=true;q.linha=true;q.novo=true;P.push(q);novo++;}});
+      if(!novo)break;}
+  }
+  // 8) ponto preto bem marcado, fora dos lugares previstos (furo duplo, refuro, linha torta): entra laranja se tiver vizinho na malha
+  if(temPonto&&P.length>=8){PT.sort((a,b)=>b.c-a.c).forEach(t=>{const limpo=t.c>=0.55*cM&&t.iso>=0.55*iM&&t.esp<=0.3; // ponto preto limpo: volta lisa (pó do furo)
+    if(!limpo&&(t.c<0.7*cM||t.iso<0.7*iM||t.esp>0.5)||!livre(t.x,t.y))return;
+    const q=novoPonto(t);const viz=P.filter(o=>{const d=Math.hypot(o.x-q.x,o.y-q.y);return d>0.7*d0&&d<1.6*d0;}).length;
+    const ap=apoio(q);if(viz>=2&&(ap>=2||(limpo&&ap>=1)||!LM.length))P.push(q);});}
+  // 9) furo fora das linhas da malha (sem vizinho nas direções da malha) fica laranja; fraco e solto sai
+  if(LM.length&&P.length>=8){const ap=P.map(apoio);
+    P=P.filter((q,i)=>{if(ap[i]>=2)return true;if(ap[i]===0&&q.novo&&!(temPonto&&q.pc>=0.7*cM&&q.pi>=0.7*iM))return false; // posto agora e solto: tira
+      if(temPonto&&((ap[i]===0&&q.pe>0.5)||(ap[i]===1&&q.pe>0.68))&&(q.novo||q.pe>0.75))return false; // fora da malha e sem ponto preto limpo (pedra, cascalho da borda)
+      q.duv=true;q.foraLinha=true;return true;});}
   // o círculo vai para o ponto preto do furo (o centro da mancha nem sempre é o furo)
   {const c=document.createElement('canvas');c.width=aw;c.height=ah;const g=c.getContext('2d');g.drawImage(im,bx0,by0,aw,ah,0,0,aw,ah);const D=g.getImageData(0,0,aw,ah).data;
-    const L=(x,y)=>{const i=(y*aw+x)*4;return D[i]+D[i+1]+D[i+2];};const rr=Math.max(3,Math.round(Math.min(1.7*R/k,0.52*d0))),pr=Math.max(1,Math.round(0.15*R/k));
-    P.forEach(q=>{const cx=Math.round(q.x-bx0),cy=Math.round(q.y-by0);let mn=Infinity,mx=cx,my=cy,sum=0,n=0;
+    const L=(x,y)=>{const i=(y*aw+x)*4;return D[i]+D[i+1]+D[i+2];};const rr=Math.max(3,Math.round(Math.min(1.7*R/k,0.4*d0))),pr=Math.max(1,Math.round(0.15*R/k));
+    P.forEach(q=>{if(q.ponto)return;const cx=Math.round(q.x-bx0),cy=Math.round(q.y-by0);let mn=Infinity,mx=cx,my=cy,sum=0,n=0;
       for(let y=Math.max(pr,cy-rr);y<=Math.min(ah-1-pr,cy+rr);y++)for(let x=Math.max(pr,cx-rr);x<=Math.min(aw-1-pr,cx+rr);x++){if((x-cx)**2+(y-cy)**2>rr*rr)continue;
         let m=0;for(let a=-pr;a<=pr;a++)m+=L(x+a,y)+L(x,y+a);sum+=L(x,y);n++;if(m<mn){mn=m;mx=x;my=y;}}
       let perto=false;const cr=3*pr+2;for(let y=Math.max(0,my-cr);y<=Math.min(ah-1,my+cr)&&!perto;y++)for(let x=Math.max(0,mx-cr);x<=Math.min(aw-1,mx+cr);x++)if(L(x,y)>=3*claro){perto=true;break;} // janela escura de carro não é furo
-      if(n&&!perto&&mn/(4*pr+2)<0.75*sum/n){q.x=mx+bx0;q.y=my+by0;}});} // só move se o ponto for bem mais escuro que a volta
+      if(n&&!perto&&mn/(4*pr+2)<0.75*sum/n&&!P.some(o=>o!==q&&Math.hypot(o.x-(mx+bx0),o.y-(my+by0))<0.35*d0)){q.x=mx+bx0;q.y=my+by0;}});} // só move se o ponto for bem mais escuro que a volta
+  // perto de carro, caminhão ou máquina (muito branco em volta): o escuro pode ser a sombra ou a borda dela
+  {const lb=Math.min(250,claro+25),rb=0.45*d0;P.forEach(q=>{const cx=Math.round(q.x-bx0),cy=Math.round(q.y-by0);let nb=0,nt=0;
+    for(let y=Math.max(0,Math.floor(cy-rb));y<=Math.min(FH-1,Math.ceil(cy+rb));y+=1)for(let x=Math.max(0,Math.floor(cx-rb));x<=Math.min(FW-1,Math.ceil(cx+rb));x+=1){if((x-cx)**2+(y-cy)**2>rb*rb)continue;nt++;if(LU[y*FW+x]>=lb||AM[y*FW+x])nb++;}
+    if(nt&&nb>0.08*nt)q.maq=true;});
+   // muita quina em volta (máquina, pedra solta): o furo tem a volta lisa de pó
+   const rg=0.45*d0,ri=Math.max(r2,0.15*d0),G=P.map(q=>{const cx=Math.round(q.x-bx0),cy=Math.round(q.y-by0);let s=0,n=0;
+     for(let y=Math.max(1,Math.floor(cy-rg));y<=Math.min(FH-2,Math.ceil(cy+rg));y++)for(let x=Math.max(1,Math.floor(cx-rg));x<=Math.min(FW-2,Math.ceil(cx+rg));x++){const d2=(x-cx)**2+(y-cy)**2;if(d2>rg*rg||d2<ri*ri)continue;
+       s+=Math.abs(LU[y*FW+x+1]-LU[y*FW+x-1])+Math.abs(LU[(y+1)*FW+x]-LU[(y-1)*FW+x]);n++;}return n?s/n:0;});
+   const gm=mediana(G.filter((g,i)=>!P[i].duv));P.forEach((q,i)=>{if(gm>0&&G[i]>2*gm){q.maq=true;q.quina=true;}});}
   // duvidoso (laranja na tela): completado pela malha, fraco, perto de coisa clara (máquina) ou colado na borda da área
   const vm2=mediana(P.map(q=>q.v||0)),dm2=mediana(P.map(q=>q.dot||0));
-  const borda=(x,y)=>{if(!area||area.length<3)return false;for(let i=0,j=area.length-1;i<area.length;j=i++){const [x1,y1]=area[j],[x2,y2]=area[i],dx=x2-x1,dy=y2-y1,L2=dx*dx+dy*dy||1,t=Math.max(0,Math.min(1,((x-x1)*dx+(y-y1)*dy)/L2));if(Math.hypot(x1+t*dx-x,y1+t*dy-y)<0.4*d0)return true;}return false;};
-  P.forEach(q=>{if((q.v||0)<0.5*vm2||(q.dot||0)<0.4*dm2||(q.claro||0)>0||borda(q.x,q.y))q.duv=true;});
-  return{furos:P.map(q=>({x:q.x,y:q.y,duv:!!q.duv})),sp:d0};}
+  const borda=(x,y,f=0.4)=>{if(!area||area.length<3)return false;for(let i=0,j=area.length-1;i<area.length;j=i++){const [x1,y1]=area[j],[x2,y2]=area[i],dx=x2-x1,dy=y2-y1,L2=dx*dx+dy*dy||1,t=Math.max(0,Math.min(1,((x-x1)*dx+(y-y1)*dy)/L2));if(Math.hypot(x1+t*dx-x,y1+t*dy-y)<f*d0)return true;}return false;};
+  // amarelo só com prova: ponto preto limpo do furo, em cima das linhas de furo, longe de máquina, pedra e borda
+  const ap9=P.map(q=>LM.length?apoio(q):2),certo=(q,i)=>temPonto&&!q.maq&&!q.foraLinha&&ap9[i]>=2&&q.pc>=0.6*cM&&q.pi>=0.6*iM&&q.pe<=0.45&&!borda(q.x,q.y,0.2);
+  P.forEach((q,i)=>{if(q.maq||(!certo(q,i)&&(q.duv||(q.v||0)<0.5*vm2||(q.dot||0)<0.4*dm2||(q.claro||0)>0||borda(q.x,q.y))))q.duv=true;else q.duv=false;});
+  // pedra solta ou máquina fora das linhas de furo: muita quina e sem vizinho na malha, não é furo
+  if(LM.length)P=P.filter((q,i)=>!(q.quina&&ap9[i]<2));
+  // furo duplo (refuro do lado): o mais fraco do par fica laranja para conferir
+  P.forEach(q=>P.forEach(o=>{if(o!==q&&Math.hypot(o.x-q.x,o.y-q.y)<0.6*d0&&((o.pc||0)<(q.pc||0)||((o.pc||0)===(q.pc||0)&&(o.v||0)<(q.v||0))))o.duv=true;}));
+  return{furos:P.map(q=>({x:q.x,y:q.y,duv:!!q.duv})),sp:d0,dirs:LM};}
 // numera em sequência pela malha: acha as linhas de furos (fileiras), da esquerda para a direita; em cada fileira, de cima para baixo (1, 2, 3…)
 function numerarFuros(P,sp){if(!P.length)return P;
   const n=P.length;if(!sp){sp=n>1?[...nnDist(P)].sort((a,b)=>a-b)[n>>1]:20;}
@@ -1391,7 +1501,7 @@ async function fotoDroneFluxo(){
         $('#fdGo').onclick=()=>{if(area.length<3){toast('Toque em pelo menos 3 cantos da área');return;}busy('Procurando os furos…');
           setTimeout(()=>{try{const R=furosNaFoto(im,area);F=R.furos;sp=R.sp;numerarFuros(F,sp);}catch(e){console.error(e);F=[];}busy();
             if(!F.length)toast('Não achei furos nessa área. Tente contornar de novo.',4000);passo='edit';botoes();desenha();},30);};}
-      else{$('#fdTx').innerHTML='2) Confira. <b style="color:#fde047">Amarelo</b> = furo claro na foto. <b style="color:#f97316">Laranja tracejado</b> = duvidoso (fraco, completado pela linha da malha, perto de máquina ou da borda): olhe um por um. <b>Toque num círculo</b> para tirar, <b>toque onde falta</b> para pôr. Fileira com furo faltando: use <b>📏 Puxar linha</b>. A numeração é refeita sozinha.';
+      else{$('#fdTx').innerHTML='2) Confira. <b style="color:#fde047">Amarelo</b> = furo claro na foto. <b style="color:#f97316">Laranja tracejado</b> = duvidoso (achado seguindo a linha de furos, fora da linha, fraco, perto de máquina, pedra ou da borda): olhe um por um. <b>Toque num círculo</b> para tirar, <b>toque onde falta</b> para pôr. Fileira com furo faltando: use <b>📏 Puxar linha</b>. A numeração é refeita sozinha.';
         if(linha)$('#fdTx').innerHTML=`<b style="color:#22d3ee">Puxar linha:</b> toque em <b>2 furos da mesma fileira</b> (vizinhos ou longe um do outro). O app põe os furos da fileira inteira no mesmo passo, até a borda da área, em laranja.`+(linha.length?' <b>Falta o 2º furo.</b>':'');
         $('#fdB').innerHTML=`<button class="btn" id="fdL" style="${linha?'background:#0e7490;color:#fff':''}">📏 ${linha?'Parar de puxar':'Puxar linha'}</button>${desfaz.length?'<button class="btn" id="fdD">Desfazer linha</button>':''}<button class="btn" id="fdA">Refazer a área</button><button class="btn pri" id="fdOk">Usar estes furos</button>`;
         $('#fdL').onclick=()=>{linha=linha?null:[];botoes();desenha();};
