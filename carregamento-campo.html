@@ -750,7 +750,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-26.4';
+const APP_VER='2026-11-26.5';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1428,8 +1428,11 @@ function furosNaFoto(im,area){
   // furo duplo (refuro do lado): o mais fraco do par fica laranja para conferir
   P.forEach(q=>P.forEach(o=>{if(o!==q&&Math.hypot(o.x-q.x,o.y-q.y)<0.6*d0&&((o.pc||0)<(q.pc||0)||((o.pc||0)===(q.pc||0)&&(o.v||0)<(q.v||0))))o.duv=true;}));
   return{furos:P.map(q=>({x:q.x,y:q.y,duv:!!q.duv})),sp:d0,dirs:LM};}
-// numera em sequência pela malha: acha as linhas de furos (fileiras), da esquerda para a direita; em cada fileira, de cima para baixo (1, 2, 3…)
-function numerarFuros(P,sp){if(!P.length)return P;
+// numera em sequência pela malha: acha as linhas de furos (fileiras); padrão: fileiras da esquerda para a direita, em cada fileira de cima para baixo (1, 2, 3…)
+// o: {c:'se'|'sd'|'ie'|'id' canto do furo 1 (superior/inferior, esquerda/direita), z: zigue-zague (vai e volta), d: 1 = fileira no outro sentido, nm:'seq'|'lf' (1,2,3 ou L1-F1)}
+const NUM_PAD={c:'se',z:false,d:0,nm:'seq'};
+const numOpc=()=>Object.assign({},NUM_PAD,(S.ui&&S.ui.numFuros)||{});
+function numerarFuros(P,sp,o){if(!P.length)return P;o=Object.assign({},NUM_PAD,o||numOpc());
   const n=P.length;if(!sp){sp=n>1?[...nnDist(P)].sort((a,b)=>a-b)[n>>1]:20;}
   const mx=P.reduce((a,q)=>a+q.x,0)/n,my=P.reduce((a,q)=>a+q.y,0)/n;
   let sxx=0,syy=0,sxy=0;P.forEach(q=>{const dx=q.x-mx,dy=q.y-my;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;});
@@ -1444,6 +1447,7 @@ function numerarFuros(P,sp){if(!P.length)return P;
     const sum=V.filter(o=>{let dd=Math.abs(o.t-(i+0.5)/NB*Math.PI);dd=Math.min(dd,Math.PI-dd);return dd<Math.PI/NB*1.5;});
     const t=Math.atan2(sum.reduce((a,o)=>a+Math.sin(2*o.t),0),sum.reduce((a,o)=>a+Math.cos(2*o.t),0))/2;
     const sc=(alongado?Math.abs(Math.sin(t-angL)):Math.abs(Math.sin(t)))*(0.5+0.5*v/hmax);if(sc>bestS){bestS=sc;angC=t;}});
+  if(o.d)angC+=Math.PI/2; // fileira no outro sentido (atravessada)
   let ux=Math.cos(angC),uy=Math.sin(angC);if(Math.abs(uy)>0.3?uy<0:ux<0){ux=-ux;uy=-uy;} // u: ao longo da fileira, para baixo
   let vx=-uy,vy=ux;if(Math.abs(vx)>0.3?vx<0:vy<0){vx=-vx;vy=-vy;} // v: de uma fileira para a outra (esquerda -> direita)
   const L=P.map(q=>({q,u:(q.x-mx)*ux+(q.y-my)*uy,v:(q.x-mx)*vx+(q.y-my)*vy,dn:-1,up:-1}));
@@ -1458,8 +1462,12 @@ function numerarFuros(P,sp){if(!P.length)return P;
       let vv=g.v,du=Infinity;g.cs.forEach(o=>o.c.forEach(z=>{const e=Math.min(Math.abs(z.u-c.u0),Math.abs(z.u-c.u1));if(e<du){du=e;vv=z.v;}}));
       const d=Math.abs((c.u0<g.cs[0].u0?c.c[c.c.length-1].v:c.c[0].v)-vv);if(d<0.75*sp&&du<3*sp&&d<bd){bd=d;bg=g;}});
     if(bg)bg.cs.push(c);else grp.push({v:c.v,cs:[c]});});
-  grp.sort((a,b)=>a.v-b.v);
-  let num=1;grp.forEach(g=>g.cs.sort((a,b)=>a.u0-b.u0).forEach(c=>c.c.forEach(o=>o.q.n=num++)));
+  // canto do furo 1: a 1ª fileira e o 1º furo de cada fileira ficam do lado desse canto
+  const cdx=/d$/.test(o.c)?1:-1,cdy=/^i/.test(o.c)?1:-1,sv=(vx*cdx+vy*cdy)>0?-1:1,su=(ux*cdx+uy*cdy)>0?-1:1;
+  grp.sort((a,b)=>sv*(a.v-b.v));
+  let num=1;grp.forEach((g,gi)=>{let fs=[];g.cs.sort((a,b)=>a.u0-b.u0).forEach(c=>c.c.forEach(z=>fs.push(z)));fs.sort((a,b)=>a.u-b.u);
+    if(su<0)fs.reverse();if(o.z&&gi%2)fs.reverse();
+    fs.forEach((z,fi)=>{z.q.n=num++;z.q.l=gi+1;z.q.f=fi+1;z.q.nome=o.nm==='lf'?`L${gi+1}-F${fi+1}`:String(z.q.n);});});
   return P;}
 // tela: marca a área na foto, o app acha os furos, a pessoa tira/põe e confirma. Devolve dados para o polígono novo.
 async function fotoDroneFluxo(){
@@ -1468,11 +1476,12 @@ async function fotoDroneFluxo(){
   const im=await new Promise((ok,er)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=er;i.src=img.url;});
   const IW=im.naturalWidth,IH=im.naturalHeight;
   return new Promise(fim=>{
-    let passo='area',area=[],F=[],sp=0,z=0,linha=null,desfaz=[];
+    let passo='area',area=[],F=[],sp=0,z=0,linha=null,desfaz=[],numAb=false;
     openSheet(`<h3>Furos da foto do drone<button class="btn sm" id="fdX">Cancelar</button></h3>
       <p id="fdTx" style="margin:0 0 6px"></p>
       <div style="display:flex;gap:6px;margin-bottom:6px"><button class="btn sm" id="fdM">−</button><button class="btn sm" id="fdP">+</button><span class="mut" id="fdN" style="align-self:center;flex:1;text-align:right"></span></div>
       <div id="fdBox" style="overflow:auto;max-height:62vh;border-radius:8px;background:#000;touch-action:pan-x pan-y"><canvas id="fdC" style="display:block"></canvas></div>
+      <div id="fdNum" style="display:none"></div>
       <div class="btns" id="fdB"></div>`);
     const box=$('#fdBox'),c=$('#fdC'),g=c.getContext('2d');
     z=Math.max(0.2,Math.min(3,(box.clientWidth||360)/IW));
@@ -1480,7 +1489,10 @@ async function fotoDroneFluxo(){
       if(area.length){g.strokeStyle='#22d3ee';g.lineWidth=2;g.beginPath();area.forEach(([x,y],i)=>i?g.lineTo(x*z,y*z):g.moveTo(x*z,y*z));if(passo!=='area'||area.length>2)g.closePath();g.stroke();
         if(passo==='area')area.forEach(([x,y])=>{g.fillStyle='#22d3ee';g.beginPath();g.arc(x*z,y*z,5,0,7);g.fill();});}
       const r=Math.max(4,(sp||16)*0.28*z);g.font=`bold ${Math.max(10,Math.round(r*1.3))}px system-ui,sans-serif`;
-      F.forEach(q=>{g.lineWidth=q.duv?3:2;g.strokeStyle=q.duv?'#f97316':'#fde047';g.setLineDash(q.duv?[4,3]:[]);g.beginPath();g.arc(q.x*z,q.y*z,r,0,7);g.stroke();g.setLineDash([]);g.fillStyle='#000';g.fillText(q.n,q.x*z+r+1,q.y*z-r+1);g.fillStyle='#fff';g.fillText(q.n,q.x*z+r,q.y*z-r);});
+      F.forEach(q=>{g.lineWidth=q.duv?3:2;g.strokeStyle=q.duv?'#f97316':'#fde047';g.setLineDash(q.duv?[4,3]:[]);g.beginPath();g.arc(q.x*z,q.y*z,r,0,7);g.stroke();g.setLineDash([]);g.fillStyle='#000';g.fillText(q.nome||q.n,q.x*z+r+1,q.y*z-r+1);g.fillStyle='#fff';g.fillText(q.nome||q.n,q.x*z+r,q.y*z-r);});
+      if(passo!=='area'&&F.length){const S1=[...F].sort((a,b)=>a.n-b.n);
+        if(numAb){g.strokeStyle='rgba(34,211,238,.75)';g.lineWidth=2;g.beginPath();S1.forEach((q,i)=>i?g.lineTo(q.x*z,q.y*z):g.moveTo(q.x*z,q.y*z));g.stroke();}
+        const q1=S1[0];g.lineWidth=4;g.strokeStyle='#22c55e';g.beginPath();g.arc(q1.x*z,q1.y*z,r+4,0,7);g.stroke();}
       if(linha&&linha.length)linha.forEach(q=>{g.lineWidth=4;g.strokeStyle='#22d3ee';g.beginPath();g.arc(q.x*z,q.y*z,r+3,0,7);g.stroke();});
       $('#fdN').innerHTML=passo==='area'?`${area.length} ponto(s)`:`${F.length} furos`+(F.some(q=>q.duv)?` · <b style="color:#f97316">${F.filter(q=>q.duv).length} para conferir</b>`:'');};
     // puxar linha: 2 furos da mesma fileira dão a direção e o passo; põe furo em cada passo até a borda, no ponto mais escuro perto do lugar esperado
@@ -1494,6 +1506,17 @@ async function fotoDroneFluxo(){
       for(const sg of [-1,1])for(let i=sg<0?0:1;;i+=sg){if(Math.abs(i)>400)break;const ex=a.x+i*ux,ey=a.y+i*uy;if(!den(ex,ey)){if(sg<0||i>n)break;else continue;}
         if(F.concat(out).some(o=>Math.hypot(o.x-ex,o.y-ey)<0.5*st))continue;const [px,py]=escuro(ex,ey,0.25*st);out.push({x:px,y:py,duv:true});}
       return out;};
+    // painel da numeração: canto do furo 1, sentido, fileira, nome. Muda e renumera na hora
+    const numPainel=()=>{const el=$('#fdNum');if(!el)return;el.style.display=numAb&&passo!=='area'?'':'none';if(!numAb||passo==='area')return;const o=numOpc();
+      const b=(k,v,t)=>`<button data-k="${k}" data-v="${v}" class="${String(o[k])===String(v)?'on':''}">${t}</button>`;
+      el.innerHTML=`<div class="card" style="margin:0 0 6px;padding:10px">
+        <label>Furo 1 começa no canto</label><div class="seg" style="display:grid;grid-template-columns:1fr 1fr">${b('c','se','↖ Em cima, esq.')}${b('c','sd','↗ Em cima, dir.')}${b('c','ie','↙ Embaixo, esq.')}${b('c','id','↘ Embaixo, dir.')}</div>
+        <label style="margin-top:8px">Seguir</label><div class="seg">${b('z','false','Toda fileira no mesmo sentido')}${b('z','true','Zigue-zague (vai e volta)')}</div>
+        <label style="margin-top:8px">Fileira</label><div class="seg">${b('d','0','Como o app achou')}${b('d','1','No outro sentido')}</div>
+        <label style="margin-top:8px">Nome do furo</label><div class="seg">${b('nm','seq','1, 2, 3…')}${b('nm','lf','L1-F1, L1-F2…')}</div>
+        <p class="mut" style="margin:6px 0 0">Círculo <b style="color:#22c55e">verde</b> = furo 1. A linha azul mostra a ordem. O app lembra a escolha.</p></div>`;
+      el.querySelectorAll('button[data-k]').forEach(x=>x.onclick=()=>{const k=x.dataset.k,v=x.dataset.v,n=numOpc();n[k]=k==='z'?v==='true':k==='d'?+v:v;
+        S.ui=Object.assign(S.ui||{},{numFuros:n});save();numerarFuros(F,sp,n);numPainel();desenha();});};
     const botoes=()=>{
       if(passo==='area'){$('#fdTx').innerHTML='1) Toque nos <b>cantos da área dos furos</b>, contornando o polígono. Depois toque em <b>Procurar furos</b>.';
         $('#fdB').innerHTML=`<button class="btn" id="fdU">Desfazer ponto</button><button class="btn pri" id="fdGo">Procurar furos</button>`;
@@ -1503,12 +1526,13 @@ async function fotoDroneFluxo(){
             if(!F.length)toast('Não achei furos nessa área. Tente contornar de novo.',4000);passo='edit';botoes();desenha();},30);};}
       else{$('#fdTx').innerHTML='2) Confira. <b style="color:#fde047">Amarelo</b> = furo claro na foto. <b style="color:#f97316">Laranja tracejado</b> = duvidoso (achado seguindo a linha de furos, fora da linha, fraco, perto de máquina, pedra ou da borda): olhe um por um. <b>Toque num círculo</b> para tirar, <b>toque onde falta</b> para pôr. Fileira com furo faltando: use <b>📏 Puxar linha</b>. A numeração é refeita sozinha.';
         if(linha)$('#fdTx').innerHTML=`<b style="color:#22d3ee">Puxar linha:</b> toque em <b>2 furos da mesma fileira</b> (vizinhos ou longe um do outro). O app põe os furos da fileira inteira no mesmo passo, até a borda da área, em laranja.`+(linha.length?' <b>Falta o 2º furo.</b>':'');
-        $('#fdB').innerHTML=`<button class="btn" id="fdL" style="${linha?'background:#0e7490;color:#fff':''}">📏 ${linha?'Parar de puxar':'Puxar linha'}</button>${desfaz.length?'<button class="btn" id="fdD">Desfazer linha</button>':''}<button class="btn" id="fdA">Refazer a área</button><button class="btn pri" id="fdOk">Usar estes furos</button>`;
+        $('#fdB').innerHTML=`<button class="btn" id="fdL" style="${linha?'background:#0e7490;color:#fff':''}">📏 ${linha?'Parar de puxar':'Puxar linha'}</button>${desfaz.length?'<button class="btn" id="fdD">Desfazer linha</button>':''}<button class="btn" id="fdNb" style="${numAb?'background:#0e7490;color:#fff':''}">🔢 Numeração</button><button class="btn" id="fdA">Refazer a área</button><button class="btn pri" id="fdOk">Usar estes furos</button>`;
+        $('#fdNb').onclick=()=>{numAb=!numAb;botoes();desenha();};numPainel();
         $('#fdL').onclick=()=>{linha=linha?null:[];botoes();desenha();};
         if($('#fdD'))$('#fdD').onclick=()=>{const u=desfaz.pop();F=F.filter(q=>!u.includes(q));numerarFuros(F,sp);botoes();desenha();};
-        $('#fdA').onclick=()=>{passo='area';area=[];F=[];linha=null;desfaz=[];botoes();desenha();};
+        $('#fdA').onclick=()=>{passo='area';area=[];F=[];linha=null;desfaz=[];numAb=false;$('#fdNum').style.display='none';botoes();desenha();};
         $('#fdOk').onclick=()=>{if(!F.length){toast('Nenhum furo marcado');return;}closeSheet();
-          fim({holes:[...F].sort((a,b)=>a.n-b.n).map(q=>novoFuro(String(q.n),q.x,q.y,null)),bg:{url:img.url,w:IW,h:IH},nome:file.name.replace(/\.[^.]+$/,''),resumo:`furos achados na foto do drone (${F.length}, conferidos)`});};}};
+          fim({holes:[...F].sort((a,b)=>a.n-b.n).map(q=>novoFuro(q.nome||String(q.n),q.x,q.y,null,q.l,q.f)),bg:{url:img.url,w:IW,h:IH},nome:file.name.replace(/\.[^.]+$/,''),resumo:`furos achados na foto do drone (${F.length}, conferidos)`});};}};
     c.onclick=e=>{const rc=c.getBoundingClientRect(),x=(e.clientX-rc.left)/z,y=(e.clientY-rc.top)/z;
       if(passo==='area'){area.push([x,y]);desenha();return;}
       const lim=Math.max(6,(sp||16)*0.45);let bi=-1,bd=Infinity;F.forEach((q,i)=>{const d=Math.hypot(q.x-x,q.y-y);if(d<bd){bd=d;bi=i;}});
