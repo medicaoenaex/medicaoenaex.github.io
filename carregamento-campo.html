@@ -76,6 +76,7 @@ tr.click{cursor:pointer}
 .conds{display:flex;flex-wrap:wrap;gap:6px}
 .conds button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 10px;font-size:13px}
 .conds button.on{background:#7a4b00;border-color:#7a4b00;color:#fff}
+.conds button.cperd,.conds button.cperd.on{border:2px solid #c92a2a;font-weight:800}.conds button.cperd{color:#e03131}.conds button.cperd.on{background:#c92a2a;color:#fff}
 .thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .thumbs img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer}
 .hist{font-size:13px;color:var(--mut);border-left:3px solid var(--line);padding-left:8px;margin-top:4px}
@@ -248,7 +249,7 @@ header h1 .logo svg{width:24px;height:24px}
 .opl input:focus{border-color:#ff8a1f;box-shadow:0 0 0 3px rgba(255,138,31,.35)}
 .oplid b{font-size:22px;display:block;line-height:1.1}.oplid span{font-size:13px;color:var(--mut)}.oplid i{font-style:normal;font-size:11px}
 .opl.carregado{background:rgba(31,157,85,.14)}.opl.carregado .oplid span{color:#4ade80;font-weight:800}
-.opl.repasse{background:rgba(240,140,0,.14)}.opl.perdido,.opl.nao{opacity:.55}
+.opl.repasse{background:rgba(240,140,0,.14)}.opl.nao{opacity:.55}.opl.perdido{background:rgba(201,42,42,.28);opacity:.8}
 .oplm{min-height:54px;padding:0;font-size:22px}
 .opmapw{background:#0b1320;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 #opMap{display:block;width:100%;height:auto;max-height:42vh}
@@ -761,7 +762,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-27.5';
+const APP_VER='2026-11-27.6';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1667,21 +1668,24 @@ function geom(p,crop,robusto){
   if(!isFinite(dmin))dmin=4;if(robusto)dmin=Math.max(dmin,espacoFuros(p)*0.8);const r=dmin*(useBg?0.3:0.36),pad=r*(crop?4:2.2),off=r*1.8;
   return{bgOn,bgUrl,useBg,minX,minY,r,pad,off,W:maxX-minX+pad*2+off,H:maxY-minY+pad*2,X:x=>x-minX+pad+off,Y:y=>y-minY+pad};
 }
+// furo perdido: círculo vermelho cheio com X branco (diferente do anel ⛔ dos avisos)
+function perdX(h,cx,cy,r){if(h.status!=='perdido')return'';const q=r*0.62;return`<path d="M${cx-q} ${cy-q}L${cx+q} ${cy+q}M${cx+q} ${cy-q}L${cx-q} ${cy+q}" stroke="#5c0a0a" stroke-width="${r*0.16}" stroke-linecap="round" opacity="0.75" pointer-events="none"/>`;}
 function corFuro(h){
+  if(h.status==='perdido')return ST.perdido.c;
   if(corPor==='caminhao'){if(h.status==='perdido'||h.status==='nao')return ST[h.status].c;return camCor(camsDoFuro(h)[0]||'');}
   if(corPor==='desvio')return DV[desvio(cur(),h).c].c;
   if(corPor==='area'){const p=cur();return areaDe(p,h)?areaCor(p,h.area):'#b8c0c8';}
-  if(corPor==='tempo'){if(h.status==='perdido'||h.status==='nao')return'#343a40';if(!temTempo(h))return'#b8c0c8';const [t0,t1]=faixaTempo(cur());return corTempo(h.tempo,t0,t1);}
+  if(corPor==='tempo'){if(h.status==='nao')return'#343a40';if(!temTempo(h))return'#b8c0c8';const [t0,t1]=faixaTempo(cur());return corTempo(h.tempo,t0,t1);}
   return ST[h.status].c;
 }
 function meiaLua(h,cx,cy,r){if(corPor!=='caminhao'||h.status==='perdido'||h.status==='nao')return'';const cs=camsDoFuro(h);if(cs.length<2)return'';const q=r*0.92;
   return`<path d="M${cx} ${cy-q}A${q} ${q} 0 0 1 ${cx} ${cy+q}Z" fill="${camCor(cs[1])}" pointer-events="none"/><line x1="${cx}" y1="${cy-q}" x2="${cx}" y2="${cy+q}" stroke="#fff" stroke-width="${r*0.06}" pointer-events="none"/>`;}
 function legendaHTML(p){
-  if(corPor==='tempo'){const a=analiseTempo(p);if(!a.com.length)return'<span class="mut">Sem tempos — importe em Temporização</span>';return`<span style="display:inline-flex;align-items:center;gap:6px">${fmt(a.t0)} ms<i style="display:inline-block;width:110px;height:10px;border-radius:5px;background:linear-gradient(90deg,${[0,.25,.5,.75,1].map(k=>corTempo(a.t0+k*(a.t1-a.t0),a.t0,a.t1)).join(',')})"></i>${fmt(a.t1)} ms</span><span><i class="dot" style="background:#b8c0c8"></i>Sem tempo ${a.sem.length}</span><span><i class="dot" style="background:#343a40"></i>Perdido / não carregar</span>${a.rep.length?`<span>⚠️ ${a.rep.length} tempo(s) repetido(s)</span>`:''}`;}
+  if(corPor==='tempo'){const a=analiseTempo(p);if(!a.com.length)return'<span class="mut">Sem tempos — importe em Temporização</span>';return`<span style="display:inline-flex;align-items:center;gap:6px">${fmt(a.t0)} ms<i style="display:inline-block;width:110px;height:10px;border-radius:5px;background:linear-gradient(90deg,${[0,.25,.5,.75,1].map(k=>corTempo(a.t0+k*(a.t1-a.t0),a.t0,a.t1)).join(',')})"></i>${fmt(a.t1)} ms</span><span><i class="dot" style="background:#b8c0c8"></i>Sem tempo ${a.sem.length}</span><span><i class="dot" style="background:${ST.perdido.c}"></i>✖ Perdido</span><span><i class="dot" style="background:#343a40"></i>Não carregar</span>${a.rep.length?`<span>⚠️ ${a.rep.length} tempo(s) repetido(s)</span>`:''}`;}
   if(corPor==='desvio'){const r=conferencia(p);return Object.entries(DV).map(([k,v])=>`<span><i class="dot" style="background:${v.c}"></i>${v.n} ${r.n[k]}</span>`).join('')+(r.lim.length?`<span style="color:#c92a2a;font-weight:800"><i class="dot" style="background:#fff;border:3px solid #e03131"></i>⛔ Passou do limite ${r.lim.length}</span>`:'');}
   if(corPor==='area'){const L=areasLista(p);const sem=p.holes.filter(h=>!areaDe(p,h)).length;return L.map(a=>`<span><i class="dot" style="background:${areaCor(p,a.id)}"></i>${esc(a.nome||a.id)} ${p.holes.filter(h=>h.area===a.id).length} · ${esc(planoTxt(p,a.id))}</span>`).join('')+`<span><i class="dot" style="background:#b8c0c8"></i>Plano do polígono ${sem}</span>`;}
   if(corPor==='caminhao'){const cnt={};p.holes.forEach(h=>{const cs=camsDoFuro(h);(cs.length?cs:['']).forEach(k=>{cnt[k]=(cnt[k]||0)+1;});});
-    return Object.keys(cnt).sort((a,b)=>(a===''?1:0)-(b===''?1:0)||a.localeCompare(b)).map(k=>`<span><i class="dot" style="background:${camCor(k)}"></i>${k?esc(k):'Sem caminhão'} ${cnt[k]}</span>`).join('')+`<span><i class="dot" style="background:${ST.perdido.c}"></i>Perdido / não carregar</span>`;}
+    return Object.keys(cnt).sort((a,b)=>(a===''?1:0)-(b===''?1:0)||a.localeCompare(b)).map(k=>`<span><i class="dot" style="background:${camCor(k)}"></i>${k?esc(k):'Sem caminhão'} ${cnt[k]}</span>`).join('')+`<span><i class="dot" style="background:${ST.perdido.c}"></i>✖ Perdido ${p.holes.filter(h=>h.status==='perdido').length}</span><span><i class="dot" style="background:${ST.nao.c}"></i>Não carregar</span>`;}
   const cnt={};Object.keys(ST).forEach(k=>cnt[k]=0);p.holes.forEach(h=>cnt[h.status]++);
   return Object.entries(ST).map(([k,v])=>`<span><i class="dot" style="background:${v.c}"></i>${v.n} ${cnt[k]}</span>`).join('')+`<span><i class="dot" style="background:#fff;border:3px solid #1971c2"></i>Com água</span>`;
 }
@@ -1694,7 +1698,7 @@ function tabMapa(p){
   p.holes.forEach((h,i)=>{const cx=g.X(h.x),cy=g.Y(h.y),c=corFuro(h);
     const lbl=nomeCurto(h);const agua=h.agua!=='seca';const sl=selMode&&selSet.has(i);
     const fl=planFlash&&Date.now()<planFlash.ate&&planFlash.ids.has(String(h.id));
-    s+=`<g data-i="${i}">${ehExtra(h)?`<circle cx="${cx}" cy="${cy}" r="${r*1.4}" fill="none" stroke="#ffd43b" stroke-width="${r*0.12}" stroke-dasharray="${r*0.35} ${r*0.25}" pointer-events="none"/>`:''}${fl?`<circle class="pfl" cx="${cx}" cy="${cy}" r="${r*1.6}" fill="none" stroke="${camCor(camsDoFuro(h)[0]||'')}" stroke-width="${r*0.3}" pointer-events="none"/>`:''}${semFoto&&semFoto.has(h.id)?`<circle cx="${cx}" cy="${cy}" r="${r*1.7}" fill="none" stroke="#f76707" stroke-width="${r*0.22}" stroke-dasharray="${r*0.5} ${r*0.3}" pointer-events="none"/>`:''}${sl?`<circle cx="${cx}" cy="${cy}" r="${r*1.45}" fill="none" stroke="#fab005" stroke-width="${r*0.35}" pointer-events="none"/>`:''}${(h.status!=='pendente'&&passouLimite(p,h))||profBaixa(p,h)?`<circle class="plim" cx="${cx}" cy="${cy}" r="${r*1.55}" fill="none" stroke="#e03131" stroke-width="${r*0.34}" pointer-events="none"/><text x="${cx+r*1.15}" y="${cy-r*0.95}" font-size="${r*0.95}" text-anchor="middle" pointer-events="none">⛔</text>`:''}${(h.cond||[]).length?`<circle cx="${cx+r*0.8}" cy="${cy-r*0.8}" r="${r*0.32}" fill="#7a4b00" stroke="#fff" stroke-width="${r*0.08}" pointer-events="none"/>`:''}<circle data-i="${i}" cx="${cx}" cy="${cy}" r="${r}" fill="${c}" fill-opacity="${g.useBg?0.85:1}" stroke="${agua?'#1971c2':'#fff'}" stroke-width="${agua?r*0.32:r*0.12}"/>${meiaLua(h,cx,cy,r)}`+
+    s+=`<g data-i="${i}">${ehExtra(h)?`<circle cx="${cx}" cy="${cy}" r="${r*1.4}" fill="none" stroke="#ffd43b" stroke-width="${r*0.12}" stroke-dasharray="${r*0.35} ${r*0.25}" pointer-events="none"/>`:''}${fl?`<circle class="pfl" cx="${cx}" cy="${cy}" r="${r*1.6}" fill="none" stroke="${camCor(camsDoFuro(h)[0]||'')}" stroke-width="${r*0.3}" pointer-events="none"/>`:''}${semFoto&&semFoto.has(h.id)?`<circle cx="${cx}" cy="${cy}" r="${r*1.7}" fill="none" stroke="#f76707" stroke-width="${r*0.22}" stroke-dasharray="${r*0.5} ${r*0.3}" pointer-events="none"/>`:''}${sl?`<circle cx="${cx}" cy="${cy}" r="${r*1.45}" fill="none" stroke="#fab005" stroke-width="${r*0.35}" pointer-events="none"/>`:''}${(h.status!=='pendente'&&passouLimite(p,h))||profBaixa(p,h)?`<circle class="plim" cx="${cx}" cy="${cy}" r="${r*1.55}" fill="none" stroke="#e03131" stroke-width="${r*0.34}" pointer-events="none"/><text x="${cx+r*1.15}" y="${cy-r*0.95}" font-size="${r*0.95}" text-anchor="middle" pointer-events="none">⛔</text>`:''}${(h.cond||[]).length?`<circle cx="${cx+r*0.8}" cy="${cy-r*0.8}" r="${r*0.32}" fill="#7a4b00" stroke="#fff" stroke-width="${r*0.08}" pointer-events="none"/>`:''}<circle data-i="${i}" cx="${cx}" cy="${cy}" r="${r}" fill="${c}" fill-opacity="${g.useBg?0.85:1}" stroke="${agua?'#1971c2':'#fff'}" stroke-width="${agua?r*0.32:r*0.12}"/>${meiaLua(h,cx,cy,r)}${perdX(h,cx,cy,r)}`+
     `<text data-i="${i}" x="${cx}" y="${cy+r*0.3}" text-anchor="middle" font-size="${r*(String(numFuro(h)).length>4?0.5:0.8)}" fill="#fff" font-weight="700" pointer-events="none">${esc(numFuro(h))}</text>`+
     (rotulos?(corPor==='tempo'?(temTempo(h)?[(h.tempos&&h.tempos.length>1?h.tempos.map(v=>fmt(v)).join('/'):fmt(h.tempo))+' ms']:[]):rotuloFuro(h)).map((t,k)=>`<text x="${cx}" y="${cy+r*(1.5+k*0.56)}" text-anchor="middle" font-size="${r*0.5}" fill="${corPor!=='tempo'&&k===0&&h.caminhao?camCor(h.caminhao):'#14202b'}" font-weight="700" stroke="#fff" stroke-width="${r*0.15}" paint-order="stroke" pointer-events="none">${esc(t)}</text>`).join(''):'')+`</g>`;});
   const lines={};p.holes.forEach(h=>{if(h.line&&lines[h.line]==null)lines[h.line]=h.y;});
@@ -1820,6 +1824,7 @@ function desenhaFuros(x,p,g,im,vetor){ // mapa em unidades do polígono (o chama
     p.holes.forEach(h=>{const cx=g.X(h.x),cy=g.Y(h.y);x.beginPath();x.arc(cx,cy,r,0,7);x.fillStyle=corFuro(h);x.globalAlpha=im?.88:1;x.fill();
       {const cs=camsDoFuro(h);if(corPor==='caminhao'&&cs.length>1&&h.status!=='perdido'&&h.status!=='nao'){x.beginPath();x.moveTo(cx,cy-r);x.arc(cx,cy,r*.92,-Math.PI/2,Math.PI/2);x.closePath();x.fillStyle=camCor(cs[1]);x.fill();}}x.globalAlpha=1;
       const ag=h.agua!=='seca';x.lineWidth=ag?r*.32:r*.12;x.strokeStyle=ag?'#1971c2':'#fff';x.stroke();
+      if(h.status==='perdido'){const q=r*.62;x.beginPath();x.moveTo(cx-q,cy-q);x.lineTo(cx+q,cy+q);x.moveTo(cx+q,cy-q);x.lineTo(cx-q,cy+q);x.lineWidth=r*.16;x.lineCap='round';x.strokeStyle='rgba(92,10,10,.75)';x.stroke();x.lineCap='butt';}
       if(vetor)return; // números e rótulos vão como texto no PDF (nítidos em qualquer zoom)
       const t=numFuro(h),em=Math.min(r*.8,1.8*r/(t.length*.58));x.font=`bold ${em}px system-ui,sans-serif`;x.textAlign='center';x.lineJoin='round';x.lineWidth=em*.14;x.strokeStyle='rgba(16,24,32,.8)';x.strokeText(t,cx,cy+em*.36);x.fillStyle='#fff';x.fillText(t,cx,cy+em*.36);
       rotulosDoFuro(h).forEach((t,k)=>{const yy=cy+r*(1.5+k*.56);x.font=`bold ${r*.5}px system-ui,sans-serif`;x.lineWidth=r*.15;x.strokeStyle='#fff';x.strokeText(t,cx,yy);x.fillStyle=corRotulo(h,k);x.fillText(t,cx,yy);});});
@@ -1850,11 +1855,11 @@ async function croquiCanvas(p,vetor){
       if(!cams.length)item(camCor(''),'Nenhum caminhão marcado');
       cams.forEach(cm=>{const n=p.holes.filter(h=>camsDoFuro(h).includes(cm)).length;const kg=Object.entries(res.cam[cm]||{}).filter(([pr])=>pr!=='Sem produto').map(([pr,k])=>`${pr} ${fmt(k)} kg`).join(' / ');item(camCor(cm),`${cm} – ${nf(n)}${kg?' – '+kg:''}${(p.nfs||{})[cm]?' – NF '+p.nfs[cm]:''}`);});
       const sem=p.holes.filter(h=>!camsDoFuro(h).length&&h.status!=='perdido'&&h.status!=='nao').length;item(camCor(''),`Sem caminhão – ${nf(sem)}`);if(p.holes.some(h=>camsDoFuro(h).length>1))item('#868e96','Furo com 2 cores: cada metade é um caminhão (um por deck)');
-      item(ST.perdido.c,`Perdido / não carregar – ${nf(res.st.perdido+res.st.nao)}`);
+      item(ST.perdido.c,`✖ Perdido – ${nf(res.st.perdido)}`);if(res.st.nao)item(ST.nao.c,`Não carregar – ${nf(res.st.nao)}`);
       item('#102a43',`Total lançado: ${Object.entries(res.prod).map(([pr,k])=>`${pr} ${fmt(k)} kg`).join(' / ')||'0 kg'} · Booster ${fmt(res.booster)} un`);
     }else if(corPor==='tempo'){const a=analiseTempo(p);
       x.fillStyle='#14202b';x.fillText(`${fmt(a.t0)} ms`,30,y);const gw=360,gx=150;const gr=x.createLinearGradient(gx,0,gx+gw,0);[0,.25,.5,.75,1].forEach(k=>gr.addColorStop(k,corTempo(a.t0+k*(a.t1-a.t0),a.t0,a.t1)));x.fillStyle=gr;x.fillRect(gx,y-20,gw,22);x.fillStyle='#14202b';x.fillText(`${fmt(a.t1)} ms`,gx+gw+16,y);y+=44;
-      item('#b8c0c8',`Sem tempo – ${nf(a.sem.length)}`);item('#343a40',`Perdido / não carregar – ${nf(p.holes.filter(h=>h.status==='perdido'||h.status==='nao').length)}`);item('#f08c00',`Tempos repetidos – ${a.rep.length}`);item('#102a43',`Detonadores com tempo: ${a.dets}${p.dvtProg!=null?' · DVT programado: '+p.dvtProg:''}`);
+      item('#b8c0c8',`Sem tempo – ${nf(a.sem.length)}`);item(ST.perdido.c,`✖ Perdido – ${nf(p.holes.filter(h=>h.status==='perdido').length)}`);item('#343a40',`Não carregar – ${nf(p.holes.filter(h=>h.status==='nao').length)}`);item('#f08c00',`Tempos repetidos – ${a.rep.length}`);item('#102a43',`Detonadores com tempo: ${a.dets}${p.dvtProg!=null?' · DVT programado: '+p.dvtProg:''}`);
     }else if(corPor==='desvio'){const cf=conferencia(p);Object.entries(DV).forEach(([k,v])=>item(v.c,`${v.n} – ${nf(cf.n[k])}`));item('#102a43',`Carga: projeto ${fmt(cf.kgProj)} kg · executado ${fmt(cf.kgExec)} kg`);if(cf.lim.length)item('#e03131',`⛔ Passou do limite do projeto – ${nf(cf.lim.length)}`);
     }else if(corPor==='area'){areasLista(p).forEach(a=>item(areaCor(p,a.id),`${a.nome||a.id} – ${nf(p.holes.filter(h=>h.area===a.id).length)} – ${planoTxt(p,a.id)}`));item('#b8c0c8',`Plano do polígono – ${nf(p.holes.filter(h=>!areaDe(p,h)).length)}`);
     }else{Object.entries(ST).forEach(([k,v])=>item(v.c,`${v.n} – ${nf(res.st[k])}`));item('#1971c2',`Com água – ${nf(res.agua)}`);}
@@ -2849,11 +2854,11 @@ function medAchar(p,q){q=medBN(q);if(!q)return -1;let b=-1,bn=9;p.holes.forEach(
 const medFeito=h=>!!h.med||h.profMed!=null;
 function medRaso(p,h){const pr=projDe(p,h);return h.profMed!=null&&h.profProj!=null&&h.profMed<h.profProj-(pr.tolProf??0.5);}
 const medBaixa=(p,h)=>h.profMed!=null&&!!profBaixa(p,h,h.profMed);
-function medCor(p,h){if(h.status==='perdido'||h.status==='nao')return'#343a40';if(!medFeito(h))return'#5b6676';if(medBaixa(p,h))return'#e03131';if(medRaso(p,h))return'#f08c00';if(h.agua==='agua'||h.aguaM>0)return'#22b8cf';return'#339af0';}
+function medCor(p,h){if(h.status==='perdido')return ST.perdido.c;if(h.status==='nao')return'#343a40';if(!medFeito(h))return'#5b6676';if(medBaixa(p,h))return'#e03131';if(medRaso(p,h))return'#f08c00';if(h.agua==='agua'||h.aguaM>0)return'#22b8cf';return'#339af0';}
 // furos do croqui (o mesmo desenho serve para o croqui grande e para o recorte em volta do furo no painel)
 function medFurosSVG(p,g,sel,pre){const r=g.r;let s='';
   if(g.useBg){const m=p.bg.m;s+=`<g transform="translate(${g.pad+g.off-g.minX} ${g.pad-g.minY})"><image href="${g.bgUrl}" width="${p.bg.w}" height="${p.bg.h}" transform="matrix(${m.join(' ')})" preserveAspectRatio="none" opacity="0.8"/></g>`;}
-  p.holes.forEach((h,i)=>{const cx=g.X(h.x),cy=g.Y(h.y);s+=`<g class="opd" data-${pre}="${i}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${medCor(p,h)}" stroke="rgba(0,0,0,.55)" stroke-width="${r*0.1}"/>${(h.cond||[]).length?`<circle cx="${cx+r*0.75}" cy="${cy-r*0.75}" r="${r*0.3}" fill="#e03131" pointer-events="none"/>`:''}<text x="${cx}" y="${cy+r*0.3}" text-anchor="middle" font-size="${r*0.8}" fill="#fff" font-weight="700" pointer-events="none">${esc(numFuro(h))}</text></g>`;});
+  p.holes.forEach((h,i)=>{const cx=g.X(h.x),cy=g.Y(h.y);s+=`<g class="opd" data-${pre}="${i}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${medCor(p,h)}" stroke="rgba(0,0,0,.55)" stroke-width="${r*0.1}"/>${perdX(h,cx,cy,r)}${(h.cond||[]).length?`<circle cx="${cx+r*0.75}" cy="${cy-r*0.75}" r="${r*0.3}" fill="#e03131" pointer-events="none"/>`:''}<text x="${cx}" y="${cy+r*0.3}" text-anchor="middle" font-size="${r*0.8}" fill="#fff" font-weight="700" pointer-events="none">${esc(numFuro(h))}</text></g>`;});
   if(sel>=0&&p.holes[sel]){const h=p.holes[sel];s+=`<circle class="mdsel" cx="${g.X(h.x)}" cy="${g.Y(h.y)}" r="${r*1.5}" fill="none" stroke="#ffd43b" stroke-width="${r*0.3}" pointer-events="none"/>`;}
   return s;}
 function medBase(g){const box=$('#tabBox');const cw=Math.max(240,((box&&box.clientWidth)||innerWidth-24)-20),ch=Math.max(300,innerHeight*0.62);return Math.min(cw/g.W,ch/g.H);}
@@ -2880,7 +2885,7 @@ function tabMed(p){
   <div class="card op" style="padding:6px">
   <div class="mdbusca"><span aria-hidden="true">🔍</span><input id="mdBq" type="text" inputmode="numeric" enterkeyhint="go" autocomplete="off" placeholder="Achar furo no croqui"><button class="btn sm" id="mdZm" aria-label="Afastar">−</button><button class="btn sm" id="mdZp" aria-label="Aproximar">+</button><button class="btn sm" id="mdZf" aria-label="Ver tudo">⤢</button></div>
   <div class="opmapw mdw" id="mdW"><svg id="mdMap" viewBox="0 0 ${g.W} ${g.H}" preserveAspectRatio="xMidYMid meet" style="width:${g.W*b}px;height:${g.H*b}px">${medFurosSVG(p,g,medSel,'mi')}</svg></div>
-  <div class="oplg"><span><i style="background:#5b6676"></i>Falta medir</span><span><i style="background:#339af0"></i>Medido seco</span><span><i style="background:#22b8cf"></i>Com água</span><span><i style="background:#f08c00"></i>Mais raso</span>${profMinFuro(p)?`<span><i style="background:#e03131"></i>Metragem baixa (&lt; ${fmt(profMinFuro(p).v,1)} m)</span>`:''}<span><i style="background:#e03131;width:8px;height:8px"></i>Condição</span></div>
+  <div class="oplg"><span><i style="background:#5b6676"></i>Falta medir</span><span><i style="background:#339af0"></i>Medido seco</span><span><i style="background:#22b8cf"></i>Com água</span><span><i style="background:#f08c00"></i>Mais raso</span>${profMinFuro(p)?`<span><i style="background:#e03131"></i>Metragem baixa (&lt; ${fmt(profMinFuro(p).v,1)} m)</span>`:''}<span><i style="background:#e03131;width:8px;height:8px"></i>Condição</span><span><i style="background:${ST.perdido.c}"></i>✖ Perdido</span></div>
   <p class="mut" style="margin:6px 2px 0"><b>Toque no furo onde você está</b> para lançar profundidade, água e tampão. Dois dedos ou + / − para aproximar.</p></div>
   <button class="btn" id="mdLT" style="width:100%;min-height:48px;margin:0 0 8px">${medListaOn?'Esconder lista ▴':'Ver em lista ▾'}</button>
   ${medListaOn?`<div class="seg" id="mdF" style="margin:0 0 8px">${[['falta','Falta medir'],['feito','Medidos'],['raso','Rasos'],['todos','Todos']].map(([k,t])=>`<button data-f="${k}" class="${medFiltro===k?'on':''}">${t}</button>`).join('')}</div>
@@ -2912,30 +2917,32 @@ function medPainel(p,i){const h=p.holes[i];if(!h)return;const pr=projDe(p,h);con
   <label>Tampão (m)<input id="mmT" inputmode="decimal" enterkeyhint="done" value="${v(h.tampao)}" placeholder="${pr.tampao!=null?v(pr.tampao):'m'}"></label></div>
   <div id="mmAv" class="opav"></div>
   <button class="btn ok opgo" id="mmOk">✔ Salvar furo ${esc(h.id)}</button>
-  <button class="btn sm" id="mmCT" style="margin-top:8px">${(h.cond||[]).length?'⚠️ '+esc(h.cond.join(', ')):'+ Condição (obstruído, desmoronado…)'}</button>
-  <div class="conds" id="mmCo" style="margin-top:8px;display:none">${CONDS.map(c=>`<button data-c="${esc(c)}" class="${(h.cond||[]).includes(c)?'on':''}" style="min-height:44px;font-size:16px">${esc(c)}</button>`).join('')}</div>`);
-  let cond=[...(h.cond||[])];
+  <button class="btn sm" id="mmCT" style="margin-top:8px${h.status==='perdido'?';background:#c92a2a;color:#fff;border-color:#c92a2a':''}">${h.status==='perdido'?'✖ PERDIDO':''}${h.status==='perdido'&&(h.cond||[]).length?' · ':''}${(h.cond||[]).length?'⚠️ '+esc(h.cond.join(', ')):h.status==='perdido'?'':'+ Condição (perdido, obstruído…)'}</button>
+  <div class="conds" id="mmCo" style="margin-top:8px;display:${h.status==='perdido'?'flex':'none'}"><button data-perd="1" class="cperd${h.status==='perdido'?' on':''}" style="min-height:44px;font-size:16px">✖ Perdido</button>${CONDS.map(c=>`<button data-c="${esc(c)}" class="${(h.cond||[]).includes(c)?'on':''}" style="min-height:44px;font-size:16px">${esc(c)}</button>`).join('')}</div>`);
+  let cond=[...(h.cond||[])],perd=h.status==='perdido';
   const av=()=>{const pm=num($('#mmP').value);const b=pm!=null?profBaixa(p,h,pm):null;const e=$('#mmAv');e.style.cssText=b?'background:#c92a2a;color:#fff;border-radius:10px;padding:8px 10px':'';e.textContent=b?'⛔ '+b.t:pm!=null&&h.profProj!=null&&pm<h.profProj-(pr.tolProf??0.5)?'⚠️ '+fmt(h.profProj-pm,1)+' m mais raso que o projeto':'';};
   $('#mmP').oninput=av;av();
   $('#mmX').onclick=closeSheet;
   $('#mmCT').onclick=()=>{const c=$('#mmCo');c.style.display=c.style.display==='none'?'flex':'none';};
-  document.querySelectorAll('#mmCo button').forEach(b=>b.onclick=()=>{const c=b.dataset.c;cond=cond.includes(c)?cond.filter(x=>x!==c):[...cond,c];b.classList.toggle('on');});
-  const ok=()=>{medGrava(p,h,num($('#mmP').value),num($('#mmA').value),num($('#mmT').value),cond);closeSheet();
+  document.querySelectorAll('#mmCo button').forEach(b=>b.onclick=()=>{if(b.dataset.perd){perd=!perd;b.classList.toggle('on',perd);return;}const c=b.dataset.c;cond=cond.includes(c)?cond.filter(x=>x!==c):[...cond,c];b.classList.toggle('on');});
+  const ok=()=>{const st0=h.status;medGrava(p,h,num($('#mmP').value),num($('#mmA').value),num($('#mmT').value),cond,perd);closeSheet();
+    if(h.status!==st0){const mw=$('#mdW'),sl=mw?mw.scrollLeft:0,stp=mw?mw.scrollTop:0;tabMed(p);const m2=$('#mdW');if(m2){m2.scrollLeft=sl;m2.scrollTop=stp;}medMarca(p,i);return;}
     const c=document.querySelector(`#mdMap [data-mi="${i}"] circle`);if(c)c.setAttribute('fill',medCor(p,h));medMarca(p,i);};
   $('#mmOk').onclick=ok;['#mmP','#mmA','#mmT'].forEach(s=>$(s).onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ok();}});
   setTimeout(()=>{const e=$('#mmP');if(e&&h.profMed==null)e.focus();},80);
 }
-function medGrava(p,h,pm,ag,tp,cond){
-  const cOld=(h.cond||[]).join('|'),cNew=(cond||[]).join('|');
-  if(pm===(h.profMed??null)&&ag===(h.aguaM??null)&&tp===(h.tampao??null)&&cOld===cNew)return;
+function medGrava(p,h,pm,ag,tp,cond,perd){
+  const cOld=(h.cond||[]).join('|'),cNew=(cond||[]).join('|');if(perd===undefined)perd=h.status==='perdido';const mudaPerd=perd!==(h.status==='perdido');
+  if(pm===(h.profMed??null)&&ag===(h.aguaM??null)&&tp===(h.tampao??null)&&cOld===cNew&&!mudaPerd)return;
   pushUndo(p,[h],'medição '+h.id);
   h.profMed=pm;h.aguaM=ag;if(ag>0)h.agua='agua';else if(h.agua==='agua')h.agua='seca';h.tampao=tp;h.cond=cond||[];
+  if(mudaPerd)h.status=perd?'perdido':(holeKg(h)>0?'carregado':'pendente');
   h.med=pm==null&&ag==null&&tp==null&&!h.cond.length?null:{ts:Date.now(),por:meuNome()||''};
-  histAdd(h,'Medição: '+[pm!=null?'prof. '+fmt(pm,1)+' m':'',ag>0?'água '+fmt(ag,1)+' m':pm!=null?'seco':'',tp!=null?'tampão '+fmt(tp,1)+' m':'',...h.cond].filter(Boolean).join(' · '));
+  histAdd(h,'Medição: '+[pm!=null?'prof. '+fmt(pm,1)+' m':'',ag>0?'água '+fmt(ag,1)+' m':pm!=null?'seco':'',tp!=null?'tampão '+fmt(tp,1)+' m':'',mudaPerd?(perd?'PERDIDO':'não é mais perdido'):'',...h.cond].filter(Boolean).join(' · '));
   h.ts=Date.now();if(meuNome())h.por=meuNome();markF(p.id,h.id);save();
   {const b=pm!=null?profBaixa(p,h,pm):null;if(b)setTimeout(()=>aviso(`<b style="font-size:18px">⛔ Furo ${esc(h.id)}: METRAGEM BAIXA</b><br>${esc(b.t)}`),60);}
   const ra=medRaso(p,h);const at=p.holes.filter(x=>x.status!=='perdido'&&x.status!=='nao');const k=document.querySelector('.mdk b');if(k)k.textContent=at.filter(medFeito).length+'/'+at.length;
-  toast('Furo '+h.id+' medido'+(ra?' · ⚠️ '+fmt(h.profProj-h.profMed,1)+' m mais raso que o projeto':'')+(SY().token?' · enviado':''),ra?3500:2200);
+  toast('Furo '+h.id+(h.status==='perdido'?' ✖ PERDIDO':' medido')+(ra?' · ⚠️ '+fmt(h.profProj-h.profMed,1)+' m mais raso que o projeto':'')+(SY().token?' · enviado':''),ra?3500:2200);
 }
 /* ===== Aba Operador (dentro do lançamento de carga): lista de furos, cada linha com carga, profundidade e tampão ===== */
 let operSujo=false,operFiltro='todos',operAdd=false,operBusca='';
@@ -3043,7 +3050,7 @@ function operMapaHTML(p,meu){
   if(p.bg&&!(p.id in bgCache))bgGet(p.id).then(()=>{if(view==='poly'&&tab==='oper'&&S.cur===p.id&&!operSujo)tabOper(p);});
   const g=geom(p),r=g.r;let s='';
   if(g.useBg){const m=p.bg.m;s+=`<g transform="translate(${g.pad+g.off-g.minX} ${g.pad-g.minY})"><image href="${g.bgUrl}" width="${p.bg.w}" height="${p.bg.h}" transform="matrix(${m.join(' ')})" preserveAspectRatio="none" opacity="0.8"/></g>`;}
-  p.holes.forEach((h,i)=>{const meuF=camsDoFuro(h).includes(meu);s+=`<g class="opd" data-oi="${i}"><circle cx="${g.X(h.x)}" cy="${g.Y(h.y)}" r="${r}" fill="${operCor(h)}" stroke="${meuF?'#fff':'rgba(0,0,0,.5)'}" stroke-width="${r*(meuF?0.22:0.1)}"/>${ehExtra(h)?`<circle cx="${g.X(h.x)}" cy="${g.Y(h.y)}" r="${r*1.35}" fill="none" stroke="#ffd43b" stroke-width="${r*0.12}" stroke-dasharray="${r*0.35} ${r*0.25}" pointer-events="none"/>`:''}<text x="${g.X(h.x)}" y="${g.Y(h.y)+r*0.3}" text-anchor="middle" font-size="${r*0.8}" fill="#fff" font-weight="700" pointer-events="none">${esc(numFuro(h))}</text></g>`;});
+  p.holes.forEach((h,i)=>{const meuF=camsDoFuro(h).includes(meu);s+=`<g class="opd" data-oi="${i}"><circle cx="${g.X(h.x)}" cy="${g.Y(h.y)}" r="${r}" fill="${operCor(h)}" stroke="${meuF?'#fff':'rgba(0,0,0,.5)'}" stroke-width="${r*(meuF?0.22:0.1)}"/>${perdX(h,g.X(h.x),g.Y(h.y),r)}${ehExtra(h)?`<circle cx="${g.X(h.x)}" cy="${g.Y(h.y)}" r="${r*1.35}" fill="none" stroke="#ffd43b" stroke-width="${r*0.12}" stroke-dasharray="${r*0.35} ${r*0.25}" pointer-events="none"/>`:''}<text x="${g.X(h.x)}" y="${g.Y(h.y)+r*0.3}" text-anchor="middle" font-size="${r*0.8}" fill="#fff" font-weight="700" pointer-events="none">${esc(numFuro(h))}</text></g>`;});
   const cams=camsPoly(p);
   operGeom=g;
   return `<div class="opmapw"><svg id="opMap" viewBox="0 0 ${g.W} ${g.H}" preserveAspectRatio="xMidYMid meet">${s}</svg></div>
@@ -3333,7 +3340,7 @@ function editHole(i,voz,vozTxt){
  <div class="row"><div><label>Tempo de detonação (ms)</label><input id="hTz" inputmode="decimal" value="${f.tempos&&f.tempos.length>1?f.tempos.join(';'):(f.tempo??'')}" placeholder="do plano"></div><div></div></div>
  ${areasLista(p).length?`<label>Área do projeto</label><select id="hAr"><option value="">Sem área (plano do polígono)</option>${areasLista(p).map(a=>`<option value="${esc(a.id)}" ${f.area===a.id?'selected':''}>${esc(a.nome||a.id)}</option>`).join('')}</select>`:''}
  <label>Carga de projeto deste furo (kg) — só se for diferente do padrão</label><input id="hCP" inputmode="decimal" value="${f.cargaProj??''}" placeholder="padrão ${areaDe(p,f)?'da '+esc(areaNome(p,f)):'do polígono'}: ${projDe(p,f).kg!=null?fmt(projDe(p,f).kg)+' kg':'não definido'}">
-    <label>Condição do furo</label><div class="conds" id="hCo">${CONDS.map(c=>`<button data-c="${esc(c)}" class="${(f.cond||[]).includes(c)?'on':''}">${esc(c)}</button>`).join('')}</div>
+    <label>Condição do furo</label><div class="conds" id="hCo"><button data-perd="1" class="cperd${f.status==='perdido'?' on':''}">✖ Perdido</button>${CONDS.map(c=>`<button data-c="${esc(c)}" class="${(f.cond||[]).includes(c)?'on':''}">${esc(c)}</button>`).join('')}</div>
     <label>Observação</label><input id="hOb" value="${esc(f.obs)}" placeholder="ex.: obstruído a 8 m, repasse">
     <div class="row"><div><label>Lote produto</label><input id="hLp" value="${esc(f.lotes?.prod||'')}" placeholder="${esc(p.lotes?.prod||'')}"></div><div><label>Lote booster</label><input id="hLb" value="${esc(f.lotes?.booster||'')}" placeholder="${esc(p.lotes?.booster||'')}"></div><div><label>Lote detonador</label><input id="hLd" value="${esc(f.lotes?.det||'')}" placeholder="${esc(p.lotes?.det||'')}"></div></div>
     <label>Fotos (ficam só neste celular)</label><div class="thumbs" id="hFt"></div><button class="btn sm" id="hFoto" style="margin-top:6px">📷 Adicionar foto</button>
@@ -3361,7 +3368,7 @@ function editHole(i,voz,vozTxt){
     $('#hVoz').onclick=()=>{grab();vozOuvir(t=>{const r=parseVoz(t,[...new Set([...CAMS,...camsPoly(p)])]);delete r.furo;aplicaVoz(p,f,r);draw();toast(`Ouvi: "${t}"`);});};
     document.querySelectorAll('.stbtns button').forEach(b=>b.onclick=()=>{grab();f.status=b.dataset.s;draw();});
     document.querySelectorAll('#hAg button').forEach(b=>b.onclick=()=>{grab();f.agua=b.dataset.a;draw();});
-    document.querySelectorAll('#hCo button').forEach(b=>b.onclick=()=>{grab();const c=b.dataset.c;f.cond=(f.cond||[]).includes(c)?f.cond.filter(x=>x!==c):[...(f.cond||[]),c];draw();});
+    document.querySelectorAll('#hCo button').forEach(b=>b.onclick=()=>{grab();if(b.dataset.perd){f.status=f.status==='perdido'?(holeKg(f)>0?'carregado':'pendente'):'perdido';draw();return;}const c=b.dataset.c;f.cond=(f.cond||[]).includes(c)?f.cond.filter(x=>x!==c):[...(f.cond||[]),c];draw();});
     document.querySelectorAll('#hND button').forEach(b=>b.onclick=()=>{grab();const n=+b.dataset.n;while(f.decks.length<n)f.decks.push({prod:f.decks[0]?.prod||'',kg:''});f.decks.length=n;draw();});
     $('#hPP').oninput=showDif;$('#hPM').oninput=showDif;
     document.querySelectorAll('[data-dk]').forEach(e=>e.addEventListener('input',showPj));$('#hCP').oninput=showPj;$('#hTa').addEventListener('input',showPj);if($('#hAr'))$('#hAr').onchange=()=>{grab();draw();};
@@ -4129,6 +4136,7 @@ function relatorio(p,modo){
   L.push('');
   L.push(`🕳️ Furos: ${r.total} | Carregados: ${r.st.carregado} | Pendentes: ${r.st.pendente}`);
   if(r.st.repasse||r.st.perdido)L.push(`🔁 Repasse: ${r.st.repasse} | Perdidos: ${r.st.perdido}`);
+  {const pd=p.holes.filter(h=>h.status==='perdido');if(pd.length)L.push(`✖ Furos perdidos: ${pd.slice(0,40).map(h=>h.id).join(', ')}${pd.length>40?' …':''}`);}
   if(r.st.nao)L.push(`🚫 Não carregar: ${r.st.nao}`);
   L.push(`💧 Com água: ${r.agua}`);
   if(r.pmMed!=null)L.push(`📏 Prof. média medida: ${fmt(r.pmMed,1)} m (projeto ${fmt(r.ppMed,1)} m)`);
