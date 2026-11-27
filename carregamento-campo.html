@@ -761,7 +761,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-27.4';
+const APP_VER='2026-11-27.5';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -809,9 +809,9 @@ function novoFuro(id,x,y,prof,line,n){return{id:String(id),x,y,line:line||null,n
 
 
 /* ===== Projeto de carregamento (valores do plano de fogo, informados pelo usuário) ===== */
-const PROJ_PADRAO={diam:'',afast:null,espac:null,dens:null,prod:'',kg:null,decks:1,tampao:null,banc:null,subf:null,densRocha:null,booster:null,brinel:null,detTipo:'',detQtd:null,tolKg:10,tolProf:0.5,tolCam:3,tolLim:0};
+const PROJ_PADRAO={diam:'',afast:null,espac:null,dens:null,prod:'',kg:null,decks:1,tampao:null,banc:null,subf:null,densRocha:null,booster:null,brinel:null,detTipo:'',detQtd:null,tolKg:10,tolProf:0.5,tolCam:3,tolLim:0,cota:null,cotaPct:60,profMin:4};
 // Áreas do polígono: trechos com diâmetro/malha/carga/tampão próprios. Campo vazio na área = vale o do polígono.
-const AREA_K=['diam','afast','espac','dens','prod','kg','decks','tampao','banc','subf','booster','brinel','detTipo','detQtd'];
+const AREA_K=['diam','afast','espac','dens','prod','kg','decks','tampao','banc','subf','booster','brinel','detTipo','detQtd','cota'];
 const AREA_CORES=['#1971c2','#e8590c','#2f9e44','#ae3ec9','#f08c00','#0c8599','#c2255c','#5c940d'];
 const areaDe=(p,h)=>{const id=typeof h==='string'?h:h&&h.area;return id&&p.areas&&p.areas[id]||null;};
 const areasLista=p=>Object.entries(p.areas||{}).filter(([,a])=>a).map(([id,a])=>Object.assign({id},a)).sort((a,b)=>String(a.nome||a.id).localeCompare(String(b.nome||b.id),'pt-BR',{numeric:true}));
@@ -876,12 +876,19 @@ const kgProj=(p,h)=>h.cargaProj!=null?h.cargaProj:projDe(p,h).kg;
 const temKgProj=p=>projDe(p).kg!=null||p.holes.some(h=>kgProj(p,h)!=null);
 // limites do projeto: carga programada (do furo, da área ou do polígono) e tampão do projeto.
 // Só compara e avisa: não bloqueia e não sugere carga. kg/tamp opcionais = valores ainda não salvos (digitando).
-function limitesFuro(p,h,kg,tamp){
+// metragem baixa: furo mais curto que X% da cota da praça (da área ou do polígono) ou que o mínimo em metros. Só avisa.
+function profMinFuro(p,h){const pr=projDe(p,h);const c=num(pr.cota),pc=num(pr.cotaPct),mn=num(pr.profMin);const a=c>0&&pc>0?Math.round(c*pc)/100:null,m=mn>0?mn:null;const v=Math.max(a||0,m||0);
+  return v>0?{v,a,m,c,pc,t:a!=null&&a>=(m||0)?`${fmt(pc,0)}% da cota ${fmt(c,1)} m`:`mínimo ${fmt(m,1)} m`}:null;}
+function profBaixa(p,h,prof){if(!h||h.status==='perdido'||h.status==='nao')return null;const pf=prof!==undefined?prof:(h.profMed??h.profProj);if(pf==null||!(pf>0))return null;
+  const m=profMinFuro(p,h);if(!m||pf>=m.v-1e-6)return null;return{k:'pb',pf,m,t:`metragem baixa: ${fmt(pf,1)} m (menos que ${fmt(m.v,1)} m = ${m.t})`};}
+const limTit=l=>l.length&&l.every(x=>x.k==='pb')?'⛔ METRAGEM BAIXA':'⛔ PASSOU DO LIMITE DO PROJETO';
+function limitesFuro(p,h,kg,tamp,prof){
   const L=[];if(!h||h.status==='perdido'||h.status==='nao')return L;const pr=projDe(p,h);
   const ke=kg!==undefined?kg:holeKg(h),kp=kgProj(p,h);
   if(ke>0&&kp!=null&&ke>kp+(num(pr.tolLim)||0)+1e-6)L.push({k:'kg',t:`carga ${fmt(ke)} kg passou da programada do projeto (${fmt(kp)} kg, +${fmt(Math.round((ke-kp)*10)/10)} kg)`});
   const t=tamp!==undefined?tamp:h.tampao;
   if(t!=null&&pr.tampao!=null&&t<pr.tampao-0.05)L.push({k:'tp',t:`tampão ${fmt(t,1)} m menor que o do projeto (${fmt(pr.tampao,1)} m)`});
+  {const b=profBaixa(p,h,prof);if(b)L.push(b);}
   return L;
 }
 const passouLimite=(p,h)=>limitesFuro(p,h).length>0;
@@ -898,9 +905,9 @@ function desvio(p,h){
 }
 const DV={ok:{n:'Dentro do projeto',c:'#1f9d55'},abaixo:{n:'Abaixo do projeto',c:'#f08c00'},acima:{n:'Acima do projeto',c:'#7048e8'},sem:{n:'Sem carga lançada',c:'#b8c0c8'},semproj:{n:'Sem projeto',c:'#5b6b7a'},fora:{n:'Perdido / não carregar',c:'#d64545'}};
 function conferencia(p){
-  const r={n:{},kgProj:0,kgExec:0,profBaixa:0,tampDif:0,boosterDif:0,densDif:0,densN:0,densSoma:0,lista:[],lim:[],limKg:0,limTp:0};Object.keys(DV).forEach(k=>r.n[k]=0);
+  const r={n:{},kgProj:0,kgExec:0,profBaixa:0,tampDif:0,boosterDif:0,densDif:0,densN:0,densSoma:0,lista:[],lim:[],limKg:0,limTp:0,limPb:0};Object.keys(DV).forEach(k=>r.n[k]=0);
   p.holes.forEach(h=>{const pr=projDe(p,h);const dv=desvio(p,h);r.n[dv.c]++;
-    {const l=limitesFuro(p,h);if(l.length){r.lim.push([h,l]);if(l.some(x=>x.k==='kg'))r.limKg++;if(l.some(x=>x.k==='tp'))r.limTp++;}}
+    {const l=limitesFuro(p,h);if(l.length){r.lim.push([h,l]);if(l.some(x=>x.k==='kg'))r.limKg++;if(l.some(x=>x.k==='tp'))r.limTp++;if(l.some(x=>x.k==='pb'))r.limPb++;}}
     if(h.status!=='perdido'&&h.status!=='nao'){const kp=kgProj(p,h);if(kp!=null)r.kgProj+=kp;}
     r.kgExec+=holeKg(h);
     if(h.profMed!=null&&h.profProj!=null&&h.profMed<h.profProj-pr.tolProf)r.profBaixa++;
@@ -920,21 +927,22 @@ function editProjeto(p){
   <div class="row"><div><label>Densidade do produto (g/cm³)</label><input id="pjDe" inputmode="decimal" value="${v(pr.dens)}" placeholder="ex.: 1,15"></div><div><label>Carga por furo (kg)</label><input id="pjKg" inputmode="decimal" value="${pr.kg??''}"></div></div>
   <div class="row"><div><label>Decks</label><select id="pjDk">${[1,2,3].map(n=>`<option ${pr.decks==n?'selected':''}>${n}</option>`).join('')}</select></div><div><label>Tampão (m)</label><input id="pjTa" inputmode="decimal" value="${pr.tampao??''}"></div></div>
   <div class="row"><div><label>Altura da bancada (m)</label><input id="pjBa" inputmode="decimal" value="${v(pr.banc)}" placeholder="vazio = usa a profundidade"></div><div><label>Subfuração (m)</label><input id="pjSf" inputmode="decimal" value="${v(pr.subf)}" placeholder="ex.: 1,0"></div></div>
-  <div class="row"><div><label>Densidade da rocha (t/m³)</label><input id="pjDr" inputmode="decimal" value="${v(pr.densRocha)}" placeholder="ex.: 2,7"></div><div></div></div>
+  <div class="row"><div><label>Densidade da rocha (t/m³)</label><input id="pjDr" inputmode="decimal" value="${v(pr.densRocha)}" placeholder="ex.: 2,7"></div><div><label>⛔ Cota da praça (m)</label><input id="pjCo" inputmode="decimal" value="${v(pr.cota)}" placeholder="ex.: 10,0"></div></div>
+  <div class="row"><div><label>⛔ Metragem baixa: abaixo de (% da cota)</label><input id="pjCp" inputmode="decimal" value="${v(pr.cotaPct)}" placeholder="ex.: 60"></div><div><label>⛔ ou abaixo de (m)</label><input id="pjPm" inputmode="decimal" value="${v(pr.profMin)}" placeholder="ex.: 4 (vazio = não usa)"></div></div>
   <div class="card" style="margin:10px 0 0;padding:10px"><h2 style="margin:0 0 6px">🧮 Contas do desmonte</h2><div id="pjContas"></div></div>
   <p class="mut" style="margin:10px 0 0"><b>Acessórios por furo</b> (o operador não lança: entram sozinhos em cada furo carregado)</p>
   <div class="row"><div><label>Booster por furo</label><input id="pjBo" inputmode="numeric" value="${pr.booster??''}"></div><div><label>Brinel por furo</label><input id="pjBr" inputmode="numeric" value="${pr.brinel??''}"></div></div>
   <div class="row"><div><label>Detonador (DVT)</label><select id="pjDt">${opts(DETS,pr.detTipo,'—')}</select></div><div><label>Detonadores por furo</label><input id="pjDq" inputmode="numeric" value="${pr.detQtd??''}"></div></div>
   <div class="row"><div><label>Tolerância de carga (±%)</label><input id="pjTk" inputmode="decimal" value="${pr.tolKg}"></div><div><label>Tolerância de profundidade (m)</label><input id="pjTp" inputmode="decimal" value="${String(pr.tolProf).replace('.',',')}"></div></div>
   <div class="row"><div><label>Tolerância caminhão: NF x lançado (±%)</label><input id="pjTc" inputmode="decimal" value="${String(pr.tolCam).replace('.',',')}"></div><div><label>⛔ Avisar quando passar da carga programada em mais de (kg)</label><input id="pjTl" inputmode="decimal" value="${String(pr.tolLim??0).replace('.',',')}" placeholder="0 = qualquer kg acima"></div></div>
-  <div class="hint" style="margin:8px 0 0">⛔ <b>Limite do projeto:</b> o app avisa (tela vermelha e vibração) quando a carga lançada passa da <b>carga programada</b> ou o tampão fica <b>menor que o do projeto</b>. Não bloqueia o lançamento.</div>
+  <div class="hint" style="margin:8px 0 0">⛔ <b>Limite do projeto:</b> o app avisa (tela vermelha e vibração) quando a carga lançada passa da <b>carga programada</b> ou o tampão fica <b>menor que o do projeto</b>, e avisa <b>furo com metragem baixa</b> (profundidade menor que a % da cota da praça ou que o mínimo em metros). Não bloqueia o lançamento.</div>
   <div class="card" style="margin:10px 0 0;padding:10px"><h2 style="margin:0 0 6px">Áreas com plano diferente</h2><p class="mut" style="margin:0 0 6px">Quando parte do polígono tem outro diâmetro, malha, carga ou tampão. O que ficar vazio na área vale o do polígono.</p>
     <div id="pjAreas">${areasLista(p).map(a=>{const n=p.holes.filter(h=>h.area===a.id).length;return`<button class="btn" data-area="${esc(a.id)}" style="width:100%;text-align:left;margin:0 0 6px;border-left:8px solid ${areaCor(p,a.id)}"><b>${esc(a.nome||a.id)}</b> · ${n} furo${n===1?'':'s'}<br><span class="mut">${esc(planoTxt(p,a.id))}</span></button>`;}).join('')||'<p class="mut" style="margin:0 0 6px">Nenhuma área. Todo o polígono usa o plano acima.</p>'}</div>
     <button class="btn sm" id="pjArNova">+ Nova área</button></div>
   <p class="mut">Furo com carga diferente (ex.: borda, com água): abra o furo e preencha "Carga de projeto deste furo".</p>
   <div class="btns"><button class="btn pri" id="pjSave">Salvar projeto</button></div>`);
   $('#pjClose').onclick=closeSheet;
-  const lerPj=()=>({diam:$('#pjDi').value.trim(),afast:num($('#pjAf').value),espac:num($('#pjEs').value),dens:densNum($('#pjDe').value),prod:$('#pjProd').value,kg:num($('#pjKg').value),decks:+$('#pjDk').value,tampao:num($('#pjTa').value),banc:num($('#pjBa').value),subf:num($('#pjSf').value),densRocha:num($('#pjDr').value),booster:num($('#pjBo').value),brinel:num($('#pjBr').value),detTipo:$('#pjDt').value,detQtd:num($('#pjDq').value),tolKg:num($('#pjTk').value)??10,tolProf:num($('#pjTp').value)??0.5,tolCam:num($('#pjTc').value)??3,tolLim:num($('#pjTl').value)??0});
+  const lerPj=()=>({diam:$('#pjDi').value.trim(),afast:num($('#pjAf').value),espac:num($('#pjEs').value),dens:densNum($('#pjDe').value),prod:$('#pjProd').value,kg:num($('#pjKg').value),decks:+$('#pjDk').value,tampao:num($('#pjTa').value),banc:num($('#pjBa').value),subf:num($('#pjSf').value),densRocha:num($('#pjDr').value),booster:num($('#pjBo').value),brinel:num($('#pjBr').value),detTipo:$('#pjDt').value,detQtd:num($('#pjDq').value),tolKg:num($('#pjTk').value)??10,tolProf:num($('#pjTp').value)??0.5,tolCam:num($('#pjTc').value)??3,tolLim:num($('#pjTl').value)??0,cota:num($('#pjCo').value),cotaPct:num($('#pjCp').value),profMin:num($('#pjPm').value)});
   const contasVivo=()=>{const pv=lerPj(),o=p.proj;p.proj=pv;try{$('#pjContas').innerHTML=contasHtml(p,Object.assign({},PROJ_PADRAO,pv));}finally{p.proj=o;}};
   ['#pjDi','#pjAf','#pjEs','#pjDe','#pjKg','#pjTa','#pjBa','#pjSf','#pjDr'].forEach(s=>$(s).addEventListener('input',contasVivo));contasVivo();
   $('#pjSave').onclick=()=>{p.proj=lerPj();
@@ -972,6 +980,7 @@ function editArea(p,id,hsIni){
   <div class="row"><div><label>⛔ Carga programada por furo (kg)</label><input id="arKg" inputmode="decimal" value="${v(a.kg)}" placeholder="${ph(base.kg)}"></div><div><label>⛔ Tampão do projeto (m)</label><input id="arTa" inputmode="decimal" value="${v(a.tampao)}" placeholder="${ph(base.tampao)}"></div></div>
   <div class="row"><div><label>Densidade do produto (g/cm³)</label><input id="arDe" inputmode="decimal" value="${v(a.dens)}" placeholder="${ph(base.dens)}"></div><div><label>Decks</label><select id="arDk"><option value="">— o do polígono —</option>${[1,2,3].map(n=>`<option ${a.decks==n?'selected':''}>${n}</option>`).join('')}</select></div></div>
   <div class="row"><div><label>Altura da bancada (m)</label><input id="arBa" inputmode="decimal" value="${v(a.banc)}" placeholder="${ph(base.banc)}"></div><div><label>Subfuração (m)</label><input id="arSf" inputmode="decimal" value="${v(a.subf)}" placeholder="${ph(base.subf)}"></div></div>
+  <div class="row"><div><label>⛔ Cota da praça (m)</label><input id="arCo" inputmode="decimal" value="${v(a.cota)}" placeholder="${ph(base.cota)}"></div><div></div></div>
   <div class="row"><div><label>Booster por furo</label><input id="arBo" inputmode="numeric" value="${v(a.booster)}" placeholder="${ph(base.booster)}"></div><div><label>Brinel por furo</label><input id="arBr" inputmode="numeric" value="${v(a.brinel)}" placeholder="${ph(base.brinel)}"></div></div>
   <div class="row"><div><label>Detonador (DVT)</label><select id="arDt">${opts(DETS,a.detTipo||'','— o do polígono —')}</select></div><div><label>Detonadores por furo</label><input id="arDq" inputmode="numeric" value="${v(a.detQtd)}" placeholder="${ph(base.detQtd)}"></div></div>
   <label>Furos desta área</label><textarea id="arFu" rows="2" placeholder="ex.: 1-20, 35, L3 (linha 3)">${esc(furosTexto(membros))}</textarea>
@@ -979,7 +988,7 @@ function editArea(p,id,hsIni){
   <p class="mut" style="margin:4px 0 0">Também dá para marcar no mapa: <b>Selecionar</b> os furos → <b>Lançar em lote</b> → Área do projeto.</p>
   <div class="card" style="margin:10px 0 0;padding:10px"><h2 style="margin:0 0 6px">🧮 Contas desta área</h2><div id="arContas"></div></div>
   <div class="btns"><button class="btn pri" id="arOk">Salvar área</button>${novo?'':'<button class="btn bad" id="arDel">Excluir área</button>'}</div>`);
-  const ler=()=>({nome:$('#arNo').value.trim()||id,diam:$('#arDi').value.trim(),prod:$('#arProd').value,afast:num($('#arAf').value),espac:num($('#arEs').value),kg:num($('#arKg').value),tampao:num($('#arTa').value),dens:densNum($('#arDe').value),decks:num($('#arDk').value),banc:num($('#arBa').value),subf:num($('#arSf').value),booster:num($('#arBo').value),brinel:num($('#arBr').value),detTipo:$('#arDt').value,detQtd:num($('#arDq').value),cor:a.cor||null});
+  const ler=()=>({nome:$('#arNo').value.trim()||id,diam:$('#arDi').value.trim(),prod:$('#arProd').value,afast:num($('#arAf').value),espac:num($('#arEs').value),kg:num($('#arKg').value),tampao:num($('#arTa').value),dens:densNum($('#arDe').value),decks:num($('#arDk').value),banc:num($('#arBa').value),subf:num($('#arSf').value),booster:num($('#arBo').value),brinel:num($('#arBr').value),detTipo:$('#arDt').value,detQtd:num($('#arDq').value),cota:num($('#arCo').value),cor:a.cor||null});
   const vivo=()=>{const hs=furosDeTexto(p,$('#arFu').value);$('#arFuN').textContent=hs.length?hs.length+' furo(s) na área':'Nenhum furo ainda';
     const pa=Object.assign({},p.areas||{});pa[id]=ler();const pr=projDe({proj:p.proj,areas:pa},id);
     $('#arContas').innerHTML=contasHtml({...p,holes:hs.map(h=>Object.assign({},h,{area:id})),areas:pa},pr,true);};
@@ -1685,7 +1694,7 @@ function tabMapa(p){
   p.holes.forEach((h,i)=>{const cx=g.X(h.x),cy=g.Y(h.y),c=corFuro(h);
     const lbl=nomeCurto(h);const agua=h.agua!=='seca';const sl=selMode&&selSet.has(i);
     const fl=planFlash&&Date.now()<planFlash.ate&&planFlash.ids.has(String(h.id));
-    s+=`<g data-i="${i}">${ehExtra(h)?`<circle cx="${cx}" cy="${cy}" r="${r*1.4}" fill="none" stroke="#ffd43b" stroke-width="${r*0.12}" stroke-dasharray="${r*0.35} ${r*0.25}" pointer-events="none"/>`:''}${fl?`<circle class="pfl" cx="${cx}" cy="${cy}" r="${r*1.6}" fill="none" stroke="${camCor(camsDoFuro(h)[0]||'')}" stroke-width="${r*0.3}" pointer-events="none"/>`:''}${semFoto&&semFoto.has(h.id)?`<circle cx="${cx}" cy="${cy}" r="${r*1.7}" fill="none" stroke="#f76707" stroke-width="${r*0.22}" stroke-dasharray="${r*0.5} ${r*0.3}" pointer-events="none"/>`:''}${sl?`<circle cx="${cx}" cy="${cy}" r="${r*1.45}" fill="none" stroke="#fab005" stroke-width="${r*0.35}" pointer-events="none"/>`:''}${h.status!=='pendente'&&passouLimite(p,h)?`<circle class="plim" cx="${cx}" cy="${cy}" r="${r*1.55}" fill="none" stroke="#e03131" stroke-width="${r*0.34}" pointer-events="none"/><text x="${cx+r*1.15}" y="${cy-r*0.95}" font-size="${r*0.95}" text-anchor="middle" pointer-events="none">⛔</text>`:''}${(h.cond||[]).length?`<circle cx="${cx+r*0.8}" cy="${cy-r*0.8}" r="${r*0.32}" fill="#7a4b00" stroke="#fff" stroke-width="${r*0.08}" pointer-events="none"/>`:''}<circle data-i="${i}" cx="${cx}" cy="${cy}" r="${r}" fill="${c}" fill-opacity="${g.useBg?0.85:1}" stroke="${agua?'#1971c2':'#fff'}" stroke-width="${agua?r*0.32:r*0.12}"/>${meiaLua(h,cx,cy,r)}`+
+    s+=`<g data-i="${i}">${ehExtra(h)?`<circle cx="${cx}" cy="${cy}" r="${r*1.4}" fill="none" stroke="#ffd43b" stroke-width="${r*0.12}" stroke-dasharray="${r*0.35} ${r*0.25}" pointer-events="none"/>`:''}${fl?`<circle class="pfl" cx="${cx}" cy="${cy}" r="${r*1.6}" fill="none" stroke="${camCor(camsDoFuro(h)[0]||'')}" stroke-width="${r*0.3}" pointer-events="none"/>`:''}${semFoto&&semFoto.has(h.id)?`<circle cx="${cx}" cy="${cy}" r="${r*1.7}" fill="none" stroke="#f76707" stroke-width="${r*0.22}" stroke-dasharray="${r*0.5} ${r*0.3}" pointer-events="none"/>`:''}${sl?`<circle cx="${cx}" cy="${cy}" r="${r*1.45}" fill="none" stroke="#fab005" stroke-width="${r*0.35}" pointer-events="none"/>`:''}${(h.status!=='pendente'&&passouLimite(p,h))||profBaixa(p,h)?`<circle class="plim" cx="${cx}" cy="${cy}" r="${r*1.55}" fill="none" stroke="#e03131" stroke-width="${r*0.34}" pointer-events="none"/><text x="${cx+r*1.15}" y="${cy-r*0.95}" font-size="${r*0.95}" text-anchor="middle" pointer-events="none">⛔</text>`:''}${(h.cond||[]).length?`<circle cx="${cx+r*0.8}" cy="${cy-r*0.8}" r="${r*0.32}" fill="#7a4b00" stroke="#fff" stroke-width="${r*0.08}" pointer-events="none"/>`:''}<circle data-i="${i}" cx="${cx}" cy="${cy}" r="${r}" fill="${c}" fill-opacity="${g.useBg?0.85:1}" stroke="${agua?'#1971c2':'#fff'}" stroke-width="${agua?r*0.32:r*0.12}"/>${meiaLua(h,cx,cy,r)}`+
     `<text data-i="${i}" x="${cx}" y="${cy+r*0.3}" text-anchor="middle" font-size="${r*(String(numFuro(h)).length>4?0.5:0.8)}" fill="#fff" font-weight="700" pointer-events="none">${esc(numFuro(h))}</text>`+
     (rotulos?(corPor==='tempo'?(temTempo(h)?[(h.tempos&&h.tempos.length>1?h.tempos.map(v=>fmt(v)).join('/'):fmt(h.tempo))+' ms']:[]):rotuloFuro(h)).map((t,k)=>`<text x="${cx}" y="${cy+r*(1.5+k*0.56)}" text-anchor="middle" font-size="${r*0.5}" fill="${corPor!=='tempo'&&k===0&&h.caminhao?camCor(h.caminhao):'#14202b'}" font-weight="700" stroke="#fff" stroke-width="${r*0.15}" paint-order="stroke" pointer-events="none">${esc(t)}</text>`).join(''):'')+`</g>`;});
   const lines={};p.holes.forEach(h=>{if(h.line&&lines[h.line]==null)lines[h.line]=h.y;});
@@ -2498,7 +2507,7 @@ function notificar(titulo,txt){
 }
 function checarAlertas(p,h,camAntes){
   const a=alertasFuro(p,h);
-  const L=[];if(a.length)L.push(`<b>${passouLimite(p,h)?'⛔ Furo '+esc(h.id)+' PASSOU DO LIMITE DO PROJETO':'Furo '+esc(h.id)+' fora do projeto'}</b><br>${a.map(esc).join('<br>')}`);
+  const L=[];if(a.length)L.push(`<b>${passouLimite(p,h)?'⛔ Furo '+esc(h.id)+' '+limTit(limitesFuro(p,h)).slice(2):'Furo '+esc(h.id)+' fora do projeto'}</b><br>${a.map(esc).join('<br>')}`);
   camsDoFuro(h).forEach(cm=>{const c=camFora(p,cm);if(c&&!(camAntes||[]).includes(cm))L.push(`<b>${esc(cm)}</b>: lançado x NF fora da tolerância (${esc(c.txt)})`);});
   if(L.length)aviso(L.join('<hr style="border:0;border-top:1px solid rgba(255,255,255,.4)">'));
 }
@@ -2839,7 +2848,8 @@ const medBN=v=>buscaNorm(v); // mesma busca da aba Operador (L1-F1 = l1f1)
 function medAchar(p,q){q=medBN(q);if(!q)return -1;let b=-1,bn=9;p.holes.forEach((h,i)=>{const id=medBN(h.id);const n=id===q?0:id.startsWith(q)?1:id.includes(q)?2:9;if(n<bn){bn=n;b=i;}});return b;}
 const medFeito=h=>!!h.med||h.profMed!=null;
 function medRaso(p,h){const pr=projDe(p,h);return h.profMed!=null&&h.profProj!=null&&h.profMed<h.profProj-(pr.tolProf??0.5);}
-function medCor(p,h){if(h.status==='perdido'||h.status==='nao')return'#343a40';if(!medFeito(h))return'#5b6676';if(medRaso(p,h))return'#f08c00';if(h.agua==='agua'||h.aguaM>0)return'#22b8cf';return'#339af0';}
+const medBaixa=(p,h)=>h.profMed!=null&&!!profBaixa(p,h,h.profMed);
+function medCor(p,h){if(h.status==='perdido'||h.status==='nao')return'#343a40';if(!medFeito(h))return'#5b6676';if(medBaixa(p,h))return'#e03131';if(medRaso(p,h))return'#f08c00';if(h.agua==='agua'||h.aguaM>0)return'#22b8cf';return'#339af0';}
 // furos do croqui (o mesmo desenho serve para o croqui grande e para o recorte em volta do furo no painel)
 function medFurosSVG(p,g,sel,pre){const r=g.r;let s='';
   if(g.useBg){const m=p.bg.m;s+=`<g transform="translate(${g.pad+g.off-g.minX} ${g.pad-g.minY})"><image href="${g.bgUrl}" width="${p.bg.w}" height="${p.bg.h}" transform="matrix(${m.join(' ')})" preserveAspectRatio="none" opacity="0.8"/></g>`;}
@@ -2858,19 +2868,19 @@ function medCentra(i){const mw=$('#mdW'),sv=$('#mdMap');if(!mw||!sv||!sv._g)retu
   mw.scrollIntoView({block:'nearest',behavior:'smooth'});}
 function medMarca(p,i){medSel=i;const sv=$('#mdMap');if(!sv||!sv._g)return;const o=sv.querySelector('.mdsel');if(o)o.remove();const h=p.holes[i];if(!h)return;const g=sv._g,r=g.r;
   sv.insertAdjacentHTML('beforeend',`<circle class="mdsel" cx="${g.X(h.x)}" cy="${g.Y(h.y)}" r="${r*1.5}" fill="none" stroke="#ffd43b" stroke-width="${r*0.3}" pointer-events="none"/>`);}
-function medStTxt(p,h){const ra=medRaso(p,h);return ra?'⚠️ '+fmt(h.profProj-h.profMed,1)+' m raso':medFeito(h)?'✔ medido'+(h.aguaM>0||h.agua==='agua'?' 💧':''):h.status!=='pendente'?ST[h.status].n:'';}
+function medStTxt(p,h){const ra=medRaso(p,h);return medBaixa(p,h)?'⛔ metragem baixa '+fmt(h.profMed,1)+' m':ra?'⚠️ '+fmt(h.profProj-h.profMed,1)+' m raso':medFeito(h)?'✔ medido'+(h.aguaM>0||h.agua==='agua'?' 💧':''):h.status!=='pendente'?ST[h.status].n:'';}
 function tabMed(p){
   const ativos=p.holes.filter(h=>h.status!=='perdido'&&h.status!=='nao');
-  const feitos=ativos.filter(medFeito),agua=ativos.filter(h=>h.aguaM>0||h.agua==='agua'),rasos=ativos.filter(h=>medRaso(p,h));
+  const feitos=ativos.filter(medFeito),agua=ativos.filter(h=>h.aguaM>0||h.agua==='agua'),rasos=ativos.filter(h=>medRaso(p,h)||medBaixa(p,h)),baixos=ativos.filter(h=>medBaixa(p,h));
   if(p.bg&&!(p.id in bgCache))bgGet(p.id).then(()=>{if(view==='poly'&&tab==='med'&&S.cur===p.id&&$('#sheet').classList.contains('hidden'))tabMed(p);});
   const g=geom(p);const b=medBase(g)*medZoom;
   const lista=medFiltro==='falta'?ativos.filter(h=>!medFeito(h)):medFiltro==='feito'?p.holes.filter(medFeito):medFiltro==='raso'?rasos:p.holes;
   $('#tabBox').innerHTML=`<div class="card op" style="padding:8px 10px">
-  <div class="opbar"><b style="font-size:18px">📏 Medição</b><span class="mdk"><b>${feitos.length}/${ativos.length}</b> medidos · <b>${agua.length}</b> 💧${rasos.length?` · <b style="color:#ffa94d">${rasos.length}</b> rasos`:''}</span><button class="btn sm" id="mdOp" style="margin-left:auto">👷 Operador</button></div></div>
+  <div class="opbar"><b style="font-size:18px">📏 Medição</b><span class="mdk"><b>${feitos.length}/${ativos.length}</b> medidos · <b>${agua.length}</b> 💧${rasos.length?` · <b style="color:#ffa94d">${rasos.length}</b> rasos`:''}${baixos.length?` · <b style="color:#ff8787">⛔ ${baixos.length}</b> metragem baixa`:''}</span><button class="btn sm" id="mdOp" style="margin-left:auto">👷 Operador</button></div></div>
   <div class="card op" style="padding:6px">
   <div class="mdbusca"><span aria-hidden="true">🔍</span><input id="mdBq" type="text" inputmode="numeric" enterkeyhint="go" autocomplete="off" placeholder="Achar furo no croqui"><button class="btn sm" id="mdZm" aria-label="Afastar">−</button><button class="btn sm" id="mdZp" aria-label="Aproximar">+</button><button class="btn sm" id="mdZf" aria-label="Ver tudo">⤢</button></div>
   <div class="opmapw mdw" id="mdW"><svg id="mdMap" viewBox="0 0 ${g.W} ${g.H}" preserveAspectRatio="xMidYMid meet" style="width:${g.W*b}px;height:${g.H*b}px">${medFurosSVG(p,g,medSel,'mi')}</svg></div>
-  <div class="oplg"><span><i style="background:#5b6676"></i>Falta medir</span><span><i style="background:#339af0"></i>Medido seco</span><span><i style="background:#22b8cf"></i>Com água</span><span><i style="background:#f08c00"></i>Mais raso</span><span><i style="background:#e03131;width:8px;height:8px"></i>Condição</span></div>
+  <div class="oplg"><span><i style="background:#5b6676"></i>Falta medir</span><span><i style="background:#339af0"></i>Medido seco</span><span><i style="background:#22b8cf"></i>Com água</span><span><i style="background:#f08c00"></i>Mais raso</span>${profMinFuro(p)?`<span><i style="background:#e03131"></i>Metragem baixa (&lt; ${fmt(profMinFuro(p).v,1)} m)</span>`:''}<span><i style="background:#e03131;width:8px;height:8px"></i>Condição</span></div>
   <p class="mut" style="margin:6px 2px 0"><b>Toque no furo onde você está</b> para lançar profundidade, água e tampão. Dois dedos ou + / − para aproximar.</p></div>
   <button class="btn" id="mdLT" style="width:100%;min-height:48px;margin:0 0 8px">${medListaOn?'Esconder lista ▴':'Ver em lista ▾'}</button>
   ${medListaOn?`<div class="seg" id="mdF" style="margin:0 0 8px">${[['falta','Falta medir'],['feito','Medidos'],['raso','Rasos'],['todos','Todos']].map(([k,t])=>`<button data-f="${k}" class="${medFiltro===k?'on':''}">${t}</button>`).join('')}</div>
@@ -2905,7 +2915,7 @@ function medPainel(p,i){const h=p.holes[i];if(!h)return;const pr=projDe(p,h);con
   <button class="btn sm" id="mmCT" style="margin-top:8px">${(h.cond||[]).length?'⚠️ '+esc(h.cond.join(', ')):'+ Condição (obstruído, desmoronado…)'}</button>
   <div class="conds" id="mmCo" style="margin-top:8px;display:none">${CONDS.map(c=>`<button data-c="${esc(c)}" class="${(h.cond||[]).includes(c)?'on':''}" style="min-height:44px;font-size:16px">${esc(c)}</button>`).join('')}</div>`);
   let cond=[...(h.cond||[])];
-  const av=()=>{const pm=num($('#mmP').value);$('#mmAv').textContent=pm!=null&&h.profProj!=null&&pm<h.profProj-(pr.tolProf??0.5)?'⚠️ '+fmt(h.profProj-pm,1)+' m mais raso que o projeto':'';};
+  const av=()=>{const pm=num($('#mmP').value);const b=pm!=null?profBaixa(p,h,pm):null;const e=$('#mmAv');e.style.cssText=b?'background:#c92a2a;color:#fff;border-radius:10px;padding:8px 10px':'';e.textContent=b?'⛔ '+b.t:pm!=null&&h.profProj!=null&&pm<h.profProj-(pr.tolProf??0.5)?'⚠️ '+fmt(h.profProj-pm,1)+' m mais raso que o projeto':'';};
   $('#mmP').oninput=av;av();
   $('#mmX').onclick=closeSheet;
   $('#mmCT').onclick=()=>{const c=$('#mmCo');c.style.display=c.style.display==='none'?'flex':'none';};
@@ -2923,6 +2933,7 @@ function medGrava(p,h,pm,ag,tp,cond){
   h.med=pm==null&&ag==null&&tp==null&&!h.cond.length?null:{ts:Date.now(),por:meuNome()||''};
   histAdd(h,'Medição: '+[pm!=null?'prof. '+fmt(pm,1)+' m':'',ag>0?'água '+fmt(ag,1)+' m':pm!=null?'seco':'',tp!=null?'tampão '+fmt(tp,1)+' m':'',...h.cond].filter(Boolean).join(' · '));
   h.ts=Date.now();if(meuNome())h.por=meuNome();markF(p.id,h.id);save();
+  {const b=pm!=null?profBaixa(p,h,pm):null;if(b)setTimeout(()=>aviso(`<b style="font-size:18px">⛔ Furo ${esc(h.id)}: METRAGEM BAIXA</b><br>${esc(b.t)}`),60);}
   const ra=medRaso(p,h);const at=p.holes.filter(x=>x.status!=='perdido'&&x.status!=='nao');const k=document.querySelector('.mdk b');if(k)k.textContent=at.filter(medFeito).length+'/'+at.length;
   toast('Furo '+h.id+' medido'+(ra?' · ⚠️ '+fmt(h.profProj-h.profMed,1)+' m mais raso que o projeto':'')+(SY().token?' · enviado':''),ra?3500:2200);
 }
@@ -3073,7 +3084,7 @@ function tabOper(p){
   const linha=h=>{const i=p.holes.indexOf(h);const kgM=kgDoCam(h,meu);const outros=holeKg(h)-kgM;const st=h.status;const tampPad=tampoPadrao(p,h);const lim=limitesFuro(p,h);
     return `<div class="opl ${st}${lim.length?' lim':''}" data-i="${i}"><div class="oplid"><b>${lim.length?'⛔ ':''}${esc(h.id)}</b>${areaDe(p,h)?`<em class="oparea" style="background:${areaCor(p,h.area)}">${esc(areaNome(p,h))}</em>`:''}${ehExtraOp(h)?'<em class="opadd">extra operador</em>':ehExtra(h)?'<em class="opadd">extra</em>':''}<span>${st==='pendente'?(h.agua!=='seca'?'💧':''):st==='carregado'?'✔':ST[st].n}${outros>0?' <i>+'+fmt(outros)+' '+esc(camsDoFuro(h).filter(c=>c!==meu).map(camCurto).join('+'))+'</i>':''}</span>${h.profProj!=null||h.obsCroqui?`<small class="opperf">${h.profProj!=null?'perf. '+fmt(h.profProj,1)+' m':''}${h.obsCroqui?' · '+esc(String(h.obsCroqui).replace(/_/g,' ')):''}</small>`:''}${h.med&&(h.profMed!=null||h.aguaM!=null)?`<small class="opperf opmd">📏 medido${h.aguaM?' · 💧 '+fmt(h.aguaM,1)+' m':''}</small>`:''}${h.oper&&st!=='pendente'?`<small class="opperf opnm">👷 ${esc(h.oper)}</small>`:''}</div>
     <input data-k="kg" class="${lim.some(x=>x.k==='kg')?'lim':''}" inputmode="decimal" enterkeyhint="next" value="${v(kgM||null)}" placeholder="${kgProj(p,h)!=null?fmt(kgProj(p,h)):'kg'}" aria-label="Carga do furo ${esc(h.id)}">
-    <input data-k="pm" inputmode="decimal" enterkeyhint="next" value="${v(h.profMed)}" placeholder="${h.profProj!=null?v(h.profProj):'m'}" aria-label="Profundidade do furo ${esc(h.id)}">
+    <input data-k="pm" class="${lim.some(x=>x.k==='pb')?'lim':''}" inputmode="decimal" enterkeyhint="next" value="${v(h.profMed)}" placeholder="${h.profProj!=null?v(h.profProj):'m'}" aria-label="Profundidade do furo ${esc(h.id)}">
     <input data-k="tp" class="${lim.some(x=>x.k==='tp')?'lim':''}" inputmode="decimal" enterkeyhint="next" value="${v(h.tampao)}" placeholder="${tampPad!=null?v(tampPad):'m'}" aria-label="Tampão do furo ${esc(h.id)}">
     <button class="btn oplm" data-m="${i}" aria-label="Mais opções do furo ${esc(h.id)}">⋯</button>${lim.length?`<div class="oplim">⛔ ${lim.map(x=>esc(x.t)).join(' · ')}</div>`:''}</div>`;};
   $('#tabBox').innerHTML=`<div class="card op">
@@ -3132,10 +3143,10 @@ function tabOper(p){
 // pinta a linha de vermelho enquanto digita, se passar do limite do projeto (não bloqueia)
 function operLimVivo(p,row,meu,h){
   h=h||p.holes[+row.dataset.i];if(!h||!row)return [];const g=k=>{const e=row.querySelector(`[data-k="${k}"]`);return e?num(e.value):null;};
-  const k=g('kg'),t=g('tp');const outros=Math.max(0,holeKg(h)-kgDoCam(h,meu));
-  const lim=limitesFuro(Object.assign({},p),Object.assign({},h,{status:h.status==='pendente'?'carregado':h.status}),k>0?k+outros:outros,t!=null?t:(k>0?h.tampao??tampoPadrao(p,h):h.tampao));
+  const k=g('kg'),t=g('tp'),pm=g('pm');const outros=Math.max(0,holeKg(h)-kgDoCam(h,meu));
+  const lim=limitesFuro(Object.assign({},p),Object.assign({},h,{status:h.status==='pendente'?'carregado':h.status}),k>0?k+outros:outros,t!=null?t:(k>0?h.tampao??tampoPadrao(p,h):h.tampao),pm??h.profProj??null);
   row.classList.toggle('lim',lim.length>0);
-  const ik=row.querySelector('[data-k="kg"]'),it=row.querySelector('[data-k="tp"]');if(ik)ik.classList.toggle('lim',lim.some(x=>x.k==='kg'));if(it)it.classList.toggle('lim',lim.some(x=>x.k==='tp'));
+  const ik=row.querySelector('[data-k="kg"]'),it=row.querySelector('[data-k="tp"]');if(ik)ik.classList.toggle('lim',lim.some(x=>x.k==='kg'));if(it)it.classList.toggle('lim',lim.some(x=>x.k==='tp'));{const ip=row.querySelector('[data-k="pm"]');if(ip)ip.classList.toggle('lim',lim.some(x=>x.k==='pb'));}
   let m=row.querySelector('.oplim');if(lim.length){if(!m){m=document.createElement('div');m.className='oplim';row.appendChild(m);}m.textContent='⛔ '+lim.map(x=>x.t).join(' · ');}else if(m)m.remove();
   const b=row.querySelector('.oplid b');if(b)b.textContent=(lim.length?'⛔ ':'')+h.id;
   return lim;
@@ -3155,7 +3166,7 @@ function operSalvaLinha(p,row,meu){
   carimbaLotes(p,h);histAdd(h,'Operador: '+resumoFuro(h));h.ts=Date.now();h.por=meuNome()||meu;if(meuOper())h.oper=meuOper();markF(p.id,h.id);save();{const r=document.querySelector(`.opl[data-i="${p.holes.indexOf(h)}"] .oplid`);if(r&&h.oper){const o2=r.querySelector('.opnm');if(o2)o2.textContent='👷 '+h.oper;else r.insertAdjacentHTML('beforeend',`<small class="opperf opnm">👷 ${esc(h.oper)}</small>`);}}
   row.className='opl '+h.status;row.querySelector('.oplid span').innerHTML=h.status==='carregado'?'✔':h.status==='pendente'?'':esc(ST[h.status].n);
   const lim=operLimVivo(p,row,meu,h);const limTxt=lim.map(x=>x.t).join('|');
-  if(lim.length&&limTxt!==limAntes)setTimeout(()=>aviso(`<b style="font-size:18px">⛔ Furo ${esc(h.id)}: PASSOU DO LIMITE DO PROJETO</b><br>${lim.map(x=>esc(x.t)).join('<br>')}`),60);
+  if(lim.length&&limTxt!==limAntes)setTimeout(()=>aviso(`<b style="font-size:18px">⛔ Furo ${esc(h.id)}: ${limTit(lim).slice(2)}</b><br>${lim.map(x=>esc(x.t)).join('<br>')}`),60);
   const av=[];const kp=kgProj(p,h);if(!lim.some(x=>x.k==='kg')&&k>0&&kp!=null&&Math.abs(k-kp)/kp*100>pr.tolKg)av.push('carga '+(k>kp?'acima':'abaixo')+' do projeto');if(pm!=null&&h.profProj!=null&&pm<h.profProj-pr.tolProf)av.push(fmt(h.profProj-pm,1)+' m mais raso');if(!lim.some(x=>x.k==='tp')&&t!=null&&pr.tampao!=null&&Math.abs(t-pr.tampao)>0.5)av.push('tampão diferente do plano');
   toast('Furo '+h.id+(h.status==='carregado'?' carregado':' salvo')+(av.length?' · ⚠️ '+av.join(' · '):'')+(SY().token?' · enviado':''));
   operMapaPinta(p,meu,h);
@@ -3244,7 +3255,7 @@ function camFuro(p,i,meu,voz){
   <div class="btns"><button class="btn ok" id="cfOk" style="font-size:18px;min-height:56px">✔ Enviar: carregado pelo ${esc(camCurto(meu))}</button></div>
   <div class="btns"><button class="btn" id="cfRe">Não deu para carregar (repasse)</button></div>`);
   const av=()=>{const a=[];const pm=num($('#cfPr').value),d=densNum($('#cfD').value),t=num($('#cfT').value);
-    {const kk=num($('#cfK').value);const lim=limitesFuro(p,h,kk>0?kk+Math.max(0,holeKg(h)-kgDoCam(h,meu)):0,t);if(lim.length){$('#cfAv').innerHTML=`<div style="background:#c92a2a;color:#fff;border-radius:10px;padding:10px;font-weight:800;font-size:16px">⛔ PASSOU DO LIMITE DO PROJETO<br>${lim.map(x=>esc(x.t)).join('<br>')}</div>`;}}
+    {const kk=num($('#cfK').value);const lim=limitesFuro(p,h,kk>0?kk+Math.max(0,holeKg(h)-kgDoCam(h,meu)):0,t,pm??h.profProj??null);if(lim.length){$('#cfAv').innerHTML=`<div style="background:#c92a2a;color:#fff;border-radius:10px;padding:10px;font-weight:800;font-size:16px">${limTit(lim)}<br>${lim.map(x=>esc(x.t)).join('<br>')}</div>`;}}
     if(pm!=null&&h.profProj!=null&&pm<h.profProj-pr.tolProf)a.push(`profundidade ${fmt(h.profProj-pm,1)} m abaixo do projeto`);
     if(densFora(d))a.push('densidade fora do comum (0,5 a 1,6)');else if(d!=null&&pr.dens!=null&&Math.abs(d-pr.dens)>0.05)a.push(`densidade diferente do plano (${fmt(pr.dens,2)})`);
     if(t!=null&&pr.tampao!=null&&Math.abs(t-pr.tampao)>0.5)a.push(`tampão diferente do plano (${fmt(pr.tampao,1)} m)`);
@@ -3339,11 +3350,11 @@ function editHole(i,voz,vozTxt){
     f.booster=num($('#hBo').value);f.brinel=num($('#hBr').value);f.detTipo=$('#hDT').value;f.detQtd=num($('#hDQ').value);
     f.tampao=num($('#hTa').value);f.caminhao=$('#hCa').value;f.obs=$('#hOb').value.trim();f.cargaProj=num($('#hCP').value);if($('#hAr'))f.area=$('#hAr').value;{const l={prod:$('#hLp').value.trim(),booster:$('#hLb').value.trim(),det:$('#hLd').value.trim()};f.lotes=Object.values(l).some(Boolean)?l:null;}{const ts=$('#hTz').value.split(/[;\/]/).map(num).filter(v=>v!=null);f.tempo=ts.length?ts[0]:null;f.tempos=ts.length>1?ts:null;}
   };
-  const showPj=()=>{const el=$('#hPj');if(!el)return;const tmp=Object.assign({},h,{decks:f.decks.map((d,k)=>({prod:d.prod,kg:num((document.querySelector(`[data-dk="${k}"]`)||{}).value)})),status:f.status,cargaProj:num(($('#hCP')||{}).value),area:$('#hAr')?$('#hAr').value:f.area,tampao:$('#hTa')?num($('#hTa').value):f.tampao});const pr=projDe(p,tmp);
+  const showPj=()=>{const el=$('#hPj');if(!el)return;const tmp=Object.assign({},h,{decks:f.decks.map((d,k)=>({prod:d.prod,kg:num((document.querySelector(`[data-dk="${k}"]`)||{}).value)})),status:f.status,cargaProj:num(($('#hCP')||{}).value),area:$('#hAr')?$('#hAr').value:f.area,tampao:$('#hTa')?num($('#hTa').value):f.tampao,profMed:$('#hPM')?num($('#hPM').value):h.profMed,profProj:$('#hPP')?num($('#hPP').value):h.profProj});const pr=projDe(p,tmp);
     const kp=kgProj(p,tmp);if(kp==null&&pr.tampao==null&&pr.booster==null&&!planoTxt(p,tmp)){el.style.display='none';return;}el.style.display='';
     const dv=desvio(p,tmp);const ke=holeKg(tmp);const lim=limitesFuro(p,tmp);
     el.style.background=lim.length?'#ffe3e3':'#eef4fb';el.style.borderColor=lim.length?'#c92a2a':'#c9dcf2';
-    el.innerHTML=`${lim.length?`<div style="color:#c92a2a;font-weight:800;font-size:16px;margin-bottom:4px">⛔ PASSOU DO LIMITE DO PROJETO<br>${lim.map(x=>esc(x.t)).join('<br>')}</div>`:''}${areaDe(p,tmp)?`<b style="color:${areaCor(p,tmp.area)}">● ${esc(areaNome(p,tmp))}</b> `:''}${planoTxt(p,tmp)?`<span class="mut">${esc(planoTxt(p,tmp))}</span><br>`:''}<b>Projeto:</b> ${kp!=null?fmt(kp)+' kg':'—'}${pr.prod?' '+esc(pr.prod):''}${pr.decks>1?' · '+pr.decks+' decks':''}${pr.tampao!=null?' · tampão '+fmt(pr.tampao,1)+' m':''}${pr.booster!=null?' · '+pr.booster+' booster':''}${pr.detQtd?' · '+pr.detQtd+' '+esc(pr.detTipo||'det.'):''}<br><b>Executado:</b> ${ke?fmt(ke)+' kg':'—'} ${ke&&kp!=null?`<span class="chip" style="background:${DV[dv.c].c}">${dv.t}</span>`:''}`;};
+    el.innerHTML=`${lim.length?`<div style="color:#c92a2a;font-weight:800;font-size:16px;margin-bottom:4px">${limTit(lim)}<br>${lim.map(x=>esc(x.t)).join('<br>')}</div>`:''}${areaDe(p,tmp)?`<b style="color:${areaCor(p,tmp.area)}">● ${esc(areaNome(p,tmp))}</b> `:''}${planoTxt(p,tmp)?`<span class="mut">${esc(planoTxt(p,tmp))}</span><br>`:''}<b>Projeto:</b> ${kp!=null?fmt(kp)+' kg':'—'}${pr.prod?' '+esc(pr.prod):''}${pr.decks>1?' · '+pr.decks+' decks':''}${pr.tampao!=null?' · tampão '+fmt(pr.tampao,1)+' m':''}${pr.booster!=null?' · '+pr.booster+' booster':''}${pr.detQtd?' · '+pr.detQtd+' '+esc(pr.detTipo||'det.'):''}<br><b>Executado:</b> ${ke?fmt(ke)+' kg':'—'} ${ke&&kp!=null?`<span class="chip" style="background:${DV[dv.c].c}">${dv.t}</span>`:''}`;};
   const showDif=()=>{const pp=num($('#hPP').value),pm=num($('#hPM').value);const el=$('#hDif');if(pp!=null&&pm!=null){const d=pm-pp;el.innerHTML=`Diferença: <b style="color:${d<-0.5?'var(--bad)':d>0.5?'var(--warn)':'var(--ok)'}">${d>0?'+':''}${fmt(d,1)} m</b>${d<-0.5?' — abaixo do projeto (avaliar repasse)':''}`;}else el.textContent='';};
   const bind=()=>{
     $('#hClose').onclick=()=>{closeSheet();sel=null;};
@@ -3411,7 +3422,12 @@ async function exportarPlanilhaSimples(p){
     // cor do status
     {const tl=num(projDe(p).tolLim)||0,T=L(col('tot')),K=L(col('kgProj')),G=L(col('tampao')),TP=L(col('tampProj')),r1=H+1;const red={fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FFE03131'}},font:{color:{argb:'FFFFFFFF'},bold:true}};
       ws.addConditionalFormatting({ref:`${T}${r1}:${T}${last}`,rules:[{type:'expression',formulae:[`AND(ISNUMBER(${K}${r1}),ISNUMBER(${T}${r1}),${T}${r1}>${K}${r1}+${tl})`],style:red}]});
-      ws.addConditionalFormatting({ref:`${G}${r1}:${G}${last}`,rules:[{type:'expression',formulae:[`AND(ISNUMBER(${G}${r1}),ISNUMBER(${TP}${r1}),${G}${r1}<${TP}${r1}-0.05)`],style:red}]});}
+      ws.addConditionalFormatting({ref:`${G}${r1}:${G}${last}`,rules:[{type:'expression',formulae:[`AND(ISNUMBER(${G}${r1}),ISNUMBER(${TP}${r1}),${G}${r1}<${TP}${r1}-0.05)`],style:red}]});
+      // metragem baixa (% da cota da praça ou mínimo em m): uma regra quando o limite é o mesmo em todo o polígono; com áreas de cota diferente, pinta a célula do furo
+      {const PM=L(col('profMed')),PP=L(col('profProj'));const lv=p.holes.map(h=>(profMinFuro(p,h)||{}).v||0);const un=[...new Set(lv)];
+        if(un.length===1&&un[0]>0){const x=un[0];ws.addConditionalFormatting({ref:`${PM}${r1}:${PM}${last}`,rules:[{type:'expression',formulae:[`AND(ISNUMBER(${PM}${r1}),${PM}${r1}>0,${PM}${r1}<${x})`],style:red}]});
+          ws.addConditionalFormatting({ref:`${PP}${r1}:${PP}${last}`,rules:[{type:'expression',formulae:[`AND(NOT(ISNUMBER(${PM}${r1})),ISNUMBER(${PP}${r1}),${PP}${r1}>0,${PP}${r1}<${x})`],style:red}]});}
+        else if(un.length>1)p.holes.forEach((h,i)=>{if(profBaixa(p,h)){const c=ws.getCell(H+1+i,col(h.profMed!=null?'profMed':'profProj'));c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE03131'}};c.font={color:{argb:'FFFFFFFF'},bold:true};}});}}
     const sCol=L(col('status'));Object.values(ST).forEach(v=>ws.addConditionalFormatting({ref:`${sCol}${H+1}:${sCol}${last}`,rules:[{type:'cellIs',operator:'equal',formulae:[`"${v.n}"`],style:{fill:{type:'pattern',pattern:'solid',bgColor:{argb:'FF'+v.c.slice(1).toUpperCase()}},font:{color:{argb:'FFFFFFFF'},bold:true}}}]}));
     // Resumo por caminhão (fórmulas: atualiza sozinho enquanto edita no Excel)
     const rs=wb.addWorksheet('Resumo');
@@ -3973,13 +3989,13 @@ function tabConf(p){
   if(!temKgProj(p)){
     $('#tabBox').innerHTML=`${planoTxt(p)?`<div class="hint" style="margin:0 0 10px"><b>Plano de fogo:</b> ${esc(planoTxt(p))}</div>`:''}<div class="card empty">Ainda não há carga de projeto para este polígono.<br><br><button class="btn pri" id="cfNew">Informar plano de fogo</button></div>${pr.afast!=null&&pr.espac!=null?`<div class="card"><h2>🧮 Contas do desmonte</h2>${contasHtml(p)}</div>`:''}`;$('#cfNew').onclick=()=>editProjeto(p);return;}
   const r=conferencia(p);const lanc=r.n.ok+r.n.abaixo+r.n.acima;const dif=r.kgProj?(r.kgExec-r.kgProj)/r.kgProj*100:null;
-  let h=`<div class="hint" style="margin:0 0 10px"><b>Plano de fogo:</b> ${esc(planoTxt(p))||'—'}</div><div class="kpis"><div class="kpi"><b>${lanc?fmt(r.n.ok/lanc*100,0)+'%':'–'}</b><span>furos dentro da tolerância (±${fmt(pr.tolKg,0)}%)</span></div><div class="kpi"><b>${r.n.abaixo}</b><span>abaixo do projeto</span></div><div class="kpi"><b>${r.n.acima}</b><span>acima do projeto</span></div><div class="kpi"><b style="color:${r.lim.length?'var(--bad)':'inherit'}">${r.lim.length}</b><span>⛔ passaram do limite (carga programada / tampão)</span></div><div class="kpi"><b>${r.n.sem}</b><span>sem carga lançada</span></div></div>
+  let h=`<div class="hint" style="margin:0 0 10px"><b>Plano de fogo:</b> ${esc(planoTxt(p))||'—'}</div><div class="kpis"><div class="kpi"><b>${lanc?fmt(r.n.ok/lanc*100,0)+'%':'–'}</b><span>furos dentro da tolerância (±${fmt(pr.tolKg,0)}%)</span></div><div class="kpi"><b>${r.n.abaixo}</b><span>abaixo do projeto</span></div><div class="kpi"><b>${r.n.acima}</b><span>acima do projeto</span></div><div class="kpi"><b style="color:${r.lim.length?'var(--bad)':'inherit'}">${r.lim.length}</b><span>⛔ passaram do limite (carga programada / tampão / metragem baixa)</span></div><div class="kpi"><b>${r.n.sem}</b><span>sem carga lançada</span></div></div>
   <div class="card" style="margin-top:12px"><h2>Carga total</h2><table><tbody><tr><td>Projeto (furos a carregar)</td><td class="n">${fmt(r.kgProj)} kg</td></tr><tr><td>Executado (lançado)</td><td class="n"><b>${fmt(r.kgExec)} kg</b></td></tr><tr><td>Diferença</td><td class="n">${dif==null?'–':(dif>=0?'+':'')+fmt(dif,1)+'%'}</td></tr></tbody></table>
   <p class="mut">A diferença total só fecha quando todos os furos estiverem lançados.</p></div>
   <div class="card"><h2>🧮 Contas do desmonte</h2>${contasHtml(p)}</div>
   ${temAreas(p)?areasLista(p).filter(a=>p.holes.some(h=>h.area===a.id)).map(a=>`<div class="card" style="border-left:8px solid ${areaCor(p,a.id)}"><h2>🧮 ${esc(a.nome||a.id)}</h2><p class="mut" style="margin:0 0 6px">${esc(planoTxt(p,a.id))}</p>${contasHtml({...p,holes:p.holes.filter(h=>h.area===a.id)},projDe(p,a.id),true)}</div>`).join(''):''}
   <div class="card"><h2>Outros pontos</h2><table><tbody><tr><td>Profundidade abaixo do projeto (> ${fmt(pr.tolProf,1)} m)</td><td class="n">${r.profBaixa}</td></tr>${pr.tampao!=null?`<tr><td>Tampão diferente do projeto (> 0,5 m)</td><td class="n">${r.tampDif}</td></tr>`:''}${pr.booster!=null?`<tr><td>Booster diferente do projeto</td><td class="n">${r.boosterDif}</td></tr>`:''}${(()=>{const l=amostras(p);if(!l.length)return'';const m=mediaDens(l);const fora=pr.dens!=null?l.filter(a=>leituras(a).some(v=>Math.abs(v-pr.dens)>0.05)).length:null;return `<tr><td>Amostras de densidade (${l.length}) · média</td><td class="n">${fmt(m,2)} g/cm³</td></tr>${fora!=null?`<tr><td>Amostras diferentes do plano (> 0,05 g/cm³)</td><td class="n">${fora}</td></tr>`:''}`;})()}<tr><td>Perdidos / não carregar</td><td class="n">${r.n.fora}</td></tr></tbody></table></div>`;
-  if(r.lim.length)h+=`<div class="card" style="padding:4px 8px;overflow:auto;border:2px solid var(--bad)"><h2 style="margin:10px 6px;color:var(--bad)">⛔ Passaram do limite do projeto</h2><table><thead><tr><th>Furo</th><th>Área</th><th>O que passou</th><th>Cam.</th></tr></thead><tbody>${r.lim.map(([x,l])=>`<tr class="click" data-i="${p.holes.indexOf(x)}"><td><b>${esc(x.id)}</b></td><td>${esc(areaNome(p,x)||'—')}</td><td style="color:var(--bad);font-weight:700">${l.map(y=>esc(y.t)).join('<br>')}</td><td>${esc(camsTxt(x))}</td></tr>`).join('')}</tbody></table></div>`;
+  if(r.lim.length)h+=`<div class="card" style="padding:4px 8px;overflow:auto;border:2px solid var(--bad)"><h2 style="margin:10px 6px;color:var(--bad)">⛔ Passaram do limite do projeto / metragem baixa</h2><table><thead><tr><th>Furo</th><th>Área</th><th>O que passou</th><th>Cam.</th></tr></thead><tbody>${r.lim.map(([x,l])=>`<tr class="click" data-i="${p.holes.indexOf(x)}"><td><b>${esc(x.id)}</b></td><td>${esc(areaNome(p,x)||'—')}</td><td style="color:var(--bad);font-weight:700">${l.map(y=>esc(y.t)).join('<br>')}</td><td>${esc(camsTxt(x))}</td></tr>`).join('')}</tbody></table></div>`;
   if(r.lista.length)h+=`<div class="card" style="padding:4px 8px;overflow:auto"><h2 style="margin:10px 6px">Furos fora da tolerância</h2><table><thead><tr><th>Furo</th><th class="n">Projeto</th><th class="n">Exec.</th><th class="n">Desvio</th><th>Cam.</th></tr></thead><tbody>${r.lista.sort((a,b)=>Math.abs(b[1].d)-Math.abs(a[1].d)).map(([x,dv])=>`<tr class="click" data-i="${p.holes.indexOf(x)}"><td><b>${esc(x.id)}</b></td><td class="n">${fmt(kgProj(p,x))}</td><td class="n">${fmt(holeKg(x))}</td><td class="n" style="color:${DV[dv.c].c};font-weight:700">${dv.d>0?'+':''}${fmt(dv.d,0)}%</td><td>${esc(camsTxt(x))}</td></tr>`).join('')}</tbody></table></div>`;
   h+=`<div class="btns"><button class="btn" id="cfEd">Editar projeto</button><button class="btn" id="cfMap">Ver no mapa</button></div>`;
   $('#tabBox').innerHTML=h;
@@ -4127,6 +4143,7 @@ function relatorio(p,modo){
     if(cf.profBaixa)L.push(`• Profundidade abaixo do projeto: ${cf.profBaixa} furo(s)`);
     if(cf.limKg)L.push(`• ⛔ Passaram da carga programada: ${cf.limKg} furo(s) (${cf.lim.filter(x=>x[1].some(y=>y.k==='kg')).slice(0,12).map(x=>x[0].id).join(', ')})`);
     if(cf.limTp)L.push(`• ⛔ Tampão menor que o projeto: ${cf.limTp} furo(s)`);}
+  {const pb=p.holes.filter(h=>profBaixa(p,h));if(pb.length){const m=Object.values(p.areas||{}).some(a=>a&&num(a.cota)>0)?null:profMinFuro(p);L.push(`• ⛔ Metragem baixa${m?' (menos que '+fmt(m.v,1)+' m)':''}: ${pb.length} furo(s) (${pb.slice(0,15).map(h=>h.id+' '+fmt(h.profMed??h.profProj,1)+' m').join(', ')}${pb.length>15?'…':''})`);}}
   {const c=contasDesmonte(p);if(c.area!=null&&(c.proj.vol!=null||c.exec.vol!=null)){const pe=(a,b,u,d)=>`projeto ${a!=null?fmt(a,d)+' '+u:'–'} | executado ${b!=null?fmt(b,d)+' '+u:'–'}`;L.push('');L.push('🧮 *Contas do desmonte*');
     L.push(`• Volume: ${pe(c.proj.vol,c.exec.vol,'m³',0)}`);if(pj.densRocha!=null)L.push(`• Massa: ${pe(c.proj.t,c.exec.t,'t',0)}`);
     L.push(`• Razão de carga: ${pe(c.proj.rc,c.exec.rc,'kg/m³',3)}`);L.push(`• Metros perfurados: ${pe(c.proj.m,c.exec.m,'m',1)}`);
