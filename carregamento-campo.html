@@ -255,6 +255,11 @@ header h1 .logo svg{width:24px;height:24px}
 #opMap .opd{cursor:pointer}#opMap .opd.sel circle{stroke:#ffb11f!important}
 .oplg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px;color:var(--mut);margin-top:6px}.oplg i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:4px;vertical-align:-1px}
 .opl.flash{box-shadow:inset 0 0 0 3px #ffb11f}
+.opbwrap{position:sticky;top:58px;z-index:4;background:#0d1420;border-radius:12px}.opbusca{display:flex;gap:6px;align-items:center;background:#0d1420;border:2px solid #ff8a1f;border-radius:12px;padding:4px 6px;margin:0 0 6px}
+.opbusca>span{font-size:22px}.opbusca input{flex:1;min-width:0;font-size:24px;font-weight:800;height:52px;border:0!important;background:transparent;color:inherit;box-shadow:none!important}
+.opbusca .btn{min-height:44px;min-width:48px}.opbres{display:flex;flex-wrap:wrap;gap:6px;padding:0 0 6px;max-height:40vh;overflow:auto}.opbres:empty{display:none}
+.opbr{min-height:56px;min-width:76px;font-size:22px;font-weight:800;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}.opbr small{font-size:11px;font-weight:600;opacity:.85}
+.opbr.carregado{border-left:6px solid #2f9e44}.opbr.pendente{border-left:6px solid #868e96}
 .opl.lim{background:rgba(201,42,42,.28)!important;box-shadow:inset 6px 0 0 #ff4d4d}.opl input.lim{border-color:#ff4d4d!important;background:#5c1010!important;color:#fff}.opl .oplim{grid-column:1/-1;color:#ff8787;font-weight:800;font-size:14px;margin:2px 0 0}
 .oparea{display:inline-block;font-size:11px;font-weight:800;padding:0 5px;border-radius:6px;color:#fff;margin-left:4px}
 .opperf{display:block;font-size:11px;color:rgba(255,255,255,.45);line-height:1.2}
@@ -750,7 +755,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-26.5';
+const APP_VER='2026-11-27.1';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -2820,7 +2825,11 @@ function renderIndic(){
 }
 
 /* ===== Aba Operador (dentro do lançamento de carga): lista de furos, cada linha com carga, profundidade e tampão ===== */
-let operSujo=false,operFiltro='todos',operAdd=false;
+let operSujo=false,operFiltro='todos',operAdd=false,operBusca='';
+// busca de furo na aba Operador: compara só letras e números (L1-F1 = l1f1); exato primeiro, depois começa com, depois contém
+const buscaNorm=v=>String(v==null?'':v).toUpperCase().replace(/[^0-9A-Z]/g,'');
+function operAchar(p,q){q=buscaNorm(q);if(!q)return [];const r=[];p.holes.forEach((h,i)=>{const id=buscaNorm(h.id);const n=id===q?0:id.startsWith(q)?1:id.includes(q)?2:9;if(n<9)r.push({h,i,n});});
+  return r.sort((a,b)=>a.n-b.n||String(a.h.id).length-String(b.h.id).length||a.i-b.i);}
 const operLast=()=>(S.ui&&S.ui.operLast)||{};
 function abrirOperador(){
   const ab=S.polys.filter(p=>situDe(p)==='aberto').sort((a,b)=>(b.data||'').localeCompare(a.data||'')||(b.criado||0)-(a.criado||0));
@@ -2976,6 +2985,8 @@ function tabOper(p){
   ${amostrasHTML(p,meu)}
   <button class="btn ${operAdd?'pri':''}" id="opAdd" style="width:100%;min-height:58px;font-size:19px;font-weight:800;margin:0 0 8px;border:2px dashed #ffd43b">${operAdd?'👆 Toque no croqui onde fica o furo':'+ Furo extra do operador (XO)'}</button>
   ${operAdd?`<div class="btns" style="margin:0 0 8px"><button class="btn" id="opAddJa" style="flex:1;min-height:52px">Pôr ao lado do último furo</button><button class="btn" id="opAddX" style="flex:1;min-height:52px">Cancelar</button></div>`:''}
+  <div class="opbwrap"><div class="opbusca" id="opBusca"><span aria-hidden="true">🔍</span><input id="opBq" type="text" inputmode="${(S.ui&&S.ui.opBqTxt)?'text':'numeric'}" enterkeyhint="go" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Achar furo nº" value="${esc(operBusca)}" aria-label="Buscar furo pelo número"><button class="btn sm" id="opBqK" title="Trocar teclado">${(S.ui&&S.ui.opBqTxt)?'123':'ABC'}</button><button class="btn sm" id="opBqX" aria-label="Limpar busca" ${operBusca?'':'hidden'}>✕</button></div>
+  <div class="opbres" id="opBres"></div></div>
   <div class="seg" id="opF" style="margin:4px 0 8px">${[['todos','Todos'],['pend','Pendentes'],['meus','Meus']].map(([k,t])=>`<button data-f="${k}" class="${operFiltro===k?'on':''}">${t}</button>`).join('')}</div>
   <div class="card op" style="padding:6px 8px"><div class="oplh"><span>Furo</span><span>Carga kg</span><span>Prof. m</span><span>Tampão m</span><span></span></div>
   <div id="opList">${lista.map(linha).join('')||'<p class="mut" style="padding:10px">Nada aqui.</p>'}</div>
@@ -2992,6 +3003,17 @@ function tabOper(p){
   $('#opMT').onclick=()=>{S.ui=Object.assign(S.ui||{},{opMapOff:!(S.ui&&S.ui.opMapOff)});save();tabOper(p);};
   const vaiFuro=i=>{let row=document.querySelector(`.opl[data-i="${i}"]`);if(!row){operFiltro='todos';tabOper(p);row=document.querySelector(`.opl[data-i="${i}"]`);}if(!row)return;row.scrollIntoView({block:'center',behavior:'smooth'});row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),1200);setTimeout(()=>{const inp=document.querySelector(`.opl[data-i="${i}"] [data-k="kg"]`);if(inp)inp.focus({preventScroll:true});},350);operMapaMarca(i);};
   document.querySelectorAll('#opMap .opd').forEach(e=>e.onclick=ev=>{if(operAdd)return;vaiFuro(+e.dataset.oi);});
+  {const bq=$('#opBq'),br=$('#opBres'),bx=$('#opBqX');
+   const ir=i=>{operBusca='';bq.value='';br.innerHTML='';bx.hidden=true;bq.blur();vaiFuro(i);};
+   const mostra=()=>{operBusca=bq.value;bx.hidden=!operBusca;const r=operAchar(p,operBusca);
+     if(!buscaNorm(operBusca)){br.innerHTML='';return;}
+     br.innerHTML=r.length?r.slice(0,12).map((x,k)=>`<button class="btn opbr ${x.h.status}${k===0?' pri':''}" data-bi="${x.i}">${esc(x.h.id)}<small>${x.h.status==='pendente'?'pendente':x.h.status==='carregado'?'✔ carregado':esc(ST[x.h.status].n)}</small></button>`).join('')+(r.length>12?`<span class="mut">+${r.length-12}… digite mais</span>`:''):'<span class="mut">Nenhum furo com esse número</span>';
+     br.querySelectorAll('[data-bi]').forEach(b=>b.onclick=()=>ir(+b.dataset.bi));
+     if(r.length&&r[0].n===0)operMapaMarca(r[0].i);};
+   bq.oninput=mostra;bq.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const r=operAchar(p,bq.value);if(r.length)ir(r[0].i);else toast('Furo não encontrado');}};
+   bx.onclick=()=>{bq.value='';mostra();bq.focus();};
+   $('#opBqK').onclick=()=>{S.ui=Object.assign(S.ui||{},{opBqTxt:!(S.ui&&S.ui.opBqTxt)});save();bq.setAttribute('inputmode',S.ui.opBqTxt?'text':'numeric');$('#opBqK').textContent=S.ui.opBqTxt?'123':'ABC';bq.blur();setTimeout(()=>bq.focus(),60);};
+   if(operBusca)mostra();}
   $('#opAdd').onclick=()=>{if(operAdd)return;operAdd=true;if(S.ui&&S.ui.opMapOff){S.ui.opMapOff=false;save();}tabOper(p);const m=$('#opMap');if(m)m.scrollIntoView({block:'center'});};
   if($('#opAddJa'))$('#opAddJa').onclick=()=>operNovoFuro(p,meu,null);
   if($('#opAddX'))$('#opAddX').onclick=()=>{operAdd=false;tabOper(p);};
