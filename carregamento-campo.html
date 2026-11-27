@@ -762,7 +762,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-27.7';
+const APP_VER='2026-11-27.8';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -3338,7 +3338,7 @@ async function nuvemCroquis(){const y=SY();if(!y.token||croquiOcupado||y.croquiO
       if(await bgPut(p.id,url,true)){y.bgv[p.id]=p.bg.v;if(view==='poly'&&S.cur===p.id&&$('#sheet').classList.contains('hidden'))renderPoly();}}
     save();}
   catch(e){if(/desconhecida/i.test(e.message||''))y.croquiOff=true;console.error(e);}finally{croquiOcupado=false;}}
-async function nuvemArquivos(){await nuvemCroquis();await enviarFotos();}
+async function nuvemArquivos(){await nuvemCroquis();await enviarFotos();await modeloNuvem();}
 async function listarFotos(pid,forca){
   const y=SY();if(!y.token||y.fotoOff)return[];const c=fotosRem[pid];if(c&&!forca&&Date.now()-c.t<5*60e3)return c.l;
   try{const r=await api({acao:'foto_listar',token:y.token,poly_id:pid});fotosRem[pid]={t:Date.now(),l:r.fotos||[]};return fotosRem[pid].l;}catch(e){return c?c.l:[];}
@@ -3523,8 +3523,41 @@ async function modeloEscolher(){
   const f=await pickFile('.xlsx');if(!f)return null;
   try{busy('Conferindo o modelo…');const buf=await readBuf(f);const X=await loadXlsx();const wb=X.read(buf,{type:'array',bookSheets:true});busy();
     if(!MOD_ABAS.some(n=>wb.SheetNames.includes(n))){toast('Este arquivo não tem as abas CARREG.1/2/3 do modelo');return null;}
-    const v={nome:f.name,buf,t:Date.now()};await bgPut(MOD_KEY,v,true);toast('Modelo guardado neste aparelho');return v;
+    const v={nome:f.name,buf,t:Date.now(),por:meuNome()};await bgPut(MOD_KEY,v,true);
+    if(SY().token){toast('Modelo guardado. Enviando para a equipe…');modeloNuvem(true).then(r=>{if(r==='enviado')toast('Modelo enviado: todos os logins da equipe já podem gerar a planilha');else if(r==='grande')toast('Modelo grande demais para a base (máx. 5 MB). Ficou só neste aparelho.');else if(r==='erro')toast('Sem conexão: o modelo sobe para a equipe quando tiver internet');});}
+    else toast('Modelo guardado neste aparelho. Entre na conta da equipe para todos usarem.');
+    return v;
   }catch(e){busy();toast('Não consegui ler esse arquivo');return null;}
+}
+// ===== Modelo da planilha para a equipe toda =====
+// Quem escolhe o modelo manda o arquivo para a base (pasta privada carreg-fotos, só abre com login da equipe);
+// qualquer login baixa e guarda no aparelho, e daí funciona sem internet. Vale o modelo escolhido por último.
+// Usa as ações croqui_enviar/croqui_url da função "carregamento" com um "polígono" reservado, sem mudar o servidor.
+const MOD_NUV='_modelo-planilha',MOD_NUV_INFO='_modelo-planilha-info',MOD_MAX=5*1024*1024;
+let modNuvT=0,modNuvP=null;
+const b64De=buf=>{const u=new Uint8Array(buf);let t='';for(let i=0;i<u.length;i+=0x8000)t+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(t);};
+async function modNuvBaixa(pid){const y=SY();const r=await api({acao:'croqui_url',token:y.token,poly_id:pid});if(!r||!r.url)return null;
+  const x=await fetch(r.url,{cache:'no-store'});return x.ok?await x.arrayBuffer():null;}
+// devolve: 'enviado' | 'baixado' | 'igual' | 'sem' | 'grande' | 'erro' | undefined (sem login / cedo demais)
+function modeloNuvem(forca){
+  const y=SY();if(!y.token)return Promise.resolve();
+  if(modNuvP)return modNuvP;if(!forca&&Date.now()-modNuvT<10*60e3)return Promise.resolve();modNuvT=Date.now();
+  return modNuvP=(async()=>{try{
+    const loc=await bgGet(MOD_KEY);let info=null;
+    try{const b=await modNuvBaixa(MOD_NUV_INFO);if(b)info=JSON.parse(new TextDecoder().decode(b));}catch(e){if(e instanceof TypeError||e.sair)throw e;info=null;}
+    const tl=loc&&loc.buf&&!loc.site?(+loc.t||0):-1,tn=info?(+info.t||0):-1;
+    if(tl>tn){ // este aparelho tem o modelo mais novo: manda para a equipe (arquivo primeiro, depois a ficha)
+      if(loc.buf.byteLength>MOD_MAX)return 'grande';
+      await api({acao:'croqui_enviar',token:y.token,poly_id:MOD_NUV,v:loc.t,img:b64De(loc.buf)});
+      const fi={nome:loc.nome,t:loc.t,por:loc.por||meuNome(),tam:loc.buf.byteLength};
+      await api({acao:'croqui_enviar',token:y.token,poly_id:MOD_NUV_INFO,v:loc.t,img:b64De(new TextEncoder().encode(JSON.stringify(fi)).buffer)});
+      return 'enviado';}
+    if(tn>tl){ // um colega escolheu um modelo mais novo (ou este aparelho não tem): baixa e guarda aqui
+      const buf=await modNuvBaixa(MOD_NUV);if(!buf)return 'sem';
+      const X=await loadXlsx();const wb=X.read(buf,{type:'array',bookSheets:true});if(!MOD_ABAS.some(n=>wb.SheetNames.includes(n)))return 'erro';
+      await bgPut(MOD_KEY,{nome:info.nome||'modelo da equipe',buf,t:tn,por:info.por||'',equipe:true},true);return 'baixado';}
+    return tn<0?'sem':'igual';
+  }catch(e){console.error(e);if(e.sair){y.token=null;save();}return 'erro';}finally{modNuvP=null;}})();
 }
 // listas da aba PARÂMETRO (litologia, explosivo, diâmetro, operadores…), pelo título da coluna
 async function modeloListas(m){
@@ -3549,9 +3582,9 @@ const modProd=(p,cam)=>{const c={};p.holes.forEach(h=>(h.decks||[]).forEach(d=>{
 const modCasa=(lista,v)=>{if(v==null||v==='')return '';const t=String(v).toLowerCase();return lista.find(x=>String(x).toLowerCase()===t)??lista.find(x=>String(x).toLowerCase().startsWith(t)||t.startsWith(String(x).toLowerCase()))??v;};
 
 async function exportarPlanilha(p){
-  let m;try{busy('Abrindo o modelo…');m=await modeloObter();busy();}catch(e){busy();}
+  let m;try{busy('Abrindo o modelo…');if(SY().token&&navigator.onLine!==false){busy('Buscando o modelo da equipe…');await Promise.race([modeloNuvem(true),new Promise(r=>setTimeout(r,12000))]);}m=await modeloObter();busy();}catch(e){busy();}
   if(!m){openSheet(`<h3>Planilha de carregamento<button class="btn sm" id="mdX">Fechar</button></h3>
-    <p>Para a planilha sair <b>igual à da Enaex</b>, escolha <b>uma vez</b> o arquivo modelo (ex.: <i>PC_US-VGR_V12_Repump.xlsx</i>). Ele fica guardado neste aparelho, inclusive sem internet.</p>
+    <p>Para a planilha sair <b>igual à da Enaex</b>, escolha <b>uma vez</b> o arquivo modelo (ex.: <i>PC_US-VGR_V12_Repump.xlsx</i>). Ele fica guardado neste aparelho, inclusive sem internet${SY().token?', e vai para a base da equipe: <b>todos os logins</b> passam a gerar a planilha sem precisar escolher de novo':'. Entre na conta da equipe para que <b>todos os logins</b> usem o mesmo modelo'}.</p>
     <div class="btns" style="flex-direction:column"><button class="btn pri" id="mdPick">Escolher a planilha modelo</button><button class="btn" id="mdOld">Usar a planilha simples do app</button></div>`);
     $('#mdX').onclick=closeSheet;$('#mdOld').onclick=()=>{closeSheet();exportarPlanilhaSimples(p);};
     $('#mdPick').onclick=async()=>{const v=await modeloEscolher();if(v){closeSheet();exportarPlanilha(p);}};return;}
@@ -3568,7 +3601,7 @@ async function exportarPlanilha(p){
   const optsP=v=>`<option value="">— vazia —</option>`+outros().map(q=>`<option value="${q.id}" ${q.id===v?'selected':''}>POL ${esc(q.pol)} · ${esc(q.mina||'')} · ${brDate(q.data)}</option>`).join('');
   const pr=projDe(p);
   openSheet(`<h3>Planilha de carregamento (modelo Enaex)<button class="btn sm" id="mdX">Fechar</button></h3>
-    <p class="mut" style="margin:0 0 6px">Modelo: <b>${esc(m.nome)}</b> <button class="btn sm" id="mdTroca">Trocar modelo</button></p>
+    <p class="mut" style="margin:0 0 6px">Modelo: <b>${esc(m.nome)}</b>${m.equipe?` <span class="mut">(da equipe${m.por?', enviado por '+esc(m.por):''})</span>`:''} <button class="btn sm" id="mdTroca">Trocar modelo</button></p>
     <div class="row"><div><label>Caminhões</label><select id="mdCam"><option value="*" ${camIni==='*'?'selected':''}>Todos – uma aba CARREG por caminhão</option>${[...new Set([...cams,...CAMS])].map(c=>`<option value="${esc(c)}" ${c===camIni?'selected':''}>Só ${esc(c)}</option>`).join('')}<option value="" ${camIni===''?'selected':''}>Todos os furos numa aba (sem separar caminhão)</option></select></div><div><label>Data</label><input id="mdData" type="date" value="${esc(p.data||today())}"></div></div>
     <div id="mdCamsBox"><label>Abas que vão na planilha (uma por caminhão)</label><div style="display:flex;flex-wrap:wrap;gap:6px 14px">${todosCams.map(c=>`<label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" class="mdCk" value="${esc(c)}" style="width:auto" ${marcados.has(c)?'checked':''}><span style="color:${camCor(c)};font-weight:700">●</span>${esc(c)}${cams.includes(c)?` <span class="mut">(${modFuros(p,c).length})</span>`:''}</label>`).join('')}</div></div>
     <div class="row"><div><label>Operador</label><input id="mdOp" list="mdOpL" value="${esc(E.operador||(camIni!=='*'&&((p.cams||{})[camIni]||{}).oper)||'')}" placeholder="vazio = o operador de cada caminhão">${dl('mdOpL',[...new Set([...L.oper,...operNomes()])])}</div><div><label>Auxiliar</label><input id="mdAux" list="mdAuxL" value="${esc(E.auxiliar||'')}">${dl('mdAuxL',L.aux)}</div></div>
