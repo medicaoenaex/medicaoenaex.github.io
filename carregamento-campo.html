@@ -762,7 +762,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-27.6';
+const APP_VER='2026-11-27.7';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1671,6 +1671,7 @@ function geom(p,crop,robusto){
 // furo perdido: círculo vermelho cheio com X branco (diferente do anel ⛔ dos avisos)
 function perdX(h,cx,cy,r){if(h.status!=='perdido')return'';const q=r*0.62;return`<path d="M${cx-q} ${cy-q}L${cx+q} ${cy+q}M${cx+q} ${cy-q}L${cx-q} ${cy+q}" stroke="#5c0a0a" stroke-width="${r*0.16}" stroke-linecap="round" opacity="0.75" pointer-events="none"/>`;}
 function corFuro(h){
+  if(corPor==='medicao')return medCor(cur(),h); // só no PDF do croqui da Medição
   if(h.status==='perdido')return ST.perdido.c;
   if(corPor==='caminhao'){if(h.status==='perdido'||h.status==='nao')return ST[h.status].c;return camCor(camsDoFuro(h)[0]||'');}
   if(corPor==='desvio')return DV[desvio(cur(),h).c].c;
@@ -1815,8 +1816,8 @@ function ligaSimulacao(p){
 }
 
 /* ----- Croqui em imagem (para WhatsApp / arquivo) ----- */
-function rotulosDoFuro(h){return rotulos?(corPor==='tempo'?(temTempo(h)?[(h.tempos&&h.tempos.length>1?h.tempos.map(v=>fmt(v)).join('/'):fmt(h.tempo))+' ms']:[]):rotuloFuro(h)):[];}
-function corRotulo(h,k){return corPor!=='tempo'&&k===0&&camsDoFuro(h).length===1?camCor(camsDoFuro(h)[0]):'#14202b';}
+function rotulosDoFuro(h){if(corPor==='medicao')return medRotulo(h);return rotulos?(corPor==='tempo'?(temTempo(h)?[(h.tempos&&h.tempos.length>1?h.tempos.map(v=>fmt(v)).join('/'):fmt(h.tempo))+' ms']:[]):rotuloFuro(h)):[];}
+function corRotulo(h,k){if(corPor==='medicao'){const p=cur();return k>0?'#0b7285':medBaixa(p,h)?'#c92a2a':medRaso(p,h)?'#d9480f':'#14202b';}return corPor!=='tempo'&&k===0&&camsDoFuro(h).length===1?camCor(camsDoFuro(h)[0]):'#14202b';}
 async function fundoImg(g){return g.useBg?await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=g.bgUrl;}):null;}
 function desenhaFuros(x,p,g,im,vetor){ // mapa em unidades do polígono (o chamador já fez scale/translate/clip)
     const r=g.r;
@@ -1839,19 +1840,24 @@ async function croquiCanvas(p,vetor){
     {const a=(Math.max(1100,g.W*K))*(g.H*K+600);if(a>15e6)K*=Math.sqrt(15e6/a);} // limite de memória do canvas no celular
     const res=resumo(p);
     const cams=camsPoly(p).sort();
-    const legL=corPor==='tempo'?5:corPor==='caminhao'?Math.max(1,cams.length)+3:corPor==='desvio'?Object.keys(DV).length+2:corPor==='area'?areasLista(p).length+1:Object.keys(ST).length+1;
+    const legL=corPor==='medicao'?8:corPor==='tempo'?5:corPor==='caminhao'?Math.max(1,cams.length)+3:corPor==='desvio'?Object.keys(DV).length+2:corPor==='area'?areasLista(p).length+1:Object.keys(ST).length+1;
     const top=130,legH=40+legL*44,Wc=Math.max(1100,Math.round(g.W*K)),Hc=top+Math.round(g.H*K)+legH;
     const c=document.createElement('canvas');c.width=Wc;c.height=Hc;const x=c.getContext('2d');
     x.fillStyle='#fff';x.fillRect(0,0,Wc,Hc);
     x.fillStyle='#102a43';x.fillRect(0,0,Wc,top-20);
-    x.fillStyle='#fff';x.font='bold 40px system-ui,sans-serif';x.fillText(`Croqui de carregamento – POL ${p.pol}`,30,52);
-    x.font='26px system-ui,sans-serif';x.fillText(`${p.mina}${p.cava?' / '+p.cava:''}${p.banco?' · Banco '+p.banco:''} · ${brDate(p.data)}${p.resp?' · '+p.resp:''} · ${corPor==='caminhao'?'cor por caminhão':corPor==='desvio'?'projeto x executado':corPor==='area'?'áreas do plano de fogo':corPor==='tempo'?'tempos de detonação':'cor por status'}`,30,92);
+    x.fillStyle='#fff';x.font='bold 40px system-ui,sans-serif';x.fillText(`${corPor==='medicao'?'Croqui da medição':'Croqui de carregamento'} – POL ${p.pol}`,30,52);
+    x.font='26px system-ui,sans-serif';x.fillText(`${p.mina}${p.cava?' / '+p.cava:''}${p.banco?' · Banco '+p.banco:''} · ${brDate(p.data)}${p.resp?' · '+p.resp:''} · ${corPor==='medicao'?'medição dos furos (profundidade real e água)':corPor==='caminhao'?'cor por caminhão':corPor==='desvio'?'projeto x executado':corPor==='area'?'áreas do plano de fogo':corPor==='tempo'?'tempos de detonação':'cor por status'}`,30,92);
     x.save();x.translate(0,top);x.scale(K,K);x.beginPath();x.rect(0,0,g.W,g.H);x.clip();
     const im=await fundoImg(g);desenhaFuros(x,p,g,im,vetor);
     x.restore();x.textAlign='left';c.mapa={g,K,top,im};
     let y=top+Math.round(g.H*K)+30;x.fillStyle='#102a43';x.font='bold 28px system-ui,sans-serif';x.fillText('Legenda',30,y);y+=40;x.font='24px system-ui,sans-serif';
     const item=(cor,txt)=>{x.fillStyle=cor;x.beginPath();x.arc(46,y-8,13,0,7);x.fill();x.fillStyle='#14202b';x.fillText(txt,72,y);y+=44;};
-    if(corPor==='caminhao'){
+    if(corPor==='medicao'){const at=p.holes.filter(h=>h.status!=='perdido'&&h.status!=='nao'),n=fn=>nf(p.holes.filter(fn).length),pm=profMinFuro(p);
+      item('#5b6676',`Falta medir – ${nf(at.filter(h=>!medFeito(h)).length)}`);item('#339af0',`Medido seco – ${n(h=>medCor(p,h)==='#339af0')}`);item('#22b8cf',`Medido com água – ${n(h=>medCor(p,h)==='#22b8cf')} (metros de água na tabela)`);
+      item('#f08c00',`Mais raso que o projeto – ${n(h=>medCor(p,h)==='#f08c00')}`);item('#e03131',`⛔ Metragem baixa – ${n(h=>h.status!=='perdido'&&medBaixa(p,h))}${pm?` (menos de ${fmt(pm.v,1)} m)`:''}`);
+      item(ST.perdido.c,`✖ Perdido (vermelho com X) – ${n(h=>h.status==='perdido')}`);if(p.holes.some(h=>h.status==='nao'))item('#343a40',`Não carregar – ${n(h=>h.status==='nao')}`);
+      item('#102a43',`Medidos ${at.filter(medFeito).length} de ${nf(at.length)} · embaixo do furo: profundidade medida (m) · tabela furo a furo no fim do PDF`);
+    }else if(corPor==='caminhao'){
       if(!cams.length)item(camCor(''),'Nenhum caminhão marcado');
       cams.forEach(cm=>{const n=p.holes.filter(h=>camsDoFuro(h).includes(cm)).length;const kg=Object.entries(res.cam[cm]||{}).filter(([pr])=>pr!=='Sem produto').map(([pr,k])=>`${pr} ${fmt(k)} kg`).join(' / ');item(camCor(cm),`${cm} – ${nf(n)}${kg?' – '+kg:''}${(p.nfs||{})[cm]?' – NF '+p.nfs[cm]:''}`);});
       const sem=p.holes.filter(h=>!camsDoFuro(h).length&&h.status!=='perdido'&&h.status!=='nao').length;item(camCor(''),`Sem caminhão – ${nf(sem)}`);if(p.holes.some(h=>camsDoFuro(h).length>1))item('#868e96','Furo com 2 cores: cada metade é um caminhão (um por deck)');
@@ -1892,7 +1898,7 @@ function pdfFuros(doc,p,g,toMM,s,box){ // números (e rótulos) dos furos como t
     rotulosDoFuro(h).forEach((t2,k)=>{const e2=r*.5;pdfTxt(doc,t2,X,Y+r*(1.5+k*.56),e2,corRotulo(h,k),'#ffffff',e2*.28);});});
   doc.setTextColor(0);doc.setDrawColor(0);doc.setLineWidth(.2);}
 async function croquiPdf(p,folha,cor,ampliar){
-  busy('Gerando PDF do croqui…');const antes=corPor;
+  busy(cor==='medicao'?'Gerando PDF do croqui da medição…':'Gerando PDF do croqui…');const antes=corPor;
   try{
     const jsPDF=await loadJsPdf();
     if(cor)corPor=cor;
@@ -1916,7 +1922,7 @@ async function croquiPdf(p,folha,cor,ampliar){
       for(let i=0;i<partes.length;i++){const t=partes[i];busy(`Gerando PDF do croqui… parte ${i+1} de ${partes.length}`);
         doc.addPage(fol,ori);
         doc.setFillColor('#102a43');doc.rect(m,m,W-2*m,hd-2,'F');doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor('#ffffff');
-        doc.text(`Croqui POL ${p.pol} – parte ${i+1} de ${partes.length} (ampliada) · ${nf(t.n)}`,m+3,m+6);
+        doc.text(`${cor==='medicao'?'Croqui da medição':'Croqui'} POL ${p.pol} – parte ${i+1} de ${partes.length} (ampliada) · ${nf(t.n)}`,m+3,m+6);
         doc.setFont('helvetica','normal');doc.setFontSize(8);doc.text('Legenda e mapa inteiro na folha 1',W-m-3,m+6,{align:'right'});
         const U0=t.u0-ov,V0=t.v0-ov,UW=tw+2*ov,VH=th+2*ov,wm=UW*s1,hm=VH*s1,x1=m+(Aw-wm)/2,y1=m+hd+(Ah-hm)/2;
         const PX=Math.min(8,3600/wm,3600/hm),cv=document.createElement('canvas');cv.width=Math.round(wm*PX);cv.height=Math.round(hm*PX);
@@ -1927,9 +1933,10 @@ async function croquiPdf(p,folha,cor,ampliar){
         doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(120);doc.text(`Carregamento de Campo · POL ${p.pol} · parte ${i+1}/${partes.length}`,m,H-4);}
       doc.setPage(1);}
     doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(120);doc.text(`Carregamento de Campo · POL ${p.pol} · gerado em ${new Date().toLocaleString('pt-BR')}${partes.length?` · partes ampliadas nas folhas 2 a ${partes.length+1}`:''}`,m,H-4);
-    doc.setProperties({title:`Croqui POL ${p.pol}`,subject:`${p.mina||''} ${brDate(p.data)}`});
+    if(cor==='medicao')medTabelaPdf(doc,p,fol,ori,W,H,m);
+    doc.setProperties({title:`${cor==='medicao'?'Croqui da medição':'Croqui'} POL ${p.pol}`,subject:`${p.mina||''} ${brDate(p.data)}`});
     const blob=doc.output('blob');busy();
-    await entregarArquivo(blob,`croqui-POL${p.pol}-${p.data||today()}-${fol.toUpperCase()}.pdf`,'application/pdf');
+    await entregarArquivo(blob,`croqui-${cor==='medicao'?'medicao-':''}POL${p.pol}-${p.data||today()}-${fol.toUpperCase()}.pdf`,'application/pdf');
     }finally{corPor=antes;}
   }catch(e){corPor=antes;busy();console.error(e);toast(/internet|carregar/i.test(e&&e.message||'')?'Não consegui abrir o gerador de PDF. Abra o app uma vez com internet.':'Não consegui gerar o PDF');}
 }
@@ -2874,6 +2881,34 @@ function medCentra(i){const mw=$('#mdW'),sv=$('#mdMap');if(!mw||!sv||!sv._g)retu
 function medMarca(p,i){medSel=i;const sv=$('#mdMap');if(!sv||!sv._g)return;const o=sv.querySelector('.mdsel');if(o)o.remove();const h=p.holes[i];if(!h)return;const g=sv._g,r=g.r;
   sv.insertAdjacentHTML('beforeend',`<circle class="mdsel" cx="${g.X(h.x)}" cy="${g.Y(h.y)}" r="${r*1.5}" fill="none" stroke="#ffd43b" stroke-width="${r*0.3}" pointer-events="none"/>`);}
 function medStTxt(p,h){const ra=medRaso(p,h);return medBaixa(p,h)?'⛔ metragem baixa '+fmt(h.profMed,1)+' m':ra?'⚠️ '+fmt(h.profProj-h.profMed,1)+' m raso':medFeito(h)?'✔ medido'+(h.aguaM>0||h.agua==='agua'?' 💧':''):h.status!=='pendente'?ST[h.status].n:'';}
+// PDF do croqui da Medição: mesmo gerador do croqui (números como texto, folhas ampliadas), cores da Medição
+function medRotulo(h){return h.status!=='perdido'&&h.profMed!=null?[fmt(h.profMed,1)+' m']:[];} // só a profundidade medida (água e situação: pela cor e na tabela)
+function medTabelaPdf(doc,p,fol,ori,W,H,m){ // tabela furo a furo no fim do PDF
+  const L=p.holes,cols=[['Furo',16],['Proj.',13],['Medida',15],['Dif.',12],['Água',12],['Tampão',14],['Situação',0]];
+  const tw=W-2*m,nb=Math.max(1,Math.floor((tw+6)/134)),bw=(tw-(nb-1)*6)/nb;cols[6][1]=bw-cols.slice(0,6).reduce((a,c)=>a+c[1],0);const lh=5.2;let y=0,pg=0,bx=m,blk=0,y0=0;
+  const cab=()=>{doc.addPage(fol,ori);pg++;doc.setFillColor('#102a43');doc.rect(m,m,tw,9,'F');doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor('#ffffff');
+    doc.text(`Medição dos furos – POL ${p.pol}${pg>1?' (cont.)':''}`,m+3,m+6);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.text(`${p.mina||''} · ${brDate(p.data)}`,W-m-3,m+6,{align:'right'});
+    blk=0;bx=m;y0=m+15;tit();};
+  const tit=()=>{y=y0;doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor('#102a43');let x=bx;cols.forEach(([t,w])=>{doc.text(t,x+1,y);x+=w;});doc.setDrawColor('#102a43');doc.setLineWidth(.3);doc.line(bx,y+1.5,bx+bw,y+1.5);y+=lh+.5;doc.setFont('helvetica','normal');};
+  cab();
+  L.forEach((h,i)=>{if(y>H-12){if(++blk<nb){bx=m+blk*(bw+6);tit();}else cab();}const b=h.status!=='perdido'&&medBaixa(p,h),ra=medRaso(p,h);
+    const st=h.status==='perdido'?'PERDIDO':h.status==='nao'?'Não carregar':b?'METRAGEM BAIXA':ra?'Mais raso':medFeito(h)?((h.aguaM>0||h.agua==='agua')?'Com água':'Medido seco'):'Falta medir';
+    const d=h.profMed!=null&&h.profProj!=null?h.profMed-h.profProj:null;
+    if(i%2){doc.setFillColor('#f1f3f5');doc.rect(bx,y-3.7,bw,lh,'F');}
+    const v=[String(h.id),fmt(h.profProj,1),fmt(h.profMed,1),d==null?'–':(d>0?'+':'')+fmt(d,1),h.aguaM>0?fmt(h.aguaM,1):h.agua==='agua'?'sim':'–',fmt(h.tampao,1),st];
+    let x=bx;v.forEach((t,k)=>{doc.setTextColor(k===6&&(b||h.status==='perdido')?'#c92a2a':k===6&&ra?'#d9480f':'#14202b');doc.setFont('helvetica',k===0||k===2||(k===6&&(b||h.status==='perdido'))?'bold':'normal');doc.text(t,x+1,y);x+=cols[k][1];});y+=lh;});
+  doc.setTextColor(0);}
+function medPdfMenu(p){let fol=(S.ui&&S.ui.pdfFolha)||'a4',amp=!(S.ui&&S.ui.pdfAmp===false);
+  const draw=()=>{openSheet(`<h3>Croqui da medição em PDF<button class="btn sm" id="mpX">Fechar</button></h3>
+    <p class="mut" style="margin:0 0 8px">Sai o croqui com as cores da Medição, a profundidade medida embaixo de cada furo (e a água, em azul) e, no fim, a tabela furo a furo. Funciona sem internet.</p>
+    <label>Números dos furos</label><div class="seg" id="mpA"><button data-a="1" class="${amp?'on':''}">Grandes (ampliadas)</button><button data-a="0" class="${amp?'':'on'}">Só 1 folha</button></div>
+    <label>Tamanho da folha</label><div class="seg" id="mpF"><button data-f="a4" class="${fol==='a4'?'on':''}">A4</button><button data-f="a3" class="${fol==='a3'?'on':''}">A3</button></div>
+    <div class="btns"><button class="btn pri" id="mpGo" style="min-height:52px">📄 Gerar PDF ${fol.toUpperCase()}</button></div>`);
+    $('#mpX').onclick=closeSheet;
+    document.querySelectorAll('#mpF button').forEach(b=>b.onclick=()=>{fol=b.dataset.f;draw();});
+    document.querySelectorAll('#mpA button').forEach(b=>b.onclick=()=>{amp=b.dataset.a==='1';draw();});
+    $('#mpGo').onclick=()=>{S.ui=Object.assign(S.ui||{},{pdfFolha:fol,pdfAmp:amp});save();closeSheet();croquiPdf(p,fol,'medicao',amp);};};
+  draw();}
 function tabMed(p){
   const ativos=p.holes.filter(h=>h.status!=='perdido'&&h.status!=='nao');
   const feitos=ativos.filter(medFeito),agua=ativos.filter(h=>h.aguaM>0||h.agua==='agua'),rasos=ativos.filter(h=>medRaso(p,h)||medBaixa(p,h)),baixos=ativos.filter(h=>medBaixa(p,h));
@@ -2881,7 +2916,7 @@ function tabMed(p){
   const g=geom(p);const b=medBase(g)*medZoom;
   const lista=medFiltro==='falta'?ativos.filter(h=>!medFeito(h)):medFiltro==='feito'?p.holes.filter(medFeito):medFiltro==='raso'?rasos:p.holes;
   $('#tabBox').innerHTML=`<div class="card op" style="padding:8px 10px">
-  <div class="opbar"><b style="font-size:18px">📏 Medição</b><span class="mdk"><b>${feitos.length}/${ativos.length}</b> medidos · <b>${agua.length}</b> 💧${rasos.length?` · <b style="color:#ffa94d">${rasos.length}</b> rasos`:''}${baixos.length?` · <b style="color:#ff8787">⛔ ${baixos.length}</b> metragem baixa`:''}</span><button class="btn sm" id="mdOp" style="margin-left:auto">👷 Operador</button></div></div>
+  <div class="opbar"><b style="font-size:18px">📏 Medição</b><span class="mdk"><b>${feitos.length}/${ativos.length}</b> medidos · <b>${agua.length}</b> 💧${rasos.length?` · <b style="color:#ffa94d">${rasos.length}</b> rasos`:''}${baixos.length?` · <b style="color:#ff8787">⛔ ${baixos.length}</b> metragem baixa`:''}</span><button class="btn sm" id="mdPdf" style="margin-left:auto">📄 PDF</button><button class="btn sm" id="mdOp">👷 Operador</button></div></div>
   <div class="card op" style="padding:6px">
   <div class="mdbusca"><span aria-hidden="true">🔍</span><input id="mdBq" type="text" inputmode="numeric" enterkeyhint="go" autocomplete="off" placeholder="Achar furo no croqui"><button class="btn sm" id="mdZm" aria-label="Afastar">−</button><button class="btn sm" id="mdZp" aria-label="Aproximar">+</button><button class="btn sm" id="mdZf" aria-label="Ver tudo">⤢</button></div>
   <div class="opmapw mdw" id="mdW"><svg id="mdMap" viewBox="0 0 ${g.W} ${g.H}" preserveAspectRatio="xMidYMid meet" style="width:${g.W*b}px;height:${g.H*b}px">${medFurosSVG(p,g,medSel,'mi')}</svg></div>
@@ -2891,7 +2926,7 @@ function tabMed(p){
   ${medListaOn?`<div class="seg" id="mdF" style="margin:0 0 8px">${[['falta','Falta medir'],['feito','Medidos'],['raso','Rasos'],['todos','Todos']].map(([k,t])=>`<button data-f="${k}" class="${medFiltro===k?'on':''}">${t}</button>`).join('')}</div>
   <div class="card op" style="padding:4px 8px">${lista.map(h=>{const i=p.holes.indexOf(h);return `<div class="mdli" data-li="${i}"><b>${esc(h.id)}</b><span>${h.profMed!=null?fmt(h.profMed,1)+' m':'–'}${h.aguaM>0?' · 💧 '+fmt(h.aguaM,1):''}${h.tampao!=null?' · tp '+fmt(h.tampao,1):''}</span><small>${esc(medStTxt(p,h))}</small></div>`;}).join('')||`<p class="mut" style="padding:10px">${medFiltro==='falta'?'Todos os furos já foram medidos 👍':'Nada aqui.'}</p>`}</div>`:''}`;
   const sv=$('#mdMap'),mw=$('#mdW');sv._g=g;sv._p=p;
-  $('#mdOp').onclick=()=>{tab='oper';renderPoly();};
+  $('#mdOp').onclick=()=>{tab='oper';renderPoly();};$('#mdPdf').onclick=()=>medPdfMenu(p);
   $('#mdLT').onclick=()=>{medListaOn=!medListaOn;tabMed(p);};
   document.querySelectorAll('#mdF button').forEach(x=>x.onclick=()=>{medFiltro=x.dataset.f;tabMed(p);});
   document.querySelectorAll('[data-li]').forEach(x=>x.onclick=()=>{const i=+x.dataset.li;medMarca(p,i);medCentra(i);setTimeout(()=>medPainel(p,i),350);});
