@@ -255,6 +255,9 @@ header h1 .logo svg{width:24px;height:24px}
 #opMap .opd{cursor:pointer}#opMap .opd.sel circle{stroke:#ffb11f!important}
 .oplg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px;color:var(--mut);margin-top:6px}.oplg i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:4px;vertical-align:-1px}
 .opl.flash{box-shadow:inset 0 0 0 3px #ffb11f}
+.opperf.opmd{color:#74c0fc;font-weight:700}.mdl.feito{background:rgba(51,154,240,.13)}.mdl.raso{background:rgba(240,140,0,.2);box-shadow:inset 6px 0 0 #f08c00}.mdl .oplid span{font-size:12px}
+.mdbusca{display:flex;gap:6px;align-items:center;border:2px solid #339af0;border-radius:12px;padding:4px 6px;margin:0 0 6px;background:#0d1420}.mdbusca>span{font-size:22px}.mdbusca input{flex:1;min-width:0;font-size:24px;font-weight:800;height:50px;border:0!important;background:transparent;color:inherit;box-shadow:none!important}
+#mdMap{display:block;width:100%;height:auto;max-height:42vh}#mdMap .opd{cursor:pointer}#mdMap .opd.sel circle{stroke:#ffb11f!important}
 .opbwrap{position:sticky;top:58px;z-index:4;background:#0d1420;border-radius:12px}.opbusca{display:flex;gap:6px;align-items:center;background:#0d1420;border:2px solid #ff8a1f;border-radius:12px;padding:4px 6px;margin:0 0 6px}
 .opbusca>span{font-size:22px}.opbusca input{flex:1;min-width:0;font-size:24px;font-weight:800;height:52px;border:0!important;background:transparent;color:inherit;box-shadow:none!important}
 .opbusca .btn{min-height:44px;min-width:48px}.opbres{display:flex;flex-wrap:wrap;gap:6px;padding:0 0 6px;max-height:40vh;overflow:auto}.opbres:empty{display:none}
@@ -438,7 +441,7 @@ function markF(pid,fid){SY().df[FK(pid,fid)]=Date.now();syncLogo();}
 function markAll(p){markP(p.id);p.holes.forEach(h=>markF(p.id,h.id));}
 function markDel(p){const y=SY();y.del=y.del||{};y.del[p.id]=polyDoc(p);y.dp[p.id]=Date.now();Object.keys(y.df).forEach(k=>{if(k.startsWith(p.id+'\u0001'))delete y.df[k];});if(y.fb)Object.keys(y.fb).forEach(k=>{if(k.startsWith(p.id+'\u0001'))delete y.fb[k];});syncLogo();}
 const GEO=['id','x','y','line','n','profProj','obsCroqui','cargaProj','area','tempo','tempos'];
-const DYN=['status','profMed','agua','aguaM','decks','booster','brinel','detTipo','detQtd','tampao','caminhao','obs','cond','lotes','hist','ts','por','dens','oper'];
+const DYN=['status','profMed','agua','aguaM','decks','booster','brinel','detTipo','detQtd','tampao','caminhao','obs','cond','lotes','hist','ts','por','dens','oper','med'];
 const PK=['lotes','cams','acess','check','situ','geo','pos','detAt','bg','wpp','dsam','areas'];
 function polyDoc(p){const ex={};PK.forEach(k=>{if(p[k]!=null)ex[k]=p[k];});if(ex.bg){ex.bg={...ex.bg};delete ex.bg.on;} /* mostrar/ocultar croqui é de cada celular */return{...ex,dvtProg:p.dvtProg??null,proj:p.proj||null,mina:p.mina,cava:p.cava,pol:p.pol,banco:p.banco,data:p.data,resp:p.resp,nfs:p.nfs||{},esp:p.esp||null,criado:p.criado||null,holes:p.holes.map(h=>{const o={};GEO.forEach(k=>{if(h[k]!=null)o[k]=h[k];});return o;})};}
 function furoDoc(h){const o={};DYN.forEach(k=>o[k]=h[k]??null);return o;}
@@ -544,7 +547,7 @@ function aplicarRemoto(d){
   });
   if(avisosRem.length){notificar(avisosRem.length===1?'Furo fora do projeto':avisosRem.length+' furos fora do projeto',avisosRem.slice(0,4).join('\n'));avisosRem.length=0;}
   if(mudou&&view==='poly'&&tab==='oper')opStAtualiza();
-  if(mudou){if(view==='home')renderHome();else if(view==='cam'&&$('#sheet').classList.contains('hidden'))renderCam();else if(view==='poly'&&$('#sheet').classList.contains('hidden')&&!(tab==='oper'&&operSujo))renderPoly();}
+  if(mudou){if(view==='home')renderHome();else if(view==='cam'&&$('#sheet').classList.contains('hidden'))renderCam();else if(view==='poly'&&$('#sheet').classList.contains('hidden')&&!((tab==='oper'||tab==='med')&&operSujo))renderPoly();}
 }
 function atualizaTelaSync(){const el=$('#syncBox');if(el)el.innerHTML=syncBoxHTML();bindSyncBox();}
 let syncAba='entrar';const syF={nome:'',login:'',senha:'',cod:''};
@@ -755,7 +758,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-27.1';
+const APP_VER='2026-11-27.2';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -1163,11 +1166,11 @@ function renderPoly(){setTimeout(()=>{try{raioChecar(cur());}catch(e){}},0);
   const p=cur();if(!p){go('home');return;}
   $('#ttl').textContent=`POL ${p.pol} · ${p.mina}`;if(tab!=='mapa'&&gpsOn)gpsStop();
   const h=$('#hdrBtn');h.style.display='';h.textContent='⋯';h.onclick=polyMenu;
-  const tabs=[['mapa','Mapa'],['oper','👷 Operador'],['lista','Lista'],['conf','Projeto x Exec.'],['tempo','Temporização'],['resumo','Caminhões e consumo'],['liber','Liberação'],['pos','Pós-fogo'],['relatorio','Relatório']];
-  let html=`${tab==='oper'?'':artBancada(p)}<div class="tabs">${tabs.map(t=>`<button data-t="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}</button>`).join('')}</div><div id="planWBox"></div><div id="tabBox"></div>`;
+  const tabs=[['mapa','Mapa'],['oper','👷 Operador'],['med','📏 Medição'],['lista','Lista'],['conf','Projeto x Exec.'],['tempo','Temporização'],['resumo','Caminhões e consumo'],['liber','Liberação'],['pos','Pós-fogo'],['relatorio','Relatório']];
+  let html=`${tab==='oper'||tab==='med'?'':artBancada(p)}<div class="tabs">${tabs.map(t=>`<button data-t="${t[0]}" class="${tab===t[0]?'on':''}">${t[1]}</button>`).join('')}</div><div id="planWBox"></div><div id="tabBox"></div>`;
   $('#app').innerHTML=html;planWBarra();
   document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;renderPoly();});
-  ({mapa:tabMapa,oper:tabOper,lista:tabLista,conf:tabConf,tempo:tabTempo,resumo:tabResumo,liber:tabLiber,pos:tabPos,relatorio:tabRelatorio})[tab](p);
+  ({mapa:tabMapa,oper:tabOper,med:tabMed,lista:tabLista,conf:tabConf,tempo:tabTempo,resumo:tabResumo,liber:tabLiber,pos:tabPos,relatorio:tabRelatorio})[tab](p);
 }
 const p0=()=>cur();
 function polyMenu(){
@@ -2824,6 +2827,88 @@ function renderIndic(){
   $('#imCsv').onclick=()=>{const n=v=>v==null?'':String(Math.round(v*10)/10).replace('.',',');exportBox('Indicadores','indicadores-'+today()+'.csv',['Data;Mina;POL;Banco;Furos;Carregados;Kg;KgPorFuro;NaTolerancia%;FurosForaTol;Agua%;ProfBaixa%;PerdidosNaoCarregar;Booster;Falhas;Fragmentacao;Ultralancamento',...L.map(x=>[x.p.data,x.p.mina,x.p.pol,x.p.banco,x.furos,x.carr,n(x.kg),n(x.kgFuro),n(x.tol),x.fora??'',n(x.agua),n(x.profBaixa),x.perd,x.booster,x.falhas,FRAG[x.frag]||'',x.ultra?'sim':''].join(';'))].join('\n'),'text/csv');};
 }
 
+/* ===== Aba 📏 Medição: medição real dos furos no campo (profundidade com trena, coluna de água, tampão)
+   grava nos mesmos campos do furo (profMed, aguaM/agua, tampao): a aba Operador já abre com esses valores ===== */
+let medFiltro='falta';
+const medBN=v=>buscaNorm(v); // mesma busca da aba Operador (L1-F1 = l1f1)
+function medAchar(p,q){q=medBN(q);if(!q)return -1;let b=-1,bn=9;p.holes.forEach((h,i)=>{const id=medBN(h.id);const n=id===q?0:id.startsWith(q)?1:id.includes(q)?2:9;if(n<bn){bn=n;b=i;}});return b;}
+const medFeito=h=>!!h.med||h.profMed!=null;
+function medRaso(p,h){const pr=projDe(p,h);return h.profMed!=null&&h.profProj!=null&&h.profMed<h.profProj-(pr.tolProf??0.5);}
+function medCor(p,h){if(!medFeito(h))return'#5b6676';if(medRaso(p,h))return'#f08c00';if(h.agua==='agua'||h.aguaM>0)return'#22b8cf';return'#339af0';}
+function medMapaHTML(p){
+  if(p.bg&&!(p.id in bgCache))bgGet(p.id).then(()=>{if(view==='poly'&&tab==='med'&&S.cur===p.id&&!operSujo)tabMed(p);});
+  const g=geom(p),r=g.r;let s='';
+  if(g.useBg){const m=p.bg.m;s+=`<g transform="translate(${g.pad+g.off-g.minX} ${g.pad-g.minY})"><image href="${g.bgUrl}" width="${p.bg.w}" height="${p.bg.h}" transform="matrix(${m.join(' ')})" preserveAspectRatio="none" opacity="0.8"/></g>`;}
+  p.holes.forEach((h,i)=>{s+=`<g class="opd" data-mi="${i}"><circle cx="${g.X(h.x)}" cy="${g.Y(h.y)}" r="${r}" fill="${medCor(p,h)}" stroke="rgba(0,0,0,.5)" stroke-width="${r*0.1}"/><text x="${g.X(h.x)}" y="${g.Y(h.y)+r*0.3}" text-anchor="middle" font-size="${r*0.8}" fill="#fff" font-weight="700" pointer-events="none">${esc(numFuro(h))}</text></g>`;});
+  return `<div class="opmapw"><svg id="mdMap" viewBox="0 0 ${g.W} ${g.H}" preserveAspectRatio="xMidYMid meet">${s}</svg></div>
+  <div class="oplg"><span><i style="background:#5b6676"></i>Falta medir</span><span><i style="background:#339af0"></i>Medido seco</span><span><i style="background:#22b8cf"></i>Com água</span><span><i style="background:#f08c00"></i>Mais raso que o projeto</span></div>`;}
+function medMarca(i){document.querySelectorAll('#mdMap .opd.sel').forEach(e=>e.classList.remove('sel'));const e=document.querySelector(`#mdMap [data-mi="${i}"]`);if(e)e.classList.add('sel');}
+function medStTxt(p,h){const ra=medRaso(p,h);return ra?'⚠️ '+fmt(h.profProj-h.profMed,1)+' m raso':medFeito(h)?'✔ medido'+(h.aguaM>0||h.agua==='agua'?' 💧':''):h.status!=='pendente'?ST[h.status].n:'';}
+function tabMed(p){
+  const v=x=>x==null?'':String(x).replace('.',',');const pr=projDe(p);
+  const ativos=p.holes.filter(h=>h.status!=='perdido'&&h.status!=='nao');
+  const feitos=ativos.filter(medFeito),agua=ativos.filter(h=>h.aguaM>0||h.agua==='agua'),rasos=ativos.filter(h=>medRaso(p,h));
+  const lista=medFiltro==='falta'?ativos.filter(h=>!medFeito(h)):medFiltro==='feito'?p.holes.filter(medFeito):medFiltro==='raso'?rasos:p.holes;
+  const linha=h=>{const i=p.holes.indexOf(h);const ra=medRaso(p,h);
+    return `<div class="opl mdl ${medFeito(h)?'feito':''}${ra?' raso':''}" data-i="${i}"><div class="oplid"><b>${esc(h.id)}</b><span>${esc(medStTxt(p,h))}</span>${h.profProj!=null?`<small class="opperf">perf. ${fmt(h.profProj,1)} m</small>`:''}${(h.cond||[]).length?`<small class="opperf">${esc(h.cond.join(', '))}</small>`:''}</div>
+    <input data-k="pm" inputmode="decimal" enterkeyhint="next" value="${v(h.profMed)}" placeholder="${h.profProj!=null?v(h.profProj):'m'}" aria-label="Profundidade real do furo ${esc(h.id)}">
+    <input data-k="ag" inputmode="decimal" enterkeyhint="next" value="${v(h.aguaM)}" placeholder="seco" aria-label="Coluna de água do furo ${esc(h.id)}">
+    <input data-k="tp" inputmode="decimal" enterkeyhint="next" value="${v(h.tampao)}" placeholder="${pr.tampao!=null?v(pr.tampao):'m'}" aria-label="Tampão do furo ${esc(h.id)}">
+    <button class="btn oplm" data-md="${i}" aria-label="Mais opções do furo ${esc(h.id)}">⋯</button></div>`;};
+  $('#tabBox').innerHTML=`<div class="card op">
+  <div class="opbar"><h2 style="margin:0">📏 Medição dos furos</h2><button class="btn sm" id="mdOp" style="margin-left:auto">👷 Ver no Operador</button></div>
+  <p class="mut" style="margin:6px 0 0">Profundidade real (trena), coluna de água e tampão. Vai direto para a aba Operador e para a planilha${SY().token?' e para a equipe':''}.</p>
+  <div class="kpis" style="margin-top:8px"><div class="kpi"><b>${feitos.length}/${ativos.length}</b><span>medidos</span></div><div class="kpi"><b>${agua.length}</b><span>com água</span></div><div class="kpi"><b style="${rasos.length?'color:#ffa94d':''}">${rasos.length}</b><span>mais rasos</span></div></div></div>
+  <div class="card op" style="padding:8px"><div class="opbar" style="margin-bottom:6px"><b>Croqui</b><span class="mut" style="margin-left:8px">toque no furo para medir</span><button class="btn sm" id="mdMT" style="margin-left:auto">${S.ui&&S.ui.mdMapOff?'Mostrar ▾':'Esconder ▴'}</button></div>${S.ui&&S.ui.mdMapOff?'':medMapaHTML(p)}</div>
+  <div class="mdbusca"><span aria-hidden="true">🔍</span><input id="mdBq" type="text" inputmode="numeric" enterkeyhint="go" autocomplete="off" placeholder="Achar furo nº"></div>
+  <div class="seg" id="mdF" style="margin:4px 0 8px">${[['falta','Falta medir'],['feito','Medidos'],['raso','Rasos'],['todos','Todos']].map(([k,t])=>`<button data-f="${k}" class="${medFiltro===k?'on':''}">${t}</button>`).join('')}</div>
+  <div class="card op" style="padding:6px 8px"><div class="oplh"><span>Furo</span><span>Prof. real m</span><span>Água m</span><span>Tampão m</span><span></span></div>
+  <div id="mdList">${lista.map(linha).join('')||`<p class="mut" style="padding:10px">${medFiltro==='falta'?'Todos os furos já foram medidos 👍':'Nada aqui.'}</p>`}</div>
+  <p class="mut" style="margin:8px 4px">Digite e passe para o próximo: salva sozinho. Água vazia = furo seco. ⋯ = obstruído, desmoronado e outras condições.</p></div>`;
+  operSujo=false;
+  $('#mdOp').onclick=()=>{tab='oper';renderPoly();};
+  $('#mdMT').onclick=()=>{S.ui=Object.assign(S.ui||{},{mdMapOff:!(S.ui&&S.ui.mdMapOff)});save();tabMed(p);};
+  document.querySelectorAll('#mdF button').forEach(b=>b.onclick=()=>{medFiltro=b.dataset.f;tabMed(p);});
+  const vai=i=>{let row=document.querySelector(`.mdl[data-i="${i}"]`);if(!row){medFiltro='todos';tabMed(p);row=document.querySelector(`.mdl[data-i="${i}"]`);}if(!row)return;row.scrollIntoView({block:'center',behavior:'smooth'});row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),1200);setTimeout(()=>{const inp=row.querySelector('[data-k="pm"]');if(inp)inp.focus({preventScroll:true});},350);medMarca(i);};
+  document.querySelectorAll('#mdMap .opd').forEach(e=>e.onclick=()=>vai(+e.dataset.mi));
+  const bq=$('#mdBq');bq.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const i=medAchar(p,bq.value);if(i<0){toast('Furo não encontrado');return;}bq.value='';bq.blur();vai(i);}};
+  bq.oninput=()=>{const i=medAchar(p,bq.value);if(i>=0)medMarca(i);};
+  document.querySelectorAll('[data-md]').forEach(b=>b.onclick=()=>medMais(p,+b.dataset.md));
+  const ins=[...document.querySelectorAll('#mdList input')];
+  ins.forEach((el,ix)=>{el.onfocus=()=>{operSujo=true;medMarca(+el.closest('.mdl').dataset.i);setTimeout(()=>{try{el.select();}catch(e){}},0);};
+    el.oninput=()=>{operSujo=true;};
+    // Enter na profundidade pula para a profundidade do próximo furo (a maioria é seco); água e tampão só quando precisar
+    el.onkeydown=e=>{if(e.key!=='Enter')return;e.preventDefault();let nx=null;if(el.dataset.k==='pm'){for(let j=ix+1;j<ins.length;j++)if(ins[j].dataset.k==='pm'){nx=ins[j];break;}}else nx=ins[ix+1];if(nx){nx.focus();nx.scrollIntoView({block:'center'});}else el.blur();};
+    el.onchange=()=>medSalva(p,el.closest('.mdl'));
+    el.onblur=()=>setTimeout(()=>{if(!document.activeElement||!document.activeElement.closest||!document.activeElement.closest('#mdList'))operSujo=false;},300);});
+}
+// salva a linha sem redesenhar a lista (não tira o foco de quem está digitando)
+function medSalva(p,row){
+  const h=p.holes[+row.dataset.i];if(!h)return;const g=k=>num(row.querySelector(`[data-k="${k}"]`).value);
+  const pm=g('pm'),ag=g('ag'),tp=g('tp');
+  if(pm===(h.profMed??null)&&ag===(h.aguaM??null)&&tp===(h.tampao??null))return;
+  pushUndo(p,[h],'medição '+h.id);
+  h.profMed=pm;h.aguaM=ag;if(ag>0)h.agua='agua';else if(h.agua==='agua')h.agua='seca';h.tampao=tp;
+  h.med=pm==null&&ag==null&&tp==null?null:{ts:Date.now(),por:meuNome()||''};
+  histAdd(h,'Medição: '+[pm!=null?'prof. '+fmt(pm,1)+' m':'',ag>0?'água '+fmt(ag,1)+' m':pm!=null?'seco':'',tp!=null?'tampão '+fmt(tp,1)+' m':''].filter(Boolean).join(' · '));
+  h.ts=Date.now();if(meuNome())h.por=meuNome();markF(p.id,h.id);save();
+  const ra=medRaso(p,h);row.classList.toggle('feito',medFeito(h));row.classList.toggle('raso',ra);
+  row.querySelector('.oplid span').textContent=medStTxt(p,h);
+  const c=document.querySelector(`#mdMap [data-mi="${p.holes.indexOf(h)}"] circle`);if(c)c.setAttribute('fill',medCor(p,h));
+  toast('Furo '+h.id+' medido'+(ra?' · ⚠️ '+fmt(h.profProj-h.profMed,1)+' m mais raso que o projeto':'')+(SY().token?' · enviado':''));
+}
+function medMais(p,i){const h=p.holes[i];
+  openSheet(`<h3>Furo ${esc(h.id)}<button class="btn sm" id="mmX">Fechar</button></h3><p class="mut" style="margin:0 0 8px">Condição do furo (toque para marcar)</p>
+  <div class="conds" id="mmCo">${CONDS.map(c=>`<button data-c="${esc(c)}" class="${(h.cond||[]).includes(c)?'on':''}" style="min-height:48px;font-size:17px">${esc(c)}</button>`).join('')}</div>
+  <div class="seg" id="mmAg" style="margin-top:10px">${Object.entries(AGUA_N).map(([k,t])=>`<button data-a="${k}" class="${h.agua===k?'on':''}">${t}</button>`).join('')}</div>
+  <div class="btns" style="flex-direction:column;margin-top:10px"><button class="btn ok" id="mmOk" style="min-height:56px;font-size:18px">✔ Salvar</button><button class="btn" id="mmAll" style="min-height:48px">Lançamento completo do furo</button></div>`);
+  let cond=[...(h.cond||[])],ag=h.agua;
+  document.querySelectorAll('#mmCo button').forEach(b=>b.onclick=()=>{const c=b.dataset.c;cond=cond.includes(c)?cond.filter(x=>x!==c):[...cond,c];b.classList.toggle('on');});
+  document.querySelectorAll('#mmAg button').forEach(b=>b.onclick=()=>{ag=b.dataset.a;document.querySelectorAll('#mmAg button').forEach(x=>x.classList.toggle('on',x===b));});
+  $('#mmX').onclick=closeSheet;$('#mmAll').onclick=()=>{closeSheet();editHole(i);};
+  $('#mmOk').onclick=()=>{pushUndo(p,[h],'medição '+h.id);h.cond=cond;h.agua=ag;if(ag==='seca')h.aguaM=null;h.med=Object.assign({},h.med||{},{ts:Date.now(),por:meuNome()||''});
+    histAdd(h,'Medição: '+[AGUA_N[ag],...cond].join(' · '));h.ts=Date.now();markF(p.id,h.id);save();closeSheet();tabMed(p);toast('Furo '+h.id+' salvo');};
+}
 /* ===== Aba Operador (dentro do lançamento de carga): lista de furos, cada linha com carga, profundidade e tampão ===== */
 let operSujo=false,operFiltro='todos',operAdd=false,operBusca='';
 // busca de furo na aba Operador: compara só letras e números (L1-F1 = l1f1); exato primeiro, depois começa com, depois contém
@@ -2831,11 +2916,11 @@ const buscaNorm=v=>String(v==null?'':v).toUpperCase().replace(/[^0-9A-Z]/g,'');
 function operAchar(p,q){q=buscaNorm(q);if(!q)return [];const r=[];p.holes.forEach((h,i)=>{const id=buscaNorm(h.id);const n=id===q?0:id.startsWith(q)?1:id.includes(q)?2:9;if(n<9)r.push({h,i,n});});
   return r.sort((a,b)=>a.n-b.n||String(a.h.id).length-String(b.h.id).length||a.i-b.i);}
 const operLast=()=>(S.ui&&S.ui.operLast)||{};
-function abrirOperador(){
+function abrirOperador(aba){
   const ab=S.polys.filter(p=>situDe(p)==='aberto').sort((a,b)=>(b.data||'').localeCompare(a.data||'')||(b.criado||0)-(a.criado||0));
   const p=(S.cur&&ab.find(x=>x.id===S.cur))||ab[0]||S.polys.find(x=>x.id===S.cur);
   if(!p){go('home');toast('Nenhum polígono em carregamento');return;}
-  S.cur=p.id;save();tab='oper';go('poly');
+  S.cur=p.id;save();tab=aba||'oper';go('poly');
 }
 /* ----- Amostras de densidade (copo): até 4 por carregamento, cada uma lida a 0, 15 e 30 min — igual à aba "Densidade" do modelo Enaex ----- */
 // no modelo: densidade = (peso do copo cheio − 6 g) / 535
@@ -2969,7 +3054,7 @@ function tabOper(p){
   const abertos=S.polys.filter(x=>situDe(x)==='aberto'||x.id===p.id);const v=x=>x==null?'':String(x).replace('.',',');
   const lista=operFiltro==='pend'?p.holes.filter(x=>x.status==='pendente'):operFiltro==='meus'?meus:p.holes;
   const linha=h=>{const i=p.holes.indexOf(h);const kgM=kgDoCam(h,meu);const outros=holeKg(h)-kgM;const st=h.status;const tampPad=tampoPadrao(p,h);const lim=limitesFuro(p,h);
-    return `<div class="opl ${st}${lim.length?' lim':''}" data-i="${i}"><div class="oplid"><b>${lim.length?'⛔ ':''}${esc(h.id)}</b>${areaDe(p,h)?`<em class="oparea" style="background:${areaCor(p,h.area)}">${esc(areaNome(p,h))}</em>`:''}${ehExtraOp(h)?'<em class="opadd">extra operador</em>':ehExtra(h)?'<em class="opadd">extra</em>':''}<span>${st==='pendente'?(h.agua!=='seca'?'💧':''):st==='carregado'?'✔':ST[st].n}${outros>0?' <i>+'+fmt(outros)+' '+esc(camsDoFuro(h).filter(c=>c!==meu).map(camCurto).join('+'))+'</i>':''}</span>${h.profProj!=null||h.obsCroqui?`<small class="opperf">${h.profProj!=null?'perf. '+fmt(h.profProj,1)+' m':''}${h.obsCroqui?' · '+esc(String(h.obsCroqui).replace(/_/g,' ')):''}</small>`:''}${h.oper&&st!=='pendente'?`<small class="opperf opnm">👷 ${esc(h.oper)}</small>`:''}</div>
+    return `<div class="opl ${st}${lim.length?' lim':''}" data-i="${i}"><div class="oplid"><b>${lim.length?'⛔ ':''}${esc(h.id)}</b>${areaDe(p,h)?`<em class="oparea" style="background:${areaCor(p,h.area)}">${esc(areaNome(p,h))}</em>`:''}${ehExtraOp(h)?'<em class="opadd">extra operador</em>':ehExtra(h)?'<em class="opadd">extra</em>':''}<span>${st==='pendente'?(h.agua!=='seca'?'💧':''):st==='carregado'?'✔':ST[st].n}${outros>0?' <i>+'+fmt(outros)+' '+esc(camsDoFuro(h).filter(c=>c!==meu).map(camCurto).join('+'))+'</i>':''}</span>${h.profProj!=null||h.obsCroqui?`<small class="opperf">${h.profProj!=null?'perf. '+fmt(h.profProj,1)+' m':''}${h.obsCroqui?' · '+esc(String(h.obsCroqui).replace(/_/g,' ')):''}</small>`:''}${h.med&&(h.profMed!=null||h.aguaM!=null)?`<small class="opperf opmd">📏 medido${h.aguaM?' · 💧 '+fmt(h.aguaM,1)+' m':''}</small>`:''}${h.oper&&st!=='pendente'?`<small class="opperf opnm">👷 ${esc(h.oper)}</small>`:''}</div>
     <input data-k="kg" class="${lim.some(x=>x.k==='kg')?'lim':''}" inputmode="decimal" enterkeyhint="next" value="${v(kgM||null)}" placeholder="${kgProj(p,h)!=null?fmt(kgProj(p,h)):'kg'}" aria-label="Carga do furo ${esc(h.id)}">
     <input data-k="pm" inputmode="decimal" enterkeyhint="next" value="${v(h.profMed)}" placeholder="${h.profProj!=null?v(h.profProj):'m'}" aria-label="Profundidade do furo ${esc(h.id)}">
     <input data-k="tp" class="${lim.some(x=>x.k==='tp')?'lim':''}" inputmode="decimal" enterkeyhint="next" value="${v(h.tampao)}" placeholder="${tampPad!=null?v(tampPad):'m'}" aria-label="Tampão do furo ${esc(h.id)}">
@@ -3840,7 +3925,7 @@ async function planWTick(pid,k,forcar){const w=planW[pid]&&planW[pid][k];if(!w||
     if(mud.length){planAplicar(p,mud,'planilha acompanhada '+w.nome);w.ult={n:mud.length,ids:mud.map(m=>m.h.id),t:Date.now()};
       planFlash={ids:new Set(mud.map(m=>String(m.h.id))),ate:Date.now()+9000};if(corPor!=='caminhao')setCorPor('caminhao');
       const ids=mud.slice(0,5).map(m=>m.h.id).join(', ')+(mud.length>5?'…':'');toast(`📗 ${w.nome}: ${mud.length} furo(s) atualizados (${ids})`,3500);
-      if(S.cur===pid&&view==='poly'&&$('#sheet').classList.contains('hidden')&&!(tab==='oper'&&operSujo))renderPoly();else if(view==='home'&&$('#sheet').classList.contains('hidden'))renderHome();else planWBarra();}
+      if(S.cur===pid&&view==='poly'&&$('#sheet').classList.contains('hidden')&&!((tab==='oper'||tab==='med')&&operSujo))renderPoly();else if(view==='home'&&$('#sheet').classList.contains('hidden'))renderHome();else planWBarra();}
     else planWBarra();
     planWGuardar(pid);
   }finally{w.lendo=false;}
@@ -4062,7 +4147,7 @@ function csv(p){
 }
 
 render();
-if(/^#oper/i.test(location.hash||''))abrirOperador();
+if(/^#oper/i.test(location.hash||''))abrirOperador();else if(/^#medi/i.test(location.hash||''))abrirOperador('med');
 if(SY().token)setTimeout(syncNow,800);
 setTimeout(checarAtualizacao,1500);setTimeout(()=>{if(SY().token)filaTodasFotos().then(()=>nuvemArquivos());},5000);setTimeout(guardarParaOffline,2500);
 // usa o mesmo service worker do site (Medição) para abrir sem sinal mesmo se o Medição nunca foi aberto neste celular
