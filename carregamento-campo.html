@@ -255,9 +255,12 @@ header h1 .logo svg{width:24px;height:24px}
 #opMap .opd{cursor:pointer}#opMap .opd.sel circle{stroke:#ffb11f!important}
 .oplg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px;color:var(--mut);margin-top:6px}.oplg i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:4px;vertical-align:-1px}
 .opl.flash{box-shadow:inset 0 0 0 3px #ffb11f}
-.opperf.opmd{color:#74c0fc;font-weight:700}.mdl.feito{background:rgba(51,154,240,.13)}.mdl.raso{background:rgba(240,140,0,.2);box-shadow:inset 6px 0 0 #f08c00}.mdl .oplid span{font-size:12px}
-.mdbusca{display:flex;gap:6px;align-items:center;border:2px solid #339af0;border-radius:12px;padding:4px 6px;margin:0 0 6px;background:#0d1420}.mdbusca>span{font-size:22px}.mdbusca input{flex:1;min-width:0;font-size:24px;font-weight:800;height:50px;border:0!important;background:transparent;color:inherit;box-shadow:none!important}
-#mdMap{display:block;width:100%;height:auto;max-height:42vh}#mdMap .opd{cursor:pointer}#mdMap .opd.sel circle{stroke:#ffb11f!important}
+.opperf.opmd{color:#74c0fc;font-weight:700}
+.mdbusca{display:flex;gap:6px;align-items:center;border:2px solid #339af0;border-radius:12px;padding:4px 6px;margin:0 0 6px;background:#0d1420}.mdbusca>span{font-size:20px}.mdbusca input{flex:1;min-width:0;font-size:22px;font-weight:800;height:46px;border:0!important;background:transparent;color:inherit;box-shadow:none!important}.mdbusca .btn{min-width:44px;min-height:44px;font-size:20px;font-weight:800}
+.mdw{overflow:auto;max-height:66vh;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}#mdMap{display:block;margin:auto}#mdMap .opd{cursor:pointer}.mdsel{animation:mdp 1.2s ease-in-out infinite}@keyframes mdp{50%{opacity:.35}}
+.mdk{font-size:13px;color:var(--mut);margin-left:8px}.mdk b{color:#fff}.mdid{font-size:30px;color:#ffd43b}.mdcrop{background:#0b1320;border:1px solid var(--line);border-radius:10px;height:150px}.mdcrop svg{width:100%;height:100%;display:block}
+.mdin{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.mdin label{font-size:13px;color:var(--mut);font-weight:700}.mdin input{width:100%;font-size:26px;font-weight:800;height:60px;text-align:center;margin-top:2px}
+.mdli{display:grid;grid-template-columns:70px 1fr auto;gap:8px;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer}.mdli b{font-size:20px}.mdli small{color:var(--mut)}
 .opbwrap{position:sticky;top:58px;z-index:4;background:#0d1420;border-radius:12px}.opbusca{display:flex;gap:6px;align-items:center;background:#0d1420;border:2px solid #ff8a1f;border-radius:12px;padding:4px 6px;margin:0 0 6px}
 .opbusca>span{font-size:22px}.opbusca input{flex:1;min-width:0;font-size:24px;font-weight:800;height:52px;border:0!important;background:transparent;color:inherit;box-shadow:none!important}
 .opbusca .btn{min-height:44px;min-width:48px}.opbres{display:flex;flex-wrap:wrap;gap:6px;padding:0 0 6px;max-height:40vh;overflow:auto}.opbres:empty{display:none}
@@ -758,7 +761,7 @@ function lerLista(){
   return hs;
 }
 /* ----- versão do app e atualização (o service worker do site mostra a versão guardada primeiro) ----- */
-const APP_VER='2026-11-27.2';
+const APP_VER='2026-11-27.3';
 const ARQ_VER='carregamento-versao.json';
 async function apagarDosCaches(nome){let n=0;try{for(const k of await caches.keys()){const c=await caches.open(k);for(const q of await c.keys())if(new URL(q.url).pathname.endsWith('/'+nome)){await c.delete(q);n++;}}}catch(e){}return n;}
 async function checarAtualizacao(){
@@ -2827,87 +2830,99 @@ function renderIndic(){
   $('#imCsv').onclick=()=>{const n=v=>v==null?'':String(Math.round(v*10)/10).replace('.',',');exportBox('Indicadores','indicadores-'+today()+'.csv',['Data;Mina;POL;Banco;Furos;Carregados;Kg;KgPorFuro;NaTolerancia%;FurosForaTol;Agua%;ProfBaixa%;PerdidosNaoCarregar;Booster;Falhas;Fragmentacao;Ultralancamento',...L.map(x=>[x.p.data,x.p.mina,x.p.pol,x.p.banco,x.furos,x.carr,n(x.kg),n(x.kgFuro),n(x.tol),x.fora??'',n(x.agua),n(x.profBaixa),x.perd,x.booster,x.falhas,FRAG[x.frag]||'',x.ultra?'sim':''].join(';'))].join('\n'),'text/csv');};
 }
 
-/* ===== Aba 📏 Medição: medição real dos furos no campo (profundidade com trena, coluna de água, tampão)
+/* ===== Aba 📏 Medição: medição real dos furos no campo PELO CROQUI (quem mede se posiciona no mapa e toca no furo)
    grava nos mesmos campos do furo (profMed, aguaM/agua, tampao): a aba Operador já abre com esses valores ===== */
-let medFiltro='falta';
+let medFiltro='falta',medZoom=1,medSel=-1,medListaOn=false;
 const medBN=v=>buscaNorm(v); // mesma busca da aba Operador (L1-F1 = l1f1)
 function medAchar(p,q){q=medBN(q);if(!q)return -1;let b=-1,bn=9;p.holes.forEach((h,i)=>{const id=medBN(h.id);const n=id===q?0:id.startsWith(q)?1:id.includes(q)?2:9;if(n<bn){bn=n;b=i;}});return b;}
 const medFeito=h=>!!h.med||h.profMed!=null;
 function medRaso(p,h){const pr=projDe(p,h);return h.profMed!=null&&h.profProj!=null&&h.profMed<h.profProj-(pr.tolProf??0.5);}
-function medCor(p,h){if(!medFeito(h))return'#5b6676';if(medRaso(p,h))return'#f08c00';if(h.agua==='agua'||h.aguaM>0)return'#22b8cf';return'#339af0';}
-function medMapaHTML(p){
-  if(p.bg&&!(p.id in bgCache))bgGet(p.id).then(()=>{if(view==='poly'&&tab==='med'&&S.cur===p.id&&!operSujo)tabMed(p);});
-  const g=geom(p),r=g.r;let s='';
+function medCor(p,h){if(h.status==='perdido'||h.status==='nao')return'#343a40';if(!medFeito(h))return'#5b6676';if(medRaso(p,h))return'#f08c00';if(h.agua==='agua'||h.aguaM>0)return'#22b8cf';return'#339af0';}
+// furos do croqui (o mesmo desenho serve para o croqui grande e para o recorte em volta do furo no painel)
+function medFurosSVG(p,g,sel,pre){const r=g.r;let s='';
   if(g.useBg){const m=p.bg.m;s+=`<g transform="translate(${g.pad+g.off-g.minX} ${g.pad-g.minY})"><image href="${g.bgUrl}" width="${p.bg.w}" height="${p.bg.h}" transform="matrix(${m.join(' ')})" preserveAspectRatio="none" opacity="0.8"/></g>`;}
-  p.holes.forEach((h,i)=>{s+=`<g class="opd" data-mi="${i}"><circle cx="${g.X(h.x)}" cy="${g.Y(h.y)}" r="${r}" fill="${medCor(p,h)}" stroke="rgba(0,0,0,.5)" stroke-width="${r*0.1}"/><text x="${g.X(h.x)}" y="${g.Y(h.y)+r*0.3}" text-anchor="middle" font-size="${r*0.8}" fill="#fff" font-weight="700" pointer-events="none">${esc(numFuro(h))}</text></g>`;});
-  return `<div class="opmapw"><svg id="mdMap" viewBox="0 0 ${g.W} ${g.H}" preserveAspectRatio="xMidYMid meet">${s}</svg></div>
-  <div class="oplg"><span><i style="background:#5b6676"></i>Falta medir</span><span><i style="background:#339af0"></i>Medido seco</span><span><i style="background:#22b8cf"></i>Com água</span><span><i style="background:#f08c00"></i>Mais raso que o projeto</span></div>`;}
-function medMarca(i){document.querySelectorAll('#mdMap .opd.sel').forEach(e=>e.classList.remove('sel'));const e=document.querySelector(`#mdMap [data-mi="${i}"]`);if(e)e.classList.add('sel');}
+  p.holes.forEach((h,i)=>{const cx=g.X(h.x),cy=g.Y(h.y);s+=`<g class="opd" data-${pre}="${i}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${medCor(p,h)}" stroke="rgba(0,0,0,.55)" stroke-width="${r*0.1}"/>${(h.cond||[]).length?`<circle cx="${cx+r*0.75}" cy="${cy-r*0.75}" r="${r*0.3}" fill="#e03131" pointer-events="none"/>`:''}<text x="${cx}" y="${cy+r*0.3}" text-anchor="middle" font-size="${r*0.8}" fill="#fff" font-weight="700" pointer-events="none">${esc(numFuro(h))}</text></g>`;});
+  if(sel>=0&&p.holes[sel]){const h=p.holes[sel];s+=`<circle class="mdsel" cx="${g.X(h.x)}" cy="${g.Y(h.y)}" r="${r*1.5}" fill="none" stroke="#ffd43b" stroke-width="${r*0.3}" pointer-events="none"/>`;}
+  return s;}
+function medBase(g){const box=$('#tabBox');const cw=Math.max(240,((box&&box.clientWidth)||innerWidth-24)-20),ch=Math.max(300,innerHeight*0.62);return Math.min(cw/g.W,ch/g.H);}
+function medZoomAplica(nz,cx,cy){const mw=$('#mdW'),sv=$('#mdMap');if(!mw||!sv)return;const g=sv._g;if(!g)return;
+  const zmax=Math.max(1,(26/g.r)/medBase(g));nz=Math.min(zmax,Math.max(1,nz));
+  if(cx==null){cx=mw.clientWidth/2;cy=mw.clientHeight/2;}const fx=(mw.scrollLeft+cx)/mw.scrollWidth,fy=(mw.scrollTop+cy)/mw.scrollHeight;
+  medZoom=nz;const b=medBase(g)*nz;sv.style.width=g.W*b+'px';sv.style.height=g.H*b+'px';
+  mw.scrollLeft=fx*mw.scrollWidth-cx;mw.scrollTop=fy*mw.scrollHeight-cy;}
+// leva o furo para o meio do croqui (busca / lista) e aproxima se estiver longe demais
+function medCentra(i){const mw=$('#mdW'),sv=$('#mdMap');if(!mw||!sv||!sv._g)return;const g=sv._g,h=sv._p.holes[i];if(!h)return;
+  if(medZoom<2.5)medZoomAplica(2.5);const k=medBase(g)*medZoom;mw.scrollLeft=g.X(h.x)*k-mw.clientWidth/2;mw.scrollTop=g.Y(h.y)*k-mw.clientHeight/2;
+  mw.scrollIntoView({block:'nearest',behavior:'smooth'});}
+function medMarca(p,i){medSel=i;const sv=$('#mdMap');if(!sv||!sv._g)return;const o=sv.querySelector('.mdsel');if(o)o.remove();const h=p.holes[i];if(!h)return;const g=sv._g,r=g.r;
+  sv.insertAdjacentHTML('beforeend',`<circle class="mdsel" cx="${g.X(h.x)}" cy="${g.Y(h.y)}" r="${r*1.5}" fill="none" stroke="#ffd43b" stroke-width="${r*0.3}" pointer-events="none"/>`);}
 function medStTxt(p,h){const ra=medRaso(p,h);return ra?'⚠️ '+fmt(h.profProj-h.profMed,1)+' m raso':medFeito(h)?'✔ medido'+(h.aguaM>0||h.agua==='agua'?' 💧':''):h.status!=='pendente'?ST[h.status].n:'';}
 function tabMed(p){
-  const v=x=>x==null?'':String(x).replace('.',',');const pr=projDe(p);
   const ativos=p.holes.filter(h=>h.status!=='perdido'&&h.status!=='nao');
   const feitos=ativos.filter(medFeito),agua=ativos.filter(h=>h.aguaM>0||h.agua==='agua'),rasos=ativos.filter(h=>medRaso(p,h));
+  if(p.bg&&!(p.id in bgCache))bgGet(p.id).then(()=>{if(view==='poly'&&tab==='med'&&S.cur===p.id&&$('#sheet').classList.contains('hidden'))tabMed(p);});
+  const g=geom(p);const b=medBase(g)*medZoom;
   const lista=medFiltro==='falta'?ativos.filter(h=>!medFeito(h)):medFiltro==='feito'?p.holes.filter(medFeito):medFiltro==='raso'?rasos:p.holes;
-  const linha=h=>{const i=p.holes.indexOf(h);const ra=medRaso(p,h);
-    return `<div class="opl mdl ${medFeito(h)?'feito':''}${ra?' raso':''}" data-i="${i}"><div class="oplid"><b>${esc(h.id)}</b><span>${esc(medStTxt(p,h))}</span>${h.profProj!=null?`<small class="opperf">perf. ${fmt(h.profProj,1)} m</small>`:''}${(h.cond||[]).length?`<small class="opperf">${esc(h.cond.join(', '))}</small>`:''}</div>
-    <input data-k="pm" inputmode="decimal" enterkeyhint="next" value="${v(h.profMed)}" placeholder="${h.profProj!=null?v(h.profProj):'m'}" aria-label="Profundidade real do furo ${esc(h.id)}">
-    <input data-k="ag" inputmode="decimal" enterkeyhint="next" value="${v(h.aguaM)}" placeholder="seco" aria-label="Coluna de água do furo ${esc(h.id)}">
-    <input data-k="tp" inputmode="decimal" enterkeyhint="next" value="${v(h.tampao)}" placeholder="${pr.tampao!=null?v(pr.tampao):'m'}" aria-label="Tampão do furo ${esc(h.id)}">
-    <button class="btn oplm" data-md="${i}" aria-label="Mais opções do furo ${esc(h.id)}">⋯</button></div>`;};
-  $('#tabBox').innerHTML=`<div class="card op">
-  <div class="opbar"><h2 style="margin:0">📏 Medição dos furos</h2><button class="btn sm" id="mdOp" style="margin-left:auto">👷 Ver no Operador</button></div>
-  <p class="mut" style="margin:6px 0 0">Profundidade real (trena), coluna de água e tampão. Vai direto para a aba Operador e para a planilha${SY().token?' e para a equipe':''}.</p>
-  <div class="kpis" style="margin-top:8px"><div class="kpi"><b>${feitos.length}/${ativos.length}</b><span>medidos</span></div><div class="kpi"><b>${agua.length}</b><span>com água</span></div><div class="kpi"><b style="${rasos.length?'color:#ffa94d':''}">${rasos.length}</b><span>mais rasos</span></div></div></div>
-  <div class="card op" style="padding:8px"><div class="opbar" style="margin-bottom:6px"><b>Croqui</b><span class="mut" style="margin-left:8px">toque no furo para medir</span><button class="btn sm" id="mdMT" style="margin-left:auto">${S.ui&&S.ui.mdMapOff?'Mostrar ▾':'Esconder ▴'}</button></div>${S.ui&&S.ui.mdMapOff?'':medMapaHTML(p)}</div>
-  <div class="mdbusca"><span aria-hidden="true">🔍</span><input id="mdBq" type="text" inputmode="numeric" enterkeyhint="go" autocomplete="off" placeholder="Achar furo nº"></div>
-  <div class="seg" id="mdF" style="margin:4px 0 8px">${[['falta','Falta medir'],['feito','Medidos'],['raso','Rasos'],['todos','Todos']].map(([k,t])=>`<button data-f="${k}" class="${medFiltro===k?'on':''}">${t}</button>`).join('')}</div>
-  <div class="card op" style="padding:6px 8px"><div class="oplh"><span>Furo</span><span>Prof. real m</span><span>Água m</span><span>Tampão m</span><span></span></div>
-  <div id="mdList">${lista.map(linha).join('')||`<p class="mut" style="padding:10px">${medFiltro==='falta'?'Todos os furos já foram medidos 👍':'Nada aqui.'}</p>`}</div>
-  <p class="mut" style="margin:8px 4px">Digite e passe para o próximo: salva sozinho. Água vazia = furo seco. ⋯ = obstruído, desmoronado e outras condições.</p></div>`;
-  operSujo=false;
+  $('#tabBox').innerHTML=`<div class="card op" style="padding:8px 10px">
+  <div class="opbar"><b style="font-size:18px">📏 Medição</b><span class="mdk"><b>${feitos.length}/${ativos.length}</b> medidos · <b>${agua.length}</b> 💧${rasos.length?` · <b style="color:#ffa94d">${rasos.length}</b> rasos`:''}</span><button class="btn sm" id="mdOp" style="margin-left:auto">👷 Operador</button></div></div>
+  <div class="card op" style="padding:6px">
+  <div class="mdbusca"><span aria-hidden="true">🔍</span><input id="mdBq" type="text" inputmode="numeric" enterkeyhint="go" autocomplete="off" placeholder="Achar furo no croqui"><button class="btn sm" id="mdZm" aria-label="Afastar">−</button><button class="btn sm" id="mdZp" aria-label="Aproximar">+</button><button class="btn sm" id="mdZf" aria-label="Ver tudo">⤢</button></div>
+  <div class="opmapw mdw" id="mdW"><svg id="mdMap" viewBox="0 0 ${g.W} ${g.H}" preserveAspectRatio="xMidYMid meet" style="width:${g.W*b}px;height:${g.H*b}px">${medFurosSVG(p,g,medSel,'mi')}</svg></div>
+  <div class="oplg"><span><i style="background:#5b6676"></i>Falta medir</span><span><i style="background:#339af0"></i>Medido seco</span><span><i style="background:#22b8cf"></i>Com água</span><span><i style="background:#f08c00"></i>Mais raso</span><span><i style="background:#e03131;width:8px;height:8px"></i>Condição</span></div>
+  <p class="mut" style="margin:6px 2px 0"><b>Toque no furo onde você está</b> para lançar profundidade, água e tampão. Dois dedos ou + / − para aproximar.</p></div>
+  <button class="btn" id="mdLT" style="width:100%;min-height:48px;margin:0 0 8px">${medListaOn?'Esconder lista ▴':'Ver em lista ▾'}</button>
+  ${medListaOn?`<div class="seg" id="mdF" style="margin:0 0 8px">${[['falta','Falta medir'],['feito','Medidos'],['raso','Rasos'],['todos','Todos']].map(([k,t])=>`<button data-f="${k}" class="${medFiltro===k?'on':''}">${t}</button>`).join('')}</div>
+  <div class="card op" style="padding:4px 8px">${lista.map(h=>{const i=p.holes.indexOf(h);return `<div class="mdli" data-li="${i}"><b>${esc(h.id)}</b><span>${h.profMed!=null?fmt(h.profMed,1)+' m':'–'}${h.aguaM>0?' · 💧 '+fmt(h.aguaM,1):''}${h.tampao!=null?' · tp '+fmt(h.tampao,1):''}</span><small>${esc(medStTxt(p,h))}</small></div>`;}).join('')||`<p class="mut" style="padding:10px">${medFiltro==='falta'?'Todos os furos já foram medidos 👍':'Nada aqui.'}</p>`}</div>`:''}`;
+  const sv=$('#mdMap'),mw=$('#mdW');sv._g=g;sv._p=p;
   $('#mdOp').onclick=()=>{tab='oper';renderPoly();};
-  $('#mdMT').onclick=()=>{S.ui=Object.assign(S.ui||{},{mdMapOff:!(S.ui&&S.ui.mdMapOff)});save();tabMed(p);};
-  document.querySelectorAll('#mdF button').forEach(b=>b.onclick=()=>{medFiltro=b.dataset.f;tabMed(p);});
-  const vai=i=>{let row=document.querySelector(`.mdl[data-i="${i}"]`);if(!row){medFiltro='todos';tabMed(p);row=document.querySelector(`.mdl[data-i="${i}"]`);}if(!row)return;row.scrollIntoView({block:'center',behavior:'smooth'});row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),1200);setTimeout(()=>{const inp=row.querySelector('[data-k="pm"]');if(inp)inp.focus({preventScroll:true});},350);medMarca(i);};
-  document.querySelectorAll('#mdMap .opd').forEach(e=>e.onclick=()=>vai(+e.dataset.mi));
-  const bq=$('#mdBq');bq.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const i=medAchar(p,bq.value);if(i<0){toast('Furo não encontrado');return;}bq.value='';bq.blur();vai(i);}};
-  bq.oninput=()=>{const i=medAchar(p,bq.value);if(i>=0)medMarca(i);};
-  document.querySelectorAll('[data-md]').forEach(b=>b.onclick=()=>medMais(p,+b.dataset.md));
-  const ins=[...document.querySelectorAll('#mdList input')];
-  ins.forEach((el,ix)=>{el.onfocus=()=>{operSujo=true;medMarca(+el.closest('.mdl').dataset.i);setTimeout(()=>{try{el.select();}catch(e){}},0);};
-    el.oninput=()=>{operSujo=true;};
-    // Enter na profundidade pula para a profundidade do próximo furo (a maioria é seco); água e tampão só quando precisar
-    el.onkeydown=e=>{if(e.key!=='Enter')return;e.preventDefault();let nx=null;if(el.dataset.k==='pm'){for(let j=ix+1;j<ins.length;j++)if(ins[j].dataset.k==='pm'){nx=ins[j];break;}}else nx=ins[ix+1];if(nx){nx.focus();nx.scrollIntoView({block:'center'});}else el.blur();};
-    el.onchange=()=>medSalva(p,el.closest('.mdl'));
-    el.onblur=()=>setTimeout(()=>{if(!document.activeElement||!document.activeElement.closest||!document.activeElement.closest('#mdList'))operSujo=false;},300);});
+  $('#mdLT').onclick=()=>{medListaOn=!medListaOn;tabMed(p);};
+  document.querySelectorAll('#mdF button').forEach(x=>x.onclick=()=>{medFiltro=x.dataset.f;tabMed(p);});
+  document.querySelectorAll('[data-li]').forEach(x=>x.onclick=()=>{const i=+x.dataset.li;medMarca(p,i);medCentra(i);setTimeout(()=>medPainel(p,i),350);});
+  $('#mdZp').onclick=()=>medZoomAplica(medZoom*1.6);$('#mdZm').onclick=()=>medZoomAplica(medZoom/1.6);$('#mdZf').onclick=()=>medZoomAplica(1);
+  let ign=0;
+  sv.querySelectorAll('.opd').forEach(e=>e.onclick=()=>{if(ign>Date.now())return;const i=+e.dataset.mi;medMarca(p,i);medPainel(p,i);});
+  // pinça com dois dedos: aproxima só o croqui
+  {let d0=0,k=1,c=null;const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+   mw.addEventListener('touchstart',e=>{if(e.touches.length===2){d0=dist(e.touches);k=1;const r=mw.getBoundingClientRect();c=[(e.touches[0].clientX+e.touches[1].clientX)/2-r.left,(e.touches[0].clientY+e.touches[1].clientY)/2-r.top];}},{passive:true});
+   mw.addEventListener('touchmove',e=>{if(e.touches.length===2&&d0){if(e.cancelable)e.preventDefault();k=dist(e.touches)/d0;sv.style.transformOrigin=`${mw.scrollLeft+c[0]}px ${mw.scrollTop+c[1]}px`;sv.style.transform=`scale(${k})`;}},{passive:false});
+   mw.addEventListener('touchend',e=>{if(d0&&e.touches.length<2){const kk=k;d0=0;sv.style.transform='';ign=Date.now()+400;if(Math.abs(kk-1)>0.05)medZoomAplica(medZoom*kk,c[0],c[1]);}});}
+  const bq=$('#mdBq');bq.oninput=()=>{const i=medAchar(p,bq.value);if(i>=0){medMarca(p,i);medCentra(i);}};
+  bq.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const i=medAchar(p,bq.value);if(i<0){toast('Furo não encontrado');return;}bq.value='';bq.blur();medMarca(p,i);medCentra(i);setTimeout(()=>medPainel(p,i),350);}};
 }
-// salva a linha sem redesenhar a lista (não tira o foco de quem está digitando)
-function medSalva(p,row){
-  const h=p.holes[+row.dataset.i];if(!h)return;const g=k=>num(row.querySelector(`[data-k="${k}"]`).value);
-  const pm=g('pm'),ag=g('ag'),tp=g('tp');
-  if(pm===(h.profMed??null)&&ag===(h.aguaM??null)&&tp===(h.tampao??null))return;
-  pushUndo(p,[h],'medição '+h.id);
-  h.profMed=pm;h.aguaM=ag;if(ag>0)h.agua='agua';else if(h.agua==='agua')h.agua='seca';h.tampao=tp;
-  h.med=pm==null&&ag==null&&tp==null?null:{ts:Date.now(),por:meuNome()||''};
-  histAdd(h,'Medição: '+[pm!=null?'prof. '+fmt(pm,1)+' m':'',ag>0?'água '+fmt(ag,1)+' m':pm!=null?'seco':'',tp!=null?'tampão '+fmt(tp,1)+' m':''].filter(Boolean).join(' · '));
-  h.ts=Date.now();if(meuNome())h.por=meuNome();markF(p.id,h.id);save();
-  const ra=medRaso(p,h);row.classList.toggle('feito',medFeito(h));row.classList.toggle('raso',ra);
-  row.querySelector('.oplid span').textContent=medStTxt(p,h);
-  const c=document.querySelector(`#mdMap [data-mi="${p.holes.indexOf(h)}"] circle`);if(c)c.setAttribute('fill',medCor(p,h));
-  toast('Furo '+h.id+' medido'+(ra?' · ⚠️ '+fmt(h.profProj-h.profMed,1)+' m mais raso que o projeto':'')+(SY().token?' · enviado':''));
-}
-function medMais(p,i){const h=p.holes[i];
-  openSheet(`<h3>Furo ${esc(h.id)}<button class="btn sm" id="mmX">Fechar</button></h3><p class="mut" style="margin:0 0 8px">Condição do furo (toque para marcar)</p>
-  <div class="conds" id="mmCo">${CONDS.map(c=>`<button data-c="${esc(c)}" class="${(h.cond||[]).includes(c)?'on':''}" style="min-height:48px;font-size:17px">${esc(c)}</button>`).join('')}</div>
-  <div class="seg" id="mmAg" style="margin-top:10px">${Object.entries(AGUA_N).map(([k,t])=>`<button data-a="${k}" class="${h.agua===k?'on':''}">${t}</button>`).join('')}</div>
-  <div class="btns" style="flex-direction:column;margin-top:10px"><button class="btn ok" id="mmOk" style="min-height:56px;font-size:18px">✔ Salvar</button><button class="btn" id="mmAll" style="min-height:48px">Lançamento completo do furo</button></div>`);
-  let cond=[...(h.cond||[])],ag=h.agua;
+// painel do furo: recorte do croqui em volta dele (para conferir que é o furo certo) + profundidade, água e tampão
+function medPainel(p,i){const h=p.holes[i];if(!h)return;const pr=projDe(p,h);const v=x=>x==null?'':String(x).replace('.',',');
+  const g=geom(p),R=Math.max(espacoFuros(p)*2.2,g.r*7);const cx=g.X(h.x),cy=g.Y(h.y);
+  openSheet(`<h3>Furo <span class="mdid">${esc(h.id)}</span><button class="btn sm" id="mmX">Fechar</button></h3>
+  <div class="mdcrop"><svg viewBox="${cx-R*1.6} ${cy-R} ${R*3.2} ${R*2}" preserveAspectRatio="xMidYMid meet">${medFurosSVG(p,g,i,'ci')}</svg></div>
+  <p class="mut" style="margin:4px 0 6px">${h.profProj!=null?'Perfurado (projeto) <b>'+fmt(h.profProj,1)+' m</b>':'Sem profundidade de projeto'}${medFeito(h)?' · '+esc(medStTxt(p,h)):''}. Confira os vizinhos no desenho.</p>
+  <div class="mdin"><label>Prof. real (m)<input id="mmP" inputmode="decimal" enterkeyhint="done" value="${v(h.profMed)}" placeholder="${h.profProj!=null?v(h.profProj):'m'}"></label>
+  <label>Água (m)<input id="mmA" inputmode="decimal" enterkeyhint="done" value="${v(h.aguaM)}" placeholder="seco"></label>
+  <label>Tampão (m)<input id="mmT" inputmode="decimal" enterkeyhint="done" value="${v(h.tampao)}" placeholder="${pr.tampao!=null?v(pr.tampao):'m'}"></label></div>
+  <div id="mmAv" class="opav"></div>
+  <button class="btn ok opgo" id="mmOk">✔ Salvar furo ${esc(h.id)}</button>
+  <button class="btn sm" id="mmCT" style="margin-top:8px">${(h.cond||[]).length?'⚠️ '+esc(h.cond.join(', ')):'+ Condição (obstruído, desmoronado…)'}</button>
+  <div class="conds" id="mmCo" style="margin-top:8px;display:none">${CONDS.map(c=>`<button data-c="${esc(c)}" class="${(h.cond||[]).includes(c)?'on':''}" style="min-height:44px;font-size:16px">${esc(c)}</button>`).join('')}</div>`);
+  let cond=[...(h.cond||[])];
+  const av=()=>{const pm=num($('#mmP').value);$('#mmAv').textContent=pm!=null&&h.profProj!=null&&pm<h.profProj-(pr.tolProf??0.5)?'⚠️ '+fmt(h.profProj-pm,1)+' m mais raso que o projeto':'';};
+  $('#mmP').oninput=av;av();
+  $('#mmX').onclick=closeSheet;
+  $('#mmCT').onclick=()=>{const c=$('#mmCo');c.style.display=c.style.display==='none'?'flex':'none';};
   document.querySelectorAll('#mmCo button').forEach(b=>b.onclick=()=>{const c=b.dataset.c;cond=cond.includes(c)?cond.filter(x=>x!==c):[...cond,c];b.classList.toggle('on');});
-  document.querySelectorAll('#mmAg button').forEach(b=>b.onclick=()=>{ag=b.dataset.a;document.querySelectorAll('#mmAg button').forEach(x=>x.classList.toggle('on',x===b));});
-  $('#mmX').onclick=closeSheet;$('#mmAll').onclick=()=>{closeSheet();editHole(i);};
-  $('#mmOk').onclick=()=>{pushUndo(p,[h],'medição '+h.id);h.cond=cond;h.agua=ag;if(ag==='seca')h.aguaM=null;h.med=Object.assign({},h.med||{},{ts:Date.now(),por:meuNome()||''});
-    histAdd(h,'Medição: '+[AGUA_N[ag],...cond].join(' · '));h.ts=Date.now();markF(p.id,h.id);save();closeSheet();tabMed(p);toast('Furo '+h.id+' salvo');};
+  const ok=()=>{medGrava(p,h,num($('#mmP').value),num($('#mmA').value),num($('#mmT').value),cond);closeSheet();
+    const c=document.querySelector(`#mdMap [data-mi="${i}"] circle`);if(c)c.setAttribute('fill',medCor(p,h));medMarca(p,i);};
+  $('#mmOk').onclick=ok;['#mmP','#mmA','#mmT'].forEach(s=>$(s).onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();ok();}});
+  setTimeout(()=>{const e=$('#mmP');if(e&&h.profMed==null)e.focus();},80);
+}
+function medGrava(p,h,pm,ag,tp,cond){
+  const cOld=(h.cond||[]).join('|'),cNew=(cond||[]).join('|');
+  if(pm===(h.profMed??null)&&ag===(h.aguaM??null)&&tp===(h.tampao??null)&&cOld===cNew)return;
+  pushUndo(p,[h],'medição '+h.id);
+  h.profMed=pm;h.aguaM=ag;if(ag>0)h.agua='agua';else if(h.agua==='agua')h.agua='seca';h.tampao=tp;h.cond=cond||[];
+  h.med=pm==null&&ag==null&&tp==null&&!h.cond.length?null:{ts:Date.now(),por:meuNome()||''};
+  histAdd(h,'Medição: '+[pm!=null?'prof. '+fmt(pm,1)+' m':'',ag>0?'água '+fmt(ag,1)+' m':pm!=null?'seco':'',tp!=null?'tampão '+fmt(tp,1)+' m':'',...h.cond].filter(Boolean).join(' · '));
+  h.ts=Date.now();if(meuNome())h.por=meuNome();markF(p.id,h.id);save();
+  const ra=medRaso(p,h);const at=p.holes.filter(x=>x.status!=='perdido'&&x.status!=='nao');const k=document.querySelector('.mdk b');if(k)k.textContent=at.filter(medFeito).length+'/'+at.length;
+  toast('Furo '+h.id+' medido'+(ra?' · ⚠️ '+fmt(h.profProj-h.profMed,1)+' m mais raso que o projeto':'')+(SY().token?' · enviado':''),ra?3500:2200);
 }
 /* ===== Aba Operador (dentro do lançamento de carga): lista de furos, cada linha com carga, profundidade e tampão ===== */
 let operSujo=false,operFiltro='todos',operAdd=false,operBusca='';
